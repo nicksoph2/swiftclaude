@@ -21,15 +21,33 @@ struct ClaudeConfigManagerApp: App {
             }
             .frame(minWidth: 980, minHeight: 620)
             .environmentObject(router)
+            .environmentObject(router.rootSelectionViewModel)
             .environmentObject(debugMonitor)
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 1200, height: 760)
 
         Settings {
-            Text("Settings will arrive in a later packet.")
-                .padding(24)
-                .frame(width: 420, height: 180)
+            RootPickerSettingsView()
+                .environmentObject(router.rootSelectionViewModel)
+                .frame(width: 620, height: 500)
         }
+    }
+}
+
+private struct RootPickerSettingsView: View {
+    var body: some View {
+        TabView {
+            UserScopeView()
+                .tabItem {
+                    Label("Global Root", systemImage: "person.crop.circle")
+                }
+
+            ProjectScopeView()
+                .tabItem {
+                    Label("Projects", systemImage: "folder")
+                }
+        }
+        .padding(16)
     }
 }

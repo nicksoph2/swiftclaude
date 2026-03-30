@@ -22,6 +22,14 @@
 		A1000001000000000000000D /* AppDebugMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000000D /* AppDebugMonitor.swift */; };
 		A1000001000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000000E /* Assets.xcassets */; };
 		A1000001000000000000000F /* ClaudeConfigManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000010 /* ClaudeConfigManagerTests.swift */; };
+		A10000010000000000000010 /* BookmarkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000013 /* BookmarkModels.swift */; };
+		A10000010000000000000011 /* BookmarkPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000014 /* BookmarkPersistence.swift */; };
+		A10000010000000000000012 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000015 /* BookmarkStore.swift */; };
+		A10000010000000000000013 /* FolderSelectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000016 /* FolderSelectionService.swift */; };
+		A10000010000000000000014 /* BookmarkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000017 /* BookmarkStoreTests.swift */; };
+		A10000010000000000000018 /* RootResolutionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000018 /* RootResolutionModels.swift */; };
+		A10000010000000000000019 /* RootLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000019 /* RootLocator.swift */; };
+		A1000001000000000000001A /* RootLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000001A /* RootLocatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +61,14 @@
 		A10001010000000000000010 /* ClaudeConfigManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeConfigManagerTests.swift; sourceTree = "<group>"; };
 		A10001010000000000000011 /* ClaudeConfigManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeConfigManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10001010000000000000012 /* ClaudeConfigManager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClaudeConfigManager.entitlements; sourceTree = "<group>"; };
+		A10001010000000000000013 /* BookmarkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkModels.swift; sourceTree = "<group>"; };
+		A10001010000000000000014 /* BookmarkPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkPersistence.swift; sourceTree = "<group>"; };
+		A10001010000000000000015 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
+		A10001010000000000000016 /* FolderSelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderSelectionService.swift; sourceTree = "<group>"; };
+		A10001010000000000000017 /* BookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStoreTests.swift; sourceTree = "<group>"; };
+		A10001010000000000000018 /* RootResolutionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootResolutionModels.swift; sourceTree = "<group>"; };
+		A10001010000000000000019 /* RootLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootLocator.swift; sourceTree = "<group>"; };
+		A1000101000000000000001A /* RootLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootLocatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +178,8 @@
 		A1000006000000000000000D /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
+				A10000060000000000000016 /* Discovery */,
+				A10000060000000000000014 /* Bookmarks */,
 				A10000060000000000000013 /* Debug */,
 			);
 			path = Infrastructure;
@@ -179,6 +197,8 @@
 		A1000006000000000000000F /* ClaudeConfigManagerTests */ = {
 			isa = PBXGroup;
 			children = (
+				A10000060000000000000015 /* Bookmarks */,
+				A10000060000000000000017 /* Discovery */,
 				A10001010000000000000010 /* ClaudeConfigManagerTests.swift */,
 			);
 			path = ClaudeConfigManagerTests;
@@ -215,6 +235,42 @@
 				A1000101000000000000000D /* AppDebugMonitor.swift */,
 			);
 			path = Debug;
+			sourceTree = "<group>";
+		};
+		A10000060000000000000014 /* Bookmarks */ = {
+			isa = PBXGroup;
+			children = (
+				A10001010000000000000013 /* BookmarkModels.swift */,
+				A10001010000000000000014 /* BookmarkPersistence.swift */,
+				A10001010000000000000015 /* BookmarkStore.swift */,
+				A10001010000000000000016 /* FolderSelectionService.swift */,
+			);
+			path = Bookmarks;
+			sourceTree = "<group>";
+		};
+		A10000060000000000000015 /* Bookmarks */ = {
+			isa = PBXGroup;
+			children = (
+				A10001010000000000000017 /* BookmarkStoreTests.swift */,
+			);
+			path = Bookmarks;
+			sourceTree = "<group>";
+		};
+		A10000060000000000000016 /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				A10001010000000000000019 /* RootLocator.swift */,
+				A10001010000000000000018 /* RootResolutionModels.swift */,
+			);
+			path = Discovery;
+			sourceTree = "<group>";
+		};
+		A10000060000000000000017 /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				A1000101000000000000001A /* RootLocatorTests.swift */,
+			);
+			path = Discovery;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -319,9 +375,15 @@
 				A10000010000000000000002 /* AppBootstrapState.swift in Sources */,
 				A10000010000000000000003 /* AppRouter.swift in Sources */,
 				A1000001000000000000000D /* AppDebugMonitor.swift in Sources */,
+				A10000010000000000000010 /* BookmarkModels.swift in Sources */,
+				A10000010000000000000011 /* BookmarkPersistence.swift in Sources */,
+				A10000010000000000000012 /* BookmarkStore.swift in Sources */,
 				A10000010000000000000001 /* ClaudeConfigManagerApp.swift in Sources */,
+				A10000010000000000000013 /* FolderSelectionService.swift in Sources */,
 				A10000010000000000000007 /* ManagedScopeView.swift in Sources */,
 				A10000010000000000000008 /* ProjectScopeView.swift in Sources */,
+				A10000010000000000000019 /* RootLocator.swift in Sources */,
+				A10000010000000000000018 /* RootResolutionModels.swift in Sources */,
 				A10000010000000000000004 /* RootSplitView.swift in Sources */,
 				A1000001000000000000000B /* ScopePlaceholderView.swift in Sources */,
 				A1000001000000000000000C /* ScopeScreenModel.swift in Sources */,
@@ -336,7 +398,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000010000000000000014 /* BookmarkStoreTests.swift in Sources */,
 				A1000001000000000000000F /* ClaudeConfigManagerTests.swift in Sources */,
+				A1000001000000000000001A /* RootLocatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

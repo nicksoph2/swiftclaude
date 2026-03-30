@@ -1,27 +1,414 @@
 import Foundation
+import CryptoKit
+import os
 
 @MainActor
 final class AppRouter: ObservableObject {
     @Published private(set) var bootstrapState: AppBootstrapState
+    @Published private(set) var bookmarkResolutionResults: [BookmarkResolutionResult]
+    @Published private(set) var bookmarkBootstrapSummary: BookmarkBootstrapSummary
+    @Published private(set) var rootSelectionViewModel: RootSelectionViewModel
+
     var sidebarState: SidebarState
+
+    private let bookmarkStore: BookmarkStore?
+    private let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "Bootstrap")
 
     init(
         bootstrapState: AppBootstrapState = .launching,
-        sidebarState: SidebarState
+        sidebarState: SidebarState,
+        bookmarkStore: BookmarkStore? = nil,
+        globalStateStore: GlobalStateStore = GlobalStateStore(persistence: InMemoryGlobalStatePersistence()),
+        rootSelectionViewModel: RootSelectionViewModel? = nil,
+        bookmarkResolutionResults: [BookmarkResolutionResult] = [],
+        bookmarkBootstrapSummary: BookmarkBootstrapSummary = .empty
     ) {
         self.bootstrapState = bootstrapState
         self.sidebarState = sidebarState
+        self.bookmarkStore = bookmarkStore
+        self.bookmarkResolutionResults = bookmarkResolutionResults
+        self.bookmarkBootstrapSummary = bookmarkBootstrapSummary
+
+        if let rootSelectionViewModel {
+            self.rootSelectionViewModel = rootSelectionViewModel
+        } else {
+            let projectRegistry = ProjectRegistry(
+                bookmarkStore: bookmarkStore,
+                globalStateStore: globalStateStore
+            )
+            self.rootSelectionViewModel = RootSelectionViewModel(
+                bookmarkStore: bookmarkStore,
+                projectRegistry: projectRegistry,
+                folderSelector: NoopFolderSelector()
+            )
+        }
     }
 
     convenience init() {
-        self.init(bootstrapState: .launching, sidebarState: SidebarState())
+        let bookmarkStore = try? BookmarkStore.makeLiveStore()
+        let globalStateStore = (try? GlobalStateStore.makeLiveStore())
+            ?? GlobalStateStore(persistence: InMemoryGlobalStatePersistence())
+        let projectRegistry = ProjectRegistry(bookmarkStore: bookmarkStore, globalStateStore: globalStateStore)
+        let rootSelectionViewModel = RootSelectionViewModel(
+            bookmarkStore: bookmarkStore,
+            projectRegistry: projectRegistry,
+            folderSelector: OpenPanelFolderSelector()
+        )
+
+        self.init(
+            bootstrapState: .launching,
+            sidebarState: SidebarState(),
+            bookmarkStore: bookmarkStore,
+            globalStateStore: globalStateStore,
+            rootSelectionViewModel: rootSelectionViewModel
+        )
     }
 
     func completeBootstrap() {
-        bootstrapState = .ready
+        defer {
+            bootstrapState = .ready
 
-        if sidebarState.selection == nil {
-            sidebarState.selection = .managed
+            if sidebarState.selection == nil {
+                sidebarState.selection = .managed
+            }
         }
+
+        guard let bookmarkStore else {
+            logger.notice("Bookmark store unavailable at launch; proceeding without restored folder access")
+            bookmarkResolutionResults = []
+            bookmarkBootstrapSummary = .empty
+            return
+        }
+
+        do {
+            let results = try bookmarkStore.restoreAccessToKnownFolders()
+            bookmarkResolutionResults = results
+            bookmarkBootstrapSummary = BookmarkBootstrapSummary(
+                total: results.count,
+                accessible: results.filter {
+                    if case .accessible = $0.status {
+                        return true
+                    }
+                    return false
+                }.count,
+                requiresReauthorization: results.filter {
+                    if case .requiresReauthorization = $0.status {
+                        return true
+                    }
+                    return false
+                }.count
+            )
+            rootSelectionViewModel.refreshFromStores()
+        } catch {
+            logger.error("Bookmark restore failed: \(String(describing: error), privacy: .public)")
+            bookmarkResolutionResults = []
+            bookmarkBootstrapSummary = .empty
+            rootSelectionViewModel.refreshFromStores()
+        }
+    }
+}
+
+struct ProjectAddOutcome: Equatable {
+    let registration: ProjectRegistration
+    let wasDuplicate: Bool
+}
+
+final class ProjectRegistry {
+    private let bookmarkStore: BookmarkStore?
+    private let globalStateStore: GlobalStateStore
+
+    init(
+        bookmarkStore: BookmarkStore?,
+        globalStateStore: GlobalStateStore
+    ) {
+        self.bookmarkStore = bookmarkStore
+        self.globalStateStore = globalStateStore
+    }
+
+    func loadState() throws -> GlobalAppState {
+        try globalStateStore.loadState()
+    }
+
+    func addProject(folderURL: URL, now: Date = Date()) throws -> ProjectAddOutcome {
+        var state = try globalStateStore.loadState()
+        let normalizedPath = Self.normalizePath(folderURL.path)
+
+        if let existing = state.projectRegistrations.first(where: {
+            $0.normalizedPath == normalizedPath
+        }) {
+            return ProjectAddOutcome(registration: existing, wasDuplicate: true)
+        }
+
+        guard let bookmarkStore else {
+            throw BookmarkError.failedToSaveMetadata
+        }
+
+        let bookmarkID = Self.projectBookmarkID(for: normalizedPath)
+        _ = try bookmarkStore.upsertBookmark(
+            id: bookmarkID,
+            kind: .projectRoot,
+            folderURL: folderURL,
+            displayName: folderURL.lastPathComponent,
+            now: now
+        )
+
+        let registration = ProjectRegistration(
+            id: bookmarkID,
+            displayName: folderURL.lastPathComponent,
+            preferredPath: folderURL.path,
+            normalizedPath: normalizedPath,
+            createdAt: now,
+            updatedAt: now
+        )
+        state.projectRegistrations.append(registration)
+        state.projectRegistrations.sort {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+
+        if state.selectedProjectRegistrationID == nil {
+            state.selectedProjectRegistrationID = registration.id
+        }
+
+        try globalStateStore.saveState(state)
+        return ProjectAddOutcome(registration: registration, wasDuplicate: false)
+    }
+
+    func removeProject(id: String) throws {
+        var state = try globalStateStore.loadState()
+        state.projectRegistrations.removeAll { $0.id == id }
+        if state.selectedProjectRegistrationID == id {
+            state.selectedProjectRegistrationID = state.projectRegistrations.first?.id
+        }
+
+        try globalStateStore.saveState(state)
+        try bookmarkStore?.removeBookmark(id: id)
+    }
+
+    func setSelectedProject(id: String?) throws {
+        var state = try globalStateStore.loadState()
+        if let id {
+            guard state.projectRegistrations.contains(where: { $0.id == id }) else {
+                return
+            }
+            state.selectedProjectRegistrationID = id
+        } else {
+            state.selectedProjectRegistrationID = nil
+        }
+        try globalStateStore.saveState(state)
+    }
+
+    func setGlobalRootOverride(folderURL: URL, now: Date = Date()) throws {
+        guard folderURL.lastPathComponent == ".claude" else {
+            throw BookmarkError.failedToCreateBookmark
+        }
+        guard let bookmarkStore else {
+            throw BookmarkError.failedToSaveMetadata
+        }
+
+        _ = try bookmarkStore.upsertBookmark(
+            id: BookmarkStore.globalRootBookmarkID,
+            kind: .globalClaudeRoot,
+            folderURL: folderURL,
+            displayName: "Claude Home Root",
+            now: now
+        )
+
+        var state = try globalStateStore.loadState()
+        state.globalClaudeRootSource = .overrideBookmark
+        state.globalClaudeRootBookmarkID = BookmarkStore.globalRootBookmarkID
+        try globalStateStore.saveState(state)
+    }
+
+    func clearGlobalRootOverride() throws {
+        var state = try globalStateStore.loadState()
+        state.globalClaudeRootSource = .defaultHomeClaude
+        state.globalClaudeRootBookmarkID = nil
+        try globalStateStore.saveState(state)
+        try bookmarkStore?.removeBookmark(id: BookmarkStore.globalRootBookmarkID)
+    }
+
+    static func normalizePath(_ path: String) -> String {
+        let resolved = URL(fileURLWithPath: path)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
+        return normalizeForCaseInsensitiveComparison(resolved)
+    }
+
+    static func projectBookmarkID(for normalizedPath: String) -> String {
+        let digest = SHA256.hash(data: Data(normalizedPath.utf8))
+        let prefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return "project-\(prefix)"
+    }
+
+    private static func normalizeForCaseInsensitiveComparison(_ path: String) -> String {
+        var normalized = (path as NSString).standardizingPath
+        if normalized.count > 1, normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized.lowercased()
+    }
+}
+
+@MainActor
+final class RootSelectionViewModel: ObservableObject {
+    @Published private(set) var defaultGlobalRootURL: URL
+    @Published private(set) var selectedGlobalRootURL: URL
+    @Published private(set) var globalRootSource: GlobalClaudeRootSource
+    @Published private(set) var projectRegistrations: [ProjectRegistration]
+    @Published var selectedProjectRegistrationID: String?
+    @Published var issue: RootSelectionIssue?
+
+    private let bookmarkStore: BookmarkStore?
+    private let projectRegistry: ProjectRegistry
+    private let folderSelector: FolderSelecting
+
+    init(
+        bookmarkStore: BookmarkStore?,
+        projectRegistry: ProjectRegistry,
+        folderSelector: FolderSelecting
+    ) {
+        self.bookmarkStore = bookmarkStore
+        self.projectRegistry = projectRegistry
+        self.folderSelector = folderSelector
+
+        let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude", isDirectory: true)
+        self.defaultGlobalRootURL = defaultRoot
+        self.selectedGlobalRootURL = defaultRoot
+        self.globalRootSource = .defaultHomeClaude
+        self.projectRegistrations = []
+        self.selectedProjectRegistrationID = nil
+
+        refreshFromStores()
+    }
+
+    var globalRootSourceLabel: String {
+        switch globalRootSource {
+        case .defaultHomeClaude:
+            return "Default"
+        case .overrideBookmark:
+            return "Override"
+        }
+    }
+
+    func refreshFromStores() {
+        do {
+            let state = try projectRegistry.loadState()
+            globalRootSource = state.globalClaudeRootSource
+            projectRegistrations = state.projectRegistrations
+            selectedProjectRegistrationID = state.selectedProjectRegistrationID
+
+            if globalRootSource == .overrideBookmark,
+               let globalRecord = try bookmarkStore?.allRecords().first(where: {
+                   $0.id == BookmarkStore.globalRootBookmarkID
+               }) {
+                selectedGlobalRootURL = URL(fileURLWithPath: globalRecord.preferredPath, isDirectory: true)
+            } else {
+                selectedGlobalRootURL = defaultGlobalRootURL
+            }
+        } catch {
+            issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func selectGlobalRootOverride() {
+        let candidate = folderSelector.selectFolder(
+            title: "Select Claude Root Folder",
+            message: "Choose the .claude folder that should be used for global discovery.",
+            prompt: "Use Override",
+            initialDirectory: selectedGlobalRootURL
+        )
+        guard let candidate else {
+            return
+        }
+
+        guard candidate.lastPathComponent == ".claude" else {
+            issue = .invalidGlobalRoot(path: candidate.path)
+            return
+        }
+
+        do {
+            try projectRegistry.setGlobalRootOverride(folderURL: candidate)
+            issue = nil
+            refreshFromStores()
+        } catch BookmarkError.failedToCreateBookmark {
+            issue = .invalidGlobalRoot(path: candidate.path)
+        } catch {
+            issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func useDefaultGlobalRoot() {
+        do {
+            try projectRegistry.clearGlobalRootOverride()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func addProjectRoot() {
+        let candidate = folderSelector.selectFolder(
+            title: "Add Project Root",
+            message: "Choose a project folder to register for discovery.",
+            prompt: "Add Project",
+            initialDirectory: FileManager.default.homeDirectoryForCurrentUser
+        )
+        guard let candidate else {
+            return
+        }
+
+        do {
+            let outcome = try projectRegistry.addProject(folderURL: candidate)
+            if outcome.wasDuplicate {
+                issue = .duplicateProject(path: outcome.registration.preferredPath)
+            } else {
+                issue = nil
+            }
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .projects, details: String(describing: error))
+        }
+    }
+
+    func removeProject(id: String) {
+        do {
+            try projectRegistry.removeProject(id: id)
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .projects, details: String(describing: error))
+        }
+    }
+
+    func selectProject(id: String) {
+        do {
+            try projectRegistry.setSelectedProject(id: id)
+            selectedProjectRegistrationID = id
+            issue = nil
+        } catch {
+            issue = .persistenceFailure(area: .projects, details: String(describing: error))
+        }
+    }
+
+    func clearIssue(for area: RootSelectionArea) {
+        guard issue?.area == area else {
+            return
+        }
+        issue = nil
+    }
+}
+
+@MainActor
+private struct NoopFolderSelector: FolderSelecting {
+    func selectFolder(
+        title: String,
+        message: String,
+        prompt: String,
+        initialDirectory: URL?
+    ) -> URL? {
+        nil
     }
 }

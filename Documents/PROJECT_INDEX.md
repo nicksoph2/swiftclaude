@@ -195,6 +195,9 @@ Goal: derived usage summaries, provenance UI, test hardening, and beta preparati
 - Always load this file first
 - Then load one section doc
 - Then load one packet doc
+- Before implementation, check for an existing packet handoff doc using:
+  - `Documents/<PACKET_NAME>-handoff.md`
+  - example: `Documents/A2_APP_SANDBOX_AND_BOOKMARKS-handoff.md`
 - Keep implementation scoped to the selected packet
 - End each implementation chat with:
   - files created or updated

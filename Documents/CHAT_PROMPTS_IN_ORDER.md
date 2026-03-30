@@ -3,6 +3,7 @@
 Use these in order.
 
 For each numbered prompt:
+
 1. Start a new chat.
 2. Open the local files listed under **Use these local docs** in the workspace and let the AI read them directly.
 3. Then paste the prompt block exactly as written.
@@ -11,7 +12,8 @@ For each numbered prompt:
 Do not ask the AI to work on more than one packet in a single chat.
 
 Current workspace note:
-- The planning docs currently live flat in `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/`.
+
+- The planning docs currently live flat in `Documents/Dev/claude/devDiscoverApp/Documents/`.
 - All document references below use the exact on-disk paths for this workspace.
 
 ---
@@ -19,11 +21,13 @@ Current workspace note:
 ## 1) Implement A1_XCODE_SETUP
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/A1_XCODE_SETUP.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/A1_XCODE_SETUP.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -57,11 +61,13 @@ Rules:
 ## 2) Implement A2_APP_SANDBOX_AND_BOOKMARKS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/A2_APP_SANDBOX_AND_BOOKMARKS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/A2_APP_SANDBOX_AND_BOOKMARKS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -95,11 +101,13 @@ Rules:
 ## 3) Implement A3_GLOBAL_AND_PROJECT_ROOT_PICKERS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/A3_GLOBAL_AND_PROJECT_ROOT_PICKERS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/A3_GLOBAL_AND_PROJECT_ROOT_PICKERS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -133,11 +141,13 @@ Rules:
 ## 4) Implement B1_ROOT_LOCATOR
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -171,25 +181,27 @@ Rules:
 ## 5) Draft B2_PROJECT_SCANNER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`.
 
 The packet should cover recursive project scanning beneath resolved roots and discovery of Claude-related file references without parsing file contents.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Match the style and granularity of the existing packet docs.
@@ -204,26 +216,28 @@ Rules:
 ## 6) Draft B3_DISCOVERY_MODELS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md` if you already drafted it
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B1_ROOT_LOCATOR.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md` if you already drafted it
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`.
 
 The packet should define the typed discovery outputs used by parsers and resolvers, including file references, scope identity, path provenance, and discovery issues.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Match the style and granularity of the existing packet docs.
@@ -237,11 +251,13 @@ Rules:
 ## 7) Implement B2_PROJECT_SCANNER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -273,11 +289,13 @@ Rules:
 ## 8) Implement B3_DISCOVERY_MODELS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -308,11 +326,13 @@ Rules:
 ## 9) Implement C1_SETTINGS_JSON_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -344,25 +364,27 @@ Rules:
 ## 10) Draft C2_CLAUDE_JSON_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`.
 
 The packet should cover parsing `~/.claude.json` as a distinct file family for global preferences and user or local MCP state, without confusing it with `settings.json`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Match the style and granularity of the existing packet docs.
@@ -375,24 +397,26 @@ Rules:
 ## 11) Draft C3_MCP_JSON_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`.
 
 The packet should cover parsing `.mcp.json`, including typed server definitions, transport forms, headers, env maps, and parse-time diagnostics.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep environment expansion out of this parser packet if that belongs to resolver or validation stages.
@@ -404,24 +428,26 @@ Rules:
 ## 12) Draft C4_CLAUDE_MD_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`.
 
 The packet should cover parsing Claude instruction markdown files, import tokens such as `@path/to/file`, and parse-time import token diagnostics without doing full resolution.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep full import graph resolution and load order out of this packet.
@@ -433,24 +459,26 @@ Rules:
 ## 13) Draft C5_AGENT_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`.
 
 The packet should cover parsing agent markdown files with YAML frontmatter and prompt body, including parse-time diagnostics for malformed frontmatter.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep duplicate-name and precedence logic out of this parser packet unless they are represented only as later semantic concerns.
@@ -462,24 +490,26 @@ Rules:
 ## 14) Draft C6_SKILL_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`.
 
 The packet should cover parsing skill directories with `SKILL.md`, supported frontmatter, supporting-file references, and parse-time diagnostics.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep resolver behavior and active-skill semantics out of this parser packet.
@@ -491,11 +521,13 @@ Rules:
 ## 15) Implement C2_CLAUDE_JSON_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -526,11 +558,13 @@ Rules:
 ## 16) Implement C3_MCP_JSON_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -561,11 +595,13 @@ Rules:
 ## 17) Implement C4_CLAUDE_MD_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -596,11 +632,13 @@ Rules:
 ## 18) Implement C5_AGENT_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -630,11 +668,13 @@ Rules:
 ## 19) Implement C6_SKILL_PARSER
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -664,12 +704,14 @@ Rules:
 ## 20) Implement D1_RESOLVER_MODELS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 - any discovery and parser model code if needed
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -700,27 +742,29 @@ Rules:
 ## 21) Draft D2_SETTINGS_PRECEDENCE
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C1_SETTINGS_JSON_PARSER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`.
 
 The packet should cover precedence resolution for settings sources, including managed, CLI, project local, project shared, and user settings sources.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep this packet focused on precedence selection, not deep merge behavior unless clearly separated for the next packet.
@@ -732,26 +776,28 @@ Rules:
 ## 22) Draft D3_SETTINGS_MERGE_RULES
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`.
 
 The packet should cover per-key merge behavior for settings resolution, including scalar override, deep-merge object cases, concatenation and de-duplication where documented, and permissions-related merge interpretation.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep this packet focused on merge behavior, not on the broad precedence ladder itself.
@@ -763,26 +809,28 @@ Rules:
 ## 23) Draft D4_INSTRUCTION_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md` if drafted
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md` if drafted
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`.
 
 The packet should cover instruction load order, recursive import resolution to the allowed depth, startup-loaded instructions versus on-demand memory, and diagnostics for broken imports and cycles.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep parsing concerns out of this packet.
@@ -794,27 +842,29 @@ Rules:
 ## 24) Draft D5_MCP_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md` if drafted
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md` if drafted
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md` if drafted
+- `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md` if drafted
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`.
 
 The packet should cover cross-scope MCP resolution, precedence across user, local, project, and managed sources, duplicate server handling, and environment expansion behavior.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep transport parsing out of this packet.
@@ -826,27 +876,29 @@ Rules:
 ## 25) Draft D6_AGENT_SKILL_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md` if drafted
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md` if drafted
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md` if drafted
+- `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md` if drafted
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`.
 
 The packet should cover project-over-user precedence, duplicate-name handling, visibility of agents and skills by scope, and diagnostics relevant to the Session view.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Keep parser concerns out of this packet.
@@ -858,26 +910,28 @@ Rules:
 ## 26) Draft D7_SESSION_PROJECTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 - any drafted D2 through D6 packet docs if available
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`.
 
 The packet should cover assembly of the read-only Session projection from resolved settings, instructions, MCP, agents, skills, provenance, issues, and confidence notes.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - The Session view must remain computed and read-only.
@@ -889,11 +943,13 @@ Rules:
 ## 27) Implement D2_SETTINGS_PRECEDENCE
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -923,11 +979,13 @@ Rules:
 ## 28) Implement D3_SETTINGS_MERGE_RULES
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -957,11 +1015,13 @@ Rules:
 ## 29) Implement D4_INSTRUCTION_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -992,11 +1052,13 @@ Rules:
 ## 30) Implement D5_MCP_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1027,11 +1089,13 @@ Rules:
 ## 31) Implement D6_AGENT_SKILL_RESOLUTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1062,11 +1126,13 @@ Rules:
 ## 32) Implement D7_SESSION_PROJECTION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1096,23 +1162,25 @@ Rules:
 ## 33) Draft SECTION_E_VALIDATION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Cover syntax, schema, and semantic validation responsibilities.
@@ -1125,23 +1193,25 @@ Rules:
 ## 34) Draft SECTION_F_SESSION_UI
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_A_APP_SHELL.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - The Session UI must be read-only.
@@ -1154,24 +1224,26 @@ Rules:
 ## 35) Draft SECTION_I_FIXTURES_AND_TESTS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_C_PARSERS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Cover fixture strategy, parser tests, resolver tests, and snapshot-style verification where appropriate.
@@ -1183,24 +1255,26 @@ Rules:
 ## 36) Draft E1_VALIDATION_MODELS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`.
 
 The packet should define validation issue types, severity levels, codes, source references, and any shared validation result containers used across parsers and resolvers.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1208,25 +1282,27 @@ Return:
 ## 37) Draft E2_SCHEMA_VALIDATION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`.
 
 The packet should cover schema-level validation for supported file families after parsing, without duplicating parse-time syntax checks.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1234,25 +1310,27 @@ Return:
 ## 38) Draft E3_SEMANTIC_VALIDATION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`.
 
 The packet should cover duplicate names, bad scope assumptions, unreachable imports, invalid tool syntax, unresolved env expansion, and similar semantic checks.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1260,25 +1338,27 @@ Return:
 ## 39) Draft F1_SESSION_SETTINGS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`.
 
 The packet should cover the read-only Session settings screen, including effective values, winning sources, merge method display, and issues.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1286,25 +1366,27 @@ Return:
 ## 40) Draft F2_SESSION_INSTRUCTIONS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`.
 
 The packet should cover the read-only Session instructions screen, including load order, imports, startup-loaded instructions, on-demand memory, and diagnostics.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1312,24 +1394,26 @@ Return:
 ## 41) Draft F3_SESSION_HOOKS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`.
 
 The packet should cover the read-only Session hooks screen, including effective hooks, event grouping, matcher presentation, and hook restrictions.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1337,25 +1421,27 @@ Return:
 ## 42) Draft F4_SESSION_MCP_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`.
 
 The packet should cover the read-only Session MCP screen, including effective servers, overridden servers, source precedence, and diagnostics.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1363,25 +1449,27 @@ Return:
 ## 43) Draft F5_SESSION_AGENTS_SKILLS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`.
 
 The packet should cover the read-only Session agents and skills screen, including visibility by scope, precedence, duplicates, and diagnostics.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1389,24 +1477,26 @@ Return:
 ## 44) Draft I1_FIXTURE_LAYOUT
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`.
 
 The packet should define the test fixture directory structure, naming strategy, representative valid and invalid cases, and how fixtures map to packet-level tests.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1414,25 +1504,27 @@ Return:
 ## 45) Draft I2_RESOLVER_TESTS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`.
 
 The packet should cover resolver-focused unit and snapshot tests for precedence, merge behavior, import resolution, MCP resolution, and Session projection integrity.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1440,25 +1532,27 @@ Return:
 ## 46) Draft I3_PARSER_TESTS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md` if drafted
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md` if drafted
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`.
 
 The packet should cover parser-focused unit tests and fixture coverage for settings, claude.json, mcp.json, CLAUDE.md, agents, and skills.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 ```
 
 ---
@@ -1466,11 +1560,13 @@ Return:
 ## 47) Implement I1_FIXTURE_LAYOUT
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1499,11 +1595,13 @@ Rules:
 ## 48) Implement I2_RESOLVER_TESTS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1532,11 +1630,13 @@ Rules:
 ## 49) Implement I3_PARSER_TESTS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1565,11 +1665,13 @@ Rules:
 ## 50) Implement E1_VALIDATION_MODELS
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1598,11 +1700,13 @@ Rules:
 ## 51) Implement E2_SCHEMA_VALIDATION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1631,11 +1735,13 @@ Rules:
 ## 52) Implement E3_SEMANTIC_VALIDATION
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1664,11 +1770,13 @@ Rules:
 ## 53) Implement F1_SESSION_SETTINGS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1698,11 +1806,13 @@ Rules:
 ## 54) Implement F2_SESSION_INSTRUCTIONS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1732,11 +1842,13 @@ Rules:
 ## 55) Implement F3_SESSION_HOOKS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1766,11 +1878,13 @@ Rules:
 ## 56) Implement F4_SESSION_MCP_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1800,11 +1914,13 @@ Rules:
 ## 57) Implement F5_SESSION_AGENTS_SKILLS_VIEW
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
 
 **Prompt**
+
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
@@ -1834,11 +1950,13 @@ Rules:
 ## 58) Milestone 1 check
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 - the most recent handoff summary
 - a concise list of packets completed so far
 
 **Prompt**
+
 ```text
 You are helping review progress on a native macOS app called Claude Config Manager.
 
@@ -1864,23 +1982,25 @@ Rules:
 ## 59) Draft SECTION_G_EDITORS_AND_SAVE
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Cover editor responsibilities, validation-before-save flow, canonical rendering, preview behavior, and atomic write-through.
@@ -1893,23 +2013,25 @@ Rules:
 ## 60) Draft SECTION_H_USAGE
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Cover derived usage summaries, reproducible usage metadata, and any supporting fingerprint or derivation infrastructure.
@@ -1922,22 +2044,24 @@ Rules:
 ## 61) Draft SECTION_J_RELEASE
 
 **Use these local docs**
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
-- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
+
+- `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
+- `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
 
 **Prompt**
+
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
 Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
 
-Task: draft the full markdown document for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`.
+Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`.
 
 Return:
-1. the complete markdown for `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`
+1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`
 2. assumptions made
-3. anything that should be added back to `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 
 Rules:
 - Cover release hardening, packaging, beta readiness, regression checks, and rollout preparation.
