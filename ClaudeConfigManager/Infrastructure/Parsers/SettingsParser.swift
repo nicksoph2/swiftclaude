@@ -19,6 +19,13 @@ struct SourceFileReference: Equatable, Sendable {
     }
 }
 
+struct SourceRange: Equatable, Sendable {
+    let startLine: Int
+    let startColumn: Int
+    let endLine: Int
+    let endColumn: Int
+}
+
 enum IssueSeverity: String, Equatable, Sendable {
     case info
     case warning
@@ -38,6 +45,11 @@ enum SyntaxIssueCode: String, Equatable, Sendable {
     case invalidTrustStateShape
     case settingsFamilyKeyInClaudeJson
     case preservedUnsupportedKey
+    case invalidFrontmatterFence
+    case invalidYAMLFrontmatter
+    case frontmatterTopLevelNotObject
+    case missingSkillMarkdown
+    case invalidMarkdownReferenceToken
 }
 
 struct SyntaxIssue: Equatable, Identifiable, Sendable {
@@ -47,19 +59,22 @@ struct SyntaxIssue: Equatable, Identifiable, Sendable {
     let message: String
     let sourcePath: String
     let keyPath: String?
+    let range: SourceRange?
 
     init(
         code: SyntaxIssueCode,
         severity: IssueSeverity,
         message: String,
         sourcePath: String,
-        keyPath: String? = nil
+        keyPath: String? = nil,
+        range: SourceRange? = nil
     ) {
         self.code = code
         self.severity = severity
         self.message = message
         self.sourcePath = sourcePath
         self.keyPath = keyPath
+        self.range = range
         self.id = "\(code.rawValue)-\(sourcePath)-\(keyPath ?? "root")-\(message)"
     }
 }

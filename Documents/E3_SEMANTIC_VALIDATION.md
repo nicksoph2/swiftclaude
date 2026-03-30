@@ -1,10 +1,10 @@
 # Packet E3 - Semantic Validation
 
 ## Goal
-Implement semantic validation across parsed and resolved project data.
+Implement semantic validation across parsed and resolved state to detect meaning-level problems that are not syntax or schema errors.
 
 ## Why this packet exists
-Some problems are not syntax or schema issues. The app needs cross-file and cross-scope checks for duplicates, broken assumptions, unreachable references, and similar meaning-level problems.
+Users need actionable diagnostics for cross-file and cross-scope conflicts such as duplicate definitions, unresolved references, and incompatible assumptions. This packet provides those checks using resolver outputs.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -15,46 +15,60 @@ Some problems are not syntax or schema issues. The app needs cross-file and cros
 
 ## Dependencies
 - `E1_VALIDATION_MODELS`
-- parser packet outputs from Section C
-- resolver packet outputs from Section D
+- parser outputs from Section C
+- resolver outputs from Section D
 
 ## Deliverables
 - `SemanticValidator`
-- semantic checks across scopes and file families
-- issue aggregation into shared validation results
-- tests for representative semantic error cases
+- semantic rule sets for major resolver families
+- aggregated semantic validation result
+- deterministic tests for representative semantic conflicts
 
 ## Required behavior
 ### Semantic issue families
-- duplicate agent or skill names
-- unreachable or cyclic imports
-- invalid tool references or unsupported tool syntax where that is a meaning-level concern
-- unresolved environment references
-- bad scope assumptions and conflicting definitions across sources
+Cover at least:
+- duplicate/conflicting agent and skill identities
+- unresolved, cyclic, or unreachable instruction imports
+- conflicting MCP server assumptions across scopes
+- unresolved environment-dependent references where semantic policy requires reporting
+- invalid cross-scope assumptions (for example expected source missing or overridden unexpectedly)
 
-### Validation rules
-- use parsed and resolved outputs rather than raw-text reparsing
-- keep semantic issues attributable to concrete sources and traces
-- distinguish semantic warnings from outright blocking errors where appropriate
+### Resolver-aware checks
+- use resolver outputs and traces instead of reparsing text
+- preserve source and related-source attribution on each issue
+- classify severity consistently (`warning` vs `error`) by rule intent
+
+### De-duplication and layering
+- avoid duplicating parser syntax issues as semantic issues unless additional semantic context is added
+- aggregate semantic issues alongside schema/syntax for Session visibility
 
 ## Suggested Swift types
 - `SemanticValidator`
 - `SemanticValidationContext`
+- `SemanticRule`
 - `ValidationIssue`
 - `ValidationResult`
 
+## Test fixture guidance
+Create tests for:
+- duplicate agent/skill identity scenarios
+- unresolved/cyclic instruction imports propagated from resolver state
+- MCP conflict scenarios requiring semantic warnings/errors
+- environment-reference semantic warnings
+- mixed schema+semantic issue sets with deterministic ordering
+
 ## Acceptance criteria
-- representative cross-file and cross-scope problems produce shared semantic issues
-- issue attribution remains concrete enough for Session inspection
-- semantic validation stays separate from parsing and precedence logic
+- representative cross-file and cross-scope problems produce attributable semantic issues
+- semantic checks consume resolver outputs directly
+- semantic rules remain separate from parser and precedence implementation
 
 ## Out of scope
-- UI rendering
-- editing workflows
-- canonical save output
+- UI rendering behavior
+- file editing/gating workflows
+- canonical write formatting
 
 ## Done when
-- the app can explain meaning-level problems in parsed and resolved project state using shared validation models
+- semantic validation can explain meaning-level conflicts in effective Session state using shared models and deterministic tests
 
 ## Suggested next packet
 - `F1_SESSION_SETTINGS_VIEW`

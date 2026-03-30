@@ -1,52 +1,76 @@
 # Packet I3 - Parser Tests
 
 ## Goal
-Define the parser-focused test plan and fixture coverage for supported file families.
+Define and implement deterministic parser test coverage across all supported file families, including valid, invalid, and forward-compatibility cases.
 
 ## Why this packet exists
-Parsers are foundational, and they need repeatable coverage for valid, invalid, and forward-compatible cases before resolver logic can be trusted.
+Parsers are foundational to resolver correctness. If parser behavior regresses, downstream effective-state output becomes unreliable.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
+- parser packet outputs from Section C
 
 ## Dependencies
 - `I1_FIXTURE_LAYOUT`
-- parser packets from Section C
+- Section C parser implementations (`C1` through `C6`)
 
 ## Deliverables
-- parser test plan
-- fixture-to-test mapping for each supported file family
-- expected-issue strategy for invalid cases
-- representative snapshot strategy where useful
+- parser test matrix by file family
+- fixture-to-test mapping for valid/invalid/edge cases
+- expected syntax-issue assertion strategy
+- optional structured snapshot strategy for parsed outputs
 
 ## Required behavior
-- cover settings parser
-- cover `~/.claude.json` parser
-- cover `.mcp.json` parser
-- cover `CLAUDE.md` parser
-- cover agent parser
-- cover skill parser
-- include forward-compatibility cases for unknown fields where relevant
+### Coverage matrix
+Cover at minimum:
+- settings parser (`C1`)
+- `~/.claude.json` parser (`C2`)
+- `.mcp.json` parser (`C3`)
+- instruction markdown parser (`C4`)
+- agent parser (`C5`)
+- skill parser (`C6`)
+
+### Assertion strategy
+- assert typed parse output fields
+- assert syntax issue code/severity/source attribution
+- assert unknown-field preservation/forward-compat behavior where applicable
+- assert deterministic ordering in token/reference extraction outputs
+
+### Invalid-case emphasis
+- malformed syntax
+- wrong top-level shape
+- wrong value types for known keys
+- missing expected structures
+- mixed valid+invalid content where parser should preserve partial output
 
 ## Suggested Swift types
 - `ParserTestCase`
 - `ExpectedSyntaxIssueSet`
 - `ExpectedParsedShape`
+- `FixtureBackedParserAssertion`
+
+## Test fixture guidance
+Create parser fixture packs for:
+- one minimal valid case per parser family (`C1` through `C6`)
+- malformed syntax cases for each parser family where applicable
+- wrong-type known-key cases for each parser family
+- unknown-field preservation cases for forward compatibility
+- mixed valid+invalid cases that should preserve partial parse output
 
 ## Acceptance criteria
-- each supported parser family has a clear deterministic test strategy
-- invalid and partial cases are first-class, not afterthoughts
-- parser tests remain distinct from validation and resolver tests
+- each parser family has deterministic, fixture-backed test coverage
+- invalid/partial/forward-compatible cases are first-class
+- parser tests remain separate from semantic and resolver assertions
 
 ## Out of scope
-- semantic validation tests
-- resolver tests
-- UI tests
+- semantic validation test rules
+- resolver precedence/merge tests
+- UI test automation
 
 ## Done when
-- the project has a clear parser-testing contract that implementation packets can follow directly
+- parser behavior across all supported families is protected by stable, packet-aligned tests
 
 ## Suggested next packet
 - `E1_VALIDATION_MODELS`

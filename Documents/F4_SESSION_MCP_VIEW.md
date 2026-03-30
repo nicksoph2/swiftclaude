@@ -1,10 +1,10 @@
 # Packet F4 - Session MCP View
 
 ## Goal
-Implement the read-only Session MCP screen.
+Implement the read-only Session MCP screen that presents effective MCP servers, overrides, and diagnostics.
 
 ## Why this packet exists
-MCP visibility, precedence, and duplicates are difficult to understand from raw files. The Session MCP screen should show effective servers and overridden definitions clearly.
+MCP configuration can span multiple files and scopes. Users need one screen that explains effective visibility and conflicts without requiring raw-file diffing.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -17,37 +17,58 @@ MCP visibility, precedence, and duplicates are difficult to understand from raw 
 - `D7_SESSION_PROJECTION`
 
 ## Deliverables
-- read-only Session MCP screen
-- UI models or adapters for effective and overridden servers
-- diagnostics presentation for duplicate and env-related issues
-- UI tests or view-state tests where practical
+- `SessionMCPView` (read-only)
+- effective-server list model and overridden-definition model
+- diagnostics model for conflicts/env notes/invalid definitions
+- view-state tests or UI tests for representative MCP states
 
 ## Required behavior
-- show effective MCP servers
-- show overridden definitions and their sources
-- show source precedence and provenance clearly
-- show diagnostics such as unresolved env behavior or conflicting definitions
-- remain read-only
+### Display requirements
+- show effective server definitions with source labels
+- show overridden definitions and why they were overridden
+- show precedence/provenance traces in inspectable form
+- show diagnostics (duplicate ids, transport conflicts, env-related notes)
+
+### State handling
+Support and test:
+- no MCP servers state
+- single-source servers state
+- multi-source override state
+- conflict-heavy diagnostic state
+- partial/incomplete snapshot state
+
+### Interaction boundaries
+- screen is read-only
+- no local precedence/merge computation in UI layer
+- optional expandable detail rows are acceptable for provenance and diagnostics
 
 ## Suggested Swift types
 - `SessionMCPView`
+- `SessionMCPViewModel`
 - `McpServerRowModel`
 - `OverriddenServerModel`
-- `McpDiagnosticBadgeModel`
+- `McpDiagnosticModel`
+- `SourceChipModel`
+
+## Test fixture guidance
+Create view-state tests for:
+- deterministic server ordering
+- override details visibility
+- conflict and env-note badge visibility
+- empty and partial states
 
 ## Acceptance criteria
-- users can inspect effective server visibility and provenance without editing files
-- overridden and conflicting definitions remain visible
-- diagnostics are surfaced clearly
-- UI does not perform MCP resolution locally
+- users can inspect effective MCP visibility and source provenance without editing files
+- overridden/conflicting definitions are visible and attributable
+- screen remains projection-driven and read-only
 
 ## Out of scope
-- editing controls
-- transport parsing
+- MCP transport parsing logic
+- MCP resolver logic
 - non-MCP Session screens
 
 ## Done when
-- users can inspect the effective MCP surface from the Session scope
+- Session MCP screen provides a trustworthy, inspectable MCP state view from `SessionProjection`
 
 ## Suggested next packet
 - `F5_SESSION_AGENTS_SKILLS_VIEW`

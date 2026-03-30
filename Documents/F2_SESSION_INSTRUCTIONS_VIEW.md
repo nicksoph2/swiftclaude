@@ -1,10 +1,10 @@
 # Packet F2 - Session Instructions View
 
 ## Goal
-Implement the read-only Session instructions screen.
+Implement the read-only Session instructions screen that presents resolved load order, import participation, and memory-related instruction state.
 
 ## Why this packet exists
-Instruction behavior is difficult to reason about from files alone. The Session instructions screen should make load order, imports, startup-loaded content, and diagnostics visible in one place.
+Instruction behavior is difficult to infer from raw markdown and imports. The Session screen must make instruction order and diagnostics understandable at a glance.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -17,37 +17,60 @@ Instruction behavior is difficult to reason about from files alone. The Session 
 - `D7_SESSION_PROJECTION`
 
 ## Deliverables
-- read-only Session instructions screen
-- UI models or adapters for load order and imports
-- diagnostics presentation for cycles, broken imports, and memory boundaries
-- UI tests or view-state tests where practical
+- `SessionInstructionsView` (read-only)
+- view-model/adapter for load order, imports, and memory projections
+- diagnostics display for cycles, missing imports, and depth-limit issues
+- view-state tests or UI tests for key scenarios
 
 ## Required behavior
-- show resolved instruction load order
-- show import relationships clearly
-- distinguish startup-loaded instructions from available on-demand memory
-- show diagnostics and partial-resolution notes
+### Display requirements
+- show resolved instruction load order in deterministic sequence
+- show import relationships per instruction entry
+- distinguish startup-loaded memory from on-demand memory topics
+- show diagnostics and partial-resolution notes inline and/or in summary
+
+### State handling
+Support and test:
+- no-import simple state
+- nested import state
+- cycle/missing-import diagnostic state
+- startup-memory and on-demand-memory combined state
+- partial-resolution state where some entries fail
+
+### Interaction boundaries
 - remain read-only
+- allow inspectable provenance and source paths
+- do not perform traversal/resolution logic in view code
 
 ## Suggested Swift types
 - `SessionInstructionsView`
+- `SessionInstructionsViewModel`
 - `InstructionEntryRowModel`
-- `ImportGraphNodeModel`
+- `ImportRelationModel`
 - `AutoMemorySectionModel`
+- `InstructionIssueSummaryModel`
+
+## Test fixture guidance
+Create view-state tests for:
+- deterministic row ordering
+- cycle diagnostics visibility
+- unresolved import visibility
+- startup vs on-demand memory separation
+- empty/partial states
 
 ## Acceptance criteria
-- the screen makes instruction participation inspectable without editing files
-- import and memory behavior are represented distinctly
-- cycles and broken imports are surfaced clearly
-- UI does not perform resolver work locally
+- instructions screen makes load order/import participation understandable without file-by-file inspection
+- memory participation is represented distinctly and clearly
+- diagnostic-heavy states remain usable and read-only
+- UI depends only on projection models
 
 ## Out of scope
-- editing controls
 - markdown parsing
+- instruction resolver logic
 - non-instruction Session screens
 
 ## Done when
-- users can inspect effective instructions, imports, and memory-related participation from the Session scope
+- users can inspect effective instruction behavior, import relationships, and memory boundaries from Session scope
 
 ## Suggested next packet
 - `F3_SESSION_HOOKS_VIEW`

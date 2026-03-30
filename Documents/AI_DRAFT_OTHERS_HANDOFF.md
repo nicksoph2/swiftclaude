@@ -3,6 +3,11 @@
 ## Purpose
 Use this document to hand the project to another AI session so it can draft additional section docs, packet docs, or implementation notes without needing the full original product spec every time.
 
+## Execution mode rule
+- If a task says `implement`, the AI must perform implementation work directly (edit code, run tests, and summarize outcomes), not stop at planning/report output.
+- If a task says `draft`, the AI should produce the requested markdown/planning document only.
+- Do not require a second prompt to begin coding when the task already says `implement`.
+
 ## What exists already
 The following planning files already exist and should be treated as the current baseline:
 - `Docs/PROJECT_INDEX.md`

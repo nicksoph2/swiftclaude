@@ -11,6 +11,12 @@ For each numbered prompt:
 
 After an implementation prompt is completed and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix `-handoff` (example: `SECTION_B_DISCOVERY-handoff.md`).
 
+Implementation execution rule:
+
+- For prompts whose Task says `implement`, the AI must directly edit code, run tests, and report results in the same chat.
+- The AI must not stop at design notes, analysis, or status reports for implementation prompts unless the user explicitly asks for planning-only output.
+- Do not require a follow-up command such as "now implement"; implementation should happen immediately when requested.
+
 Communication rule for Codex chat output:
 
 - Do not paste full Swift/code listings in chat by default.
@@ -39,11 +45,12 @@ Current workspace note:
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet A1_XCODE_SETUP only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. proposed file and folder layout
 3. full code for the initial SwiftUI macOS app shell
@@ -80,11 +87,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet A2_APP_SANDBOX_AND_BOOKMARKS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. the Swift types and files to add or update
 3. full code for sandbox-safe folder access and security-scoped bookmark persistence
@@ -121,11 +129,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet A3_GLOBAL_AND_PROJECT_ROOT_PICKERS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. view models and data models
 3. full SwiftUI code for selecting the global Claude root and one or more project roots
@@ -162,11 +171,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet B1_ROOT_LOCATOR only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. discovery-facing Swift types
 3. full code for the RootLocator service and root resolution models
@@ -190,7 +200,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 5) Draft B2_PROJECT_SCANNER
+## 5) writeB2_PROJECT_SCANNER
 
 **Use these local docs**
 
@@ -204,13 +214,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`.
 
 The packet should cover recursive project scanning beneath resolved roots and discovery of Claude-related file references without parsing file contents.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/B2_PROJECT_SCANNER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -226,7 +237,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 6) Draft B3_DISCOVERY_MODELS
+## 6) writeB3_DISCOVERY_MODELS
 
 **Use these local docs**
 
@@ -241,13 +252,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`.
 
 The packet should define the typed discovery outputs used by parsers and resolvers, including file references, scope identity, path provenance, and discovery issues.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/B3_DISCOVERY_MODELS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -275,11 +287,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet B2_PROJECT_SCANNER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. proposed file list
 3. full code for project scanning and discovery of Claude-related files
@@ -314,11 +327,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet B3_DISCOVERY_MODELS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. model list
 3. full code for the shared discovery domain models
@@ -352,11 +366,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C1_SETTINGS_JSON_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
 3. full code for parsing Claude settings.json files into a typed domain model
@@ -378,7 +393,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 10) Draft C2_CLAUDE_JSON_PARSER
+## 10) writeC2_CLAUDE_JSON_PARSER
 
 **Use these local docs**
 
@@ -392,13 +407,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`.
 
 The packet should cover parsing `~/.claude.json` as a distinct file family for global preferences and user or local MCP state, without confusing it with `settings.json`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C2_CLAUDE_JSON_PARSER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -412,7 +428,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 11) Draft C3_MCP_JSON_PARSER
+## 11) writeC3_MCP_JSON_PARSER
 
 **Use these local docs**
 
@@ -425,13 +441,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`.
 
 The packet should cover parsing `.mcp.json`, including typed server definitions, transport forms, headers, env maps, and parse-time diagnostics.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C3_MCP_JSON_PARSER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -444,7 +461,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 12) Draft C4_CLAUDE_MD_PARSER
+## 12) writeC4_CLAUDE_MD_PARSER
 
 **Use these local docs**
 
@@ -457,13 +474,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`.
 
 The packet should cover parsing Claude instruction markdown files, import tokens such as `@path/to/file`, and parse-time import token diagnostics without doing full resolution.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C4_CLAUDE_MD_PARSER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -476,7 +494,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 13) Draft C5_AGENT_PARSER
+## 13) writeC5_AGENT_PARSER
 
 **Use these local docs**
 
@@ -489,13 +507,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`.
 
 The packet should cover parsing agent markdown files with YAML frontmatter and prompt body, including parse-time diagnostics for malformed frontmatter.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C5_AGENT_PARSER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -508,7 +527,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 14) Draft C6_SKILL_PARSER
+## 14) writeC6_SKILL_PARSER
 
 **Use these local docs**
 
@@ -521,13 +540,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`.
 
 The packet should cover parsing skill directories with `SKILL.md`, supported frontmatter, supporting-file references, and parse-time diagnostics.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/C6_SKILL_PARSER.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -553,16 +573,17 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C2_CLAUDE_JSON_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
-3. full code for parsing `~/.claude.json`
+3. create and implement full code for parsing `~/.claude.json`
 4. syntax diagnostics behavior
-5. fixtures and tests
+5. run fixtures and tests
 6. assumptions made
 7. edge cases
 8. end-of-chat handoff summary
@@ -591,11 +612,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C3_MCP_JSON_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
 3. full code for parsing `.mcp.json`
@@ -629,16 +651,17 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C4_CLAUDE_MD_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
-3. full code for parsing Claude instruction markdown files and import tokens
+ create and implement full code for parsing agent markdown files with YAML frontmatter and prompt body
 4. syntax diagnostics behavior
-5. fixtures and tests
+5. run fixtures and tests
 6. assumptions made
 7. edge cases
 8. end-of-chat handoff summary
@@ -667,16 +690,17 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C5_AGENT_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
-3. full code for parsing agent markdown files with YAML frontmatter and prompt body
+3. create and implement full code for parsing agent markdown files with YAML frontmatter and prompt body
 4. syntax diagnostics behavior
-5. fixtures and tests
+5. run fixtures and tests
 6. assumptions made
 7. edge cases
 8. end-of-chat handoff summary
@@ -704,16 +728,17 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet C6_SKILL_PARSER only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. parser-facing Swift types
-3. full code for parsing skill directories and `SKILL.md`
+3.  create and implement full code for parsing agent markdown files with YAML frontmatter and prompt body
 4. syntax diagnostics behavior
-5. fixtures and tests
+5. run fixtures and tests
 6. assumptions made
 7. edge cases
 8. end-of-chat handoff summary
@@ -742,18 +767,20 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D1_RESOLVER_MODELS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver model list
-3. full code for the shared resolver domain types and SessionProjection skeleton
-4. tests
-5. assumptions made
-6. edge cases
-7. end-of-chat handoff summary
+3. create and implement full code for parsing agent markdown files with YAML frontmatter and prompt body
+4. syntax diagnostics behavior
+5. run fixtures and tests
+6. assumptions made
+7. edge cases
+8. end-of-chat handoff summary
 
 Rules:
 - Stay inside Packet D1 only.
@@ -767,7 +794,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 21) Draft D2_SETTINGS_PRECEDENCE
+## 21) writeD2_SETTINGS_PRECEDENCE
 
 **Use these local docs**
 
@@ -783,13 +810,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`.
 
 The packet should cover precedence resolution for settings sources, including managed, CLI, project local, project shared, and user settings sources.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D2_SETTINGS_PRECEDENCE.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -802,7 +830,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 22) Draft D3_SETTINGS_MERGE_RULES
+## 22) writeD3_SETTINGS_MERGE_RULES
 
 **Use these local docs**
 
@@ -817,13 +845,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`.
 
 The packet should cover per-key merge behavior for settings resolution, including scalar override, deep-merge object cases, concatenation and de-duplication where documented, and permissions-related merge interpretation.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D3_SETTINGS_MERGE_RULES.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -836,7 +865,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 23) Draft D4_INSTRUCTION_RESOLUTION
+## 23) writeD4_INSTRUCTION_RESOLUTION
 
 **Use these local docs**
 
@@ -851,13 +880,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`.
 
 The packet should cover instruction load order, recursive import resolution to the allowed depth, startup-loaded instructions versus on-demand memory, and diagnostics for broken imports and cycles.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D4_INSTRUCTION_RESOLUTION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -870,7 +900,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 24) Draft D5_MCP_RESOLUTION
+## 24) writeD5_MCP_RESOLUTION
 
 **Use these local docs**
 
@@ -886,13 +916,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`.
 
 The packet should cover cross-scope MCP resolution, precedence across user, local, project, and managed sources, duplicate server handling, and environment expansion behavior.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D5_MCP_RESOLUTION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -905,7 +936,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 25) Draft D6_AGENT_SKILL_RESOLUTION
+## 25) writeD6_AGENT_SKILL_RESOLUTION
 
 **Use these local docs**
 
@@ -921,13 +952,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`.
 
 The packet should cover project-over-user precedence, duplicate-name handling, visibility of agents and skills by scope, and diagnostics relevant to the Session view.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D6_AGENT_SKILL_RESOLUTION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -940,7 +972,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 26) Draft D7_SESSION_PROJECTION
+## 26) writeD7_SESSION_PROJECTION
 
 **Use these local docs**
 
@@ -955,13 +987,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`.
 
 The packet should cover assembly of the read-only Session projection from resolved settings, instructions, MCP, agents, skills, provenance, issues, and confidence notes.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/D7_SESSION_PROJECTION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -987,11 +1020,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D2_SETTINGS_PRECEDENCE only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver-facing Swift types or updates needed
 3. full code for settings precedence resolution
@@ -1024,11 +1058,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D3_SETTINGS_MERGE_RULES only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver-facing Swift types or updates needed
 3. full code for per-key merge behavior
@@ -1061,11 +1096,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D4_INSTRUCTION_RESOLUTION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver-facing Swift types or updates needed
 3. full code for instruction load-order and import resolution
@@ -1099,11 +1135,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D5_MCP_RESOLUTION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver-facing Swift types or updates needed
 3. full code for MCP resolution across scopes
@@ -1137,11 +1174,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D6_AGENT_SKILL_RESOLUTION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. resolver-facing Swift types or updates needed
 3. full code for agent and skill resolution
@@ -1175,11 +1213,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet D7_SESSION_PROJECTION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. projection-facing Swift types or updates needed
 3. full code for building the read-only Session projection
@@ -1199,7 +1238,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 33) Draft SECTION_E_VALIDATION
+## 33) write SECTION_E_VALIDATION
 
 **Use these local docs**
 
@@ -1213,11 +1252,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_E_VALIDATION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1231,7 +1271,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 34) Draft SECTION_F_SESSION_UI
+## 34) writeSECTION_F_SESSION_UI
 
 **Use these local docs**
 
@@ -1245,11 +1285,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_F_SESSION_UI.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1263,7 +1304,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 35) Draft SECTION_I_FIXTURES_AND_TESTS
+## 35) writeSECTION_I_FIXTURES_AND_TESTS
 
 **Use these local docs**
 
@@ -1278,11 +1319,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_I_FIXTURES_AND_TESTS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1295,7 +1337,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 36) Draft E1_VALIDATION_MODELS
+## 36) writeE1_VALIDATION_MODELS
 
 **Use these local docs**
 
@@ -1308,13 +1350,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`.
 
 The packet should define validation issue types, severity levels, codes, source references, and any shared validation result containers used across parsers and resolvers.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1323,7 +1366,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 37) Draft E2_SCHEMA_VALIDATION
+## 37) writeE2_SCHEMA_VALIDATION
 
 **Use these local docs**
 
@@ -1337,13 +1380,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`.
 
 The packet should cover schema-level validation for supported file families after parsing, without duplicating parse-time syntax checks.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1352,7 +1396,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 38) Draft E3_SEMANTIC_VALIDATION
+## 38) writeE3_SEMANTIC_VALIDATION
 
 **Use these local docs**
 
@@ -1366,13 +1410,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`.
 
 The packet should cover duplicate names, bad scope assumptions, unreachable imports, invalid tool syntax, unresolved env expansion, and similar semantic checks.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1381,7 +1426,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 39) Draft F1_SESSION_SETTINGS_VIEW
+## 39) writeF1_SESSION_SETTINGS_VIEW
 
 **Use these local docs**
 
@@ -1395,13 +1440,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`.
 
 The packet should cover the read-only Session settings screen, including effective values, winning sources, merge method display, and issues.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1410,7 +1456,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 40) Draft F2_SESSION_INSTRUCTIONS_VIEW
+## 40) writeF2_SESSION_INSTRUCTIONS_VIEW
 
 **Use these local docs**
 
@@ -1424,13 +1470,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`.
 
 The packet should cover the read-only Session instructions screen, including load order, imports, startup-loaded instructions, on-demand memory, and diagnostics.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1439,7 +1486,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 41) Draft F3_SESSION_HOOKS_VIEW
+## 41) writeF3_SESSION_HOOKS_VIEW
 
 **Use these local docs**
 
@@ -1452,13 +1499,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`.
 
 The packet should cover the read-only Session hooks screen, including effective hooks, event grouping, matcher presentation, and hook restrictions.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1467,7 +1515,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 42) Draft F4_SESSION_MCP_VIEW
+## 42) writeF4_SESSION_MCP_VIEW
 
 **Use these local docs**
 
@@ -1481,13 +1529,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`.
 
 The packet should cover the read-only Session MCP screen, including effective servers, overridden servers, source precedence, and diagnostics.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1496,7 +1545,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 43) Draft F5_SESSION_AGENTS_SKILLS_VIEW
+## 43) writeF5_SESSION_AGENTS_SKILLS_VIEW
 
 **Use these local docs**
 
@@ -1510,13 +1559,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`.
 
 The packet should cover the read-only Session agents and skills screen, including visibility by scope, precedence, duplicates, and diagnostics.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1525,7 +1575,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 44) Draft I1_FIXTURE_LAYOUT
+## 44) writeI1_FIXTURE_LAYOUT
 
 **Use these local docs**
 
@@ -1538,13 +1588,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`.
 
 The packet should define the test fixture directory structure, naming strategy, representative valid and invalid cases, and how fixtures map to packet-level tests.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1553,7 +1604,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 45) Draft I2_RESOLVER_TESTS
+## 45) writeI2_RESOLVER_TESTS
 
 **Use these local docs**
 
@@ -1567,13 +1618,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`.
 
 The packet should cover resolver-focused unit and snapshot tests for precedence, merge behavior, import resolution, MCP resolution, and Session projection integrity.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1582,7 +1634,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 46) Draft I3_PARSER_TESTS
+## 46) writeI3_PARSER_TESTS
 
 **Use these local docs**
 
@@ -1596,13 +1648,14 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`.
 
 The packet should cover parser-focused unit tests and fixture coverage for settings, claude.json, mcp.json, CLAUDE.md, agents, and skills.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -1624,11 +1677,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet I1_FIXTURE_LAYOUT only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. fixture directory plan
 3. full fixture files and expected-output files where relevant
@@ -1660,11 +1714,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet I2_RESOLVER_TESTS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. test strategy
 3. full resolver test code
@@ -1696,11 +1751,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet I3_PARSER_TESTS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. test strategy
 3. full parser test code
@@ -1732,11 +1788,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet E1_VALIDATION_MODELS only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. validation model list
 3. full code for shared validation issue and result types
@@ -1768,11 +1825,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet E2_SCHEMA_VALIDATION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. validator-facing Swift types or updates needed
 3. full code for schema-level validation
@@ -1804,11 +1862,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet E3_SEMANTIC_VALIDATION only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. validator-facing Swift types or updates needed
 3. full code for semantic validation
@@ -1840,11 +1899,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet F1_SESSION_SETTINGS_VIEW only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. UI model updates if needed
 3. full SwiftUI code for the read-only Session settings screen
@@ -1877,11 +1937,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet F2_SESSION_INSTRUCTIONS_VIEW only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. UI model updates if needed
 3. full SwiftUI code for the read-only Session instructions screen
@@ -1914,11 +1975,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet F3_SESSION_HOOKS_VIEW only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. UI model updates if needed
 3. full SwiftUI code for the read-only Session hooks screen
@@ -1951,11 +2013,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet F4_SESSION_MCP_VIEW only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. UI model updates if needed
 3. full SwiftUI code for the read-only Session MCP screen
@@ -1988,11 +2051,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping build a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: implement Packet F5_SESSION_AGENTS_SKILLS_VIEW only.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. design notes
 2. UI model updates if needed
 3. full SwiftUI code for the read-only Session agents and skills screen
@@ -2025,11 +2089,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping review progress on a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
 Task: assess whether Milestone 1 is complete.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. what Milestone 1 required
 2. which packets appear complete
 3. any gaps that remain before Milestone 1 can be considered done
@@ -2045,7 +2110,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 59) Draft SECTION_G_EDITORS_AND_SAVE
+## 59) writeSECTION_G_EDITORS_AND_SAVE
 
 **Use these local docs**
 
@@ -2059,11 +2124,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_G_EDITORS_AND_SAVE.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -2077,7 +2143,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 60) Draft SECTION_H_USAGE
+## 60) writeSECTION_H_USAGE
 
 **Use these local docs**
 
@@ -2091,11 +2157,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_H_USAGE.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -2109,7 +2176,7 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 
 ---
 
-## 61) Draft SECTION_J_RELEASE
+## 61) writeSECTION_J_RELEASE
 
 **Use these local docs**
 
@@ -2122,11 +2189,12 @@ Handoff rule: if this prompt is an implementation prompt and tests pass, the AI 
 ```text
 You are helping document a native macOS app called Claude Config Manager.
 
-Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet or draft this document.
+Use only the local documents listed above for planning context. You may inspect the current workspace code as needed to implement this packet when the Task says implement, or writethis document when the Task says draft.
 
-Task: draft the full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`.
+Task: writethe full markdown document for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`.
 
 Return:
+- Implement the system you have reported in the app, complete and integrate the code, then run fixtures and tests, amending code until the app builds, runs, and passes all tests.
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/SECTION_J_RELEASE.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`

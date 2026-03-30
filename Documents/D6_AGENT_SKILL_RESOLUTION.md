@@ -1,10 +1,10 @@
 # Packet D6 - Agent and Skill Resolution
 
 ## Goal
-Implement effective visibility and precedence rules for agents and skills across scopes.
+Implement deterministic visibility and precedence resolution for agents and skills across user and project scopes.
 
 ## Why this packet exists
-The app must show which agents and skills are effectively available, how project scope overrides user scope, and which duplicates or malformed definitions need attention.
+The Session view needs one coherent picture of which agents and skills are effectively available, which are overridden, and which are invalid or partially usable.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
@@ -21,41 +21,61 @@ The app must show which agents and skills are effectively available, how project
 ## Deliverables
 - `AgentResolver`
 - `SkillResolver`
-- precedence rules for user and project scope
-- duplicate-name and unsupported-shape diagnostics
-- unit tests for visibility and override scenarios
+- effective visibility and precedence rules by scope
+- override/conflict diagnostics for duplicates and invalid definitions
+- resolved snapshots for agents and skills with provenance
+- deterministic unit tests for visibility scenarios
 
 ## Required behavior
-### Agent rules
-- prefer project agents over user agents when names collide
-- preserve overridden definitions for provenance
-- surface malformed or unsupported agent definitions as issues rather than silently dropping them
+### Agent resolution rules
+- resolve by agent identity (name/key) with explicit normalization policy
+- prefer project-scoped definitions over user-scoped definitions when identities collide
+- preserve overridden agent definitions for provenance display
+- carry parse/shape issues into resolution issues without silently dropping entries
 
-### Skill rules
-- represent skills by scope and visibility
-- preserve invalid frontmatter and missing-reference diagnostics for later Session presentation
-- distinguish hidden, invalid, and overridden skill states
+### Skill resolution rules
+- resolve skill visibility from discovered skill directories by scope
+- preserve invalid/missing-structure skills as discovered-but-problematic entries
+- distinguish states such as effective, overridden, invalid, and unavailable
+- preserve supporting-reference diagnostics from parser output for downstream validation display
+
+### Determinism and provenance
+- stable ordering for effective and overridden entries
+- explicit source traces for each resolved entry
+- explicit issue attribution for collisions and malformed definitions
 
 ## Suggested Swift types
+- `AgentResolver`
+- `SkillResolver`
 - `ResolvedAgentSnapshot`
 - `ResolvedSkillSnapshot`
 - `ResolvedAgentEntry`
 - `ResolvedSkillEntry`
+- `VisibilityState`
 - `ResolutionIssue`
 
+## Test fixture guidance
+Create tests for:
+- user-only agents and skills
+- project overrides user entries
+- duplicate identities in same scope
+- malformed agent frontmatter carried into resolved output
+- missing or malformed skill documents carried into resolved output
+- deterministic ordering for effective and overridden entries
+
 ## Acceptance criteria
-- effective visibility is deterministic for the same inputs
-- duplicate names and overrides are inspectable in provenance
-- invalid but discovered definitions are represented explicitly
-- parser logic remains separate from resolution logic
+- effective agent/skill visibility is deterministic and inspectable
+- overrides and invalid entries remain visible with provenance and issues
+- parser concerns remain separate from resolution concerns
+- output is consumable by Session projection without re-deriving precedence
 
 ## Out of scope
-- editing behavior
-- UI layout
-- save preview behavior
+- editing workflows
+- UI layout and interaction
+- runtime execution validation of tools/scripts
 
 ## Done when
-- Session projection packets can consume one resolved agent snapshot and one resolved skill snapshot with visibility, provenance, and diagnostics
+- `D7_SESSION_PROJECTION` can consume resolved agent and skill snapshots with effective/overridden/invalid states and diagnostics
 
 ## Suggested next packet
 - `D7_SESSION_PROJECTION`

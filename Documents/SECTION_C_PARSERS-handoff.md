@@ -69,3 +69,50 @@
 
 ## Recommended next packet
 - `C3_MCP_JSON_PARSER`
+
+---
+
+## Completed in this session (C6 update)
+- Packet completed: `C6_SKILL_PARSER`
+- Status: implemented and test-verified
+- Test command used:
+  - `xcodebuild -project ClaudeConfigManager.xcodeproj -scheme ClaudeConfigManager -configuration Debug -derivedDataPath .derivedData test CODE_SIGNING_ALLOWED=NO`
+- Result: `TEST SUCCEEDED`
+
+## Files added or updated for C6
+- `ClaudeConfigManager/Infrastructure/Parsers/SkillParser.swift` (new)
+- `ClaudeConfigManagerTests/Parsers/SkillParserTests.swift` (new)
+- `ClaudeConfigManager/Infrastructure/Parsers/SettingsParser.swift` (updated `SyntaxIssueCode` with skill parser diagnostics)
+- `ClaudeConfigManager.xcodeproj/project.pbxproj` (updated to include parser and tests)
+
+## Scope implemented
+- Added `SkillParser` that parses one skill directory at a time using `SKILL.md` as the canonical entry file.
+- Added optional YAML frontmatter parsing for supported typed keys:
+  - `name`
+  - `description`
+  - `version`
+  - `tags`
+- Preserved unknown frontmatter fields in a raw map for forward compatibility.
+- Preserved markdown body text after frontmatter splitting.
+- Extracted supporting references from markdown links and images with normalized path text and local-reference parseability flags.
+- Emitted parse-time diagnostics for:
+  - missing `SKILL.md`
+  - malformed frontmatter fence
+  - malformed YAML frontmatter
+  - non-object top-level frontmatter
+  - known frontmatter type mismatches
+  - malformed markdown reference token shapes
+
+## Explicitly out of scope (not implemented here)
+- Skill precedence/visibility/active semantics
+- Cross-skill or cross-scope resolution behavior
+- Referenced-file existence checks
+- Runtime or execution semantics for referenced assets/scripts
+
+## Assumptions in C6
+- `name`, `description`, `version`, and `tags` are the supported typed frontmatter keys for this packet.
+- Unknown frontmatter keys should be preserved as raw YAML values.
+- External URLs can be extracted as references but are not parseable local file references.
+
+## Recommended next packet
+- `D1_RESOLVER_MODELS`

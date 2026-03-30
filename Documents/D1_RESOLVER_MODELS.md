@@ -1,36 +1,68 @@
 # Packet D1 - Resolver Models
 
 ## Goal
-Define the shared domain models used by all resolver families and by the Session projection.
+Define shared resolver domain models for effective values, provenance traces, issues, and family snapshots used by all resolver packets and the Session projection.
 
 ## Why this packet exists
-Before implementing precedence logic, the project needs stable types for resolved values, traces, merge methods, issues, and source provenance.
+Resolver packets `D2` through `D7` need consistent contracts for "what was resolved," "why," and "from where." Without shared models, each resolver family would drift and Session UI contracts would become unstable.
 
 ## Inputs
-- `Docs/PROJECT_INDEX.md`
-- `Docs/Sections/SECTION_D_RESOLVER.md`
-- parser output model shapes from Section C
-- discovery output model shapes from Section B
+- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+- `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
+- parser output shapes from Section C
+- discovery output shapes from Section B
 
 ## Dependencies
-- Discovery and parser packet outputs can be partial or mocked, but this packet should anticipate their interfaces cleanly
+- none hard-required; parser/discovery types may be partially stubbed while defining resolver models
 
 ## Deliverables
 - shared resolver domain types
-- source provenance model
-- merge method enum or equivalent
-- trace model for participating sources
-- Session projection skeleton type
+- source provenance model and source-kind taxonomy
+- merge method taxonomy
+- trace model for winning and participating sources
+- issue/note model for resolution-time diagnostics
+- family snapshot types for settings, instructions, MCP, agents, and skills
+- top-level `SessionProjection` skeleton contract
+
+## Required behavior
+### Shared resolved-value contract
+Every resolved field/entry contract should be able to represent:
+- effective value (or unresolved state)
+- winning source
+- participating sources in deterministic order
+- merge/selection method
+- attached resolution issues and notes
+
+### Source provenance contract
+A `ResolutionSource` should support:
+- scope (`managed`, `user`, `project`, `projectLocal`, `session`, etc. as needed)
+- source kind (`managed`, `cli`, `file`, `imported`, `autoMemory`, virtual synthetic source)
+- concrete source identifier (path or virtual id)
+- availability state (present, missing, invalid, inaccessible)
+
+### Resolution issue contract
+Resolution issues should support:
+- stable issue code
+- severity
+- message
+- optional source link/range
+- optional related sources for conflict reporting
+
+### Determinism rules
+- model types should make stable ordering explicit (for traces/collections)
+- output equality should be practical for deterministic tests
+- contracts should not assume UI-specific formatting
 
 ## Suggested Swift types
+- `ResolvedValue<Value>`
 - `ResolutionSource`
 - `ResolutionSourceKind`
+- `ResolutionScope`
+- `ResolutionAvailability`
 - `ResolutionTrace`
 - `MergeMethod`
 - `ResolutionIssue`
-- `ResolutionNote`
-- `ResolvedValue<T>`
-- `ResolvedCollection<Item>` if useful
+- `ResolutionIssueCode`
 - `ResolvedSettingsSnapshot`
 - `ResolvedInstructionSnapshot`
 - `ResolvedMcpSnapshot`
@@ -38,45 +70,38 @@ Before implementing precedence logic, the project needs stable types for resolve
 - `ResolvedSkillSnapshot`
 - `SessionProjection`
 
-## Required modeling behaviors
-### Resolved value shape
-Every resolved field should be able to surface:
-- effective value
-- winning source
-- all participating sources
-- merge method
-- validation issues
-- notes
+## Suggested model shape (non-binding)
+```swift
+struct ResolvedValue<Value> {
+    let effectiveValue: Value?
+    let winningSource: ResolutionSource?
+    let trace: ResolutionTrace
+    let mergeMethod: MergeMethod
+    let issues: [ResolutionIssue]
+}
 
-### Source provenance
-A source should be able to represent:
-- scope
-- path or virtual source identity
-- source kind such as managed, user, project, local, CLI, imported, auto-memory
-- availability status if relevant
-
-### Issues
-Issues should support at least:
-- severity
-- stable code
-- user-facing message
-- optional source link or range
+struct ResolutionTrace {
+    let participants: [ResolutionSource]
+    let overridden: [ResolutionSource]
+    let notes: [String]
+}
+```
 
 ## Acceptance criteria
-- Shared resolver types are expressive enough for settings, instructions, MCP, agents, and skills
-- The model does not hard-code rules that belong in later precedence packets
-- The model is suitable for both internal resolver logic and Session UI inspection
-- The Session projection type can aggregate all resolved snapshots without forcing persistence
+- resolver models are expressive enough for all Section D families
+- contracts preserve provenance and issue attribution without UI coupling
+- model shapes avoid embedding precedence logic that belongs in later packets
+- Session projection can aggregate family snapshots without persistence assumptions
 
 ## Out of scope
-- actual precedence algorithms
-- merge implementation
-- UI rendering details
-- save preview details
+- precedence algorithms
+- merge algorithms
+- validation policy
+- UI layout and presentation
 
 ## Done when
-- Later resolver packets can build logic on top of these types without redefining basic concepts
-- Unit tests can instantiate representative resolved values and traces cleanly
+- packets `D2` to `D7` can build implementation logic directly against these shared types
+- model unit tests can construct representative snapshots and trace scenarios cleanly
 
 ## Suggested next packet
 - `D2_SETTINGS_PRECEDENCE`

@@ -1,16 +1,17 @@
 # Packet D7 - Session Projection
 
 ## Goal
-Assemble the read-only Session projection from all resolved families into one inspectable model.
+Assemble one read-only `SessionProjection` from all resolved families and validation outputs, preserving provenance and partial-state diagnostics.
 
 ## Why this packet exists
-The Session UI needs one coherent computed snapshot that aggregates effective settings, instructions, hooks, MCP servers, agents, skills, provenance, and issues without creating a shadow database.
+Session UI should consume one stable computed contract rather than calling each resolver directly. This packet unifies outputs while preserving traceability and without introducing persistence.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_D_RESOLVER.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/D1_RESOLVER_MODELS.md`
 - resolved outputs from `D2` through `D6`
+- validation outputs from Section E when available
 
 ## Dependencies
 - `D1_RESOLVER_MODELS`
@@ -22,25 +23,36 @@ The Session UI needs one coherent computed snapshot that aggregates effective se
 
 ## Deliverables
 - `SessionProjectionBuilder`
-- aggregate `SessionProjection`
-- consistent top-level issue and provenance summaries
-- unit tests for projection integrity and representative mixed scenarios
+- aggregate `SessionProjection` model assembly
+- top-level issue summaries and completeness indicators
+- deterministic ordering policy for projection collections
+- unit tests for projection integrity under mixed valid/invalid states
 
 ## Required behavior
-### Projection contents
+### Projection composition
+Session projection should include:
 - resolved settings snapshot
-- resolved instruction snapshot
-- resolved hooks view data derived from resolved settings when relevant
+- resolved instructions snapshot
+- resolved hooks projection derived from resolved settings where applicable
 - resolved MCP snapshot
 - resolved agent snapshot
 - resolved skill snapshot
-- combined issue summary
-- confidence or completeness notes for partial states
+- aggregated issue summary (parser/resolver/validation as available)
+- completeness/confidence metadata for partial states
 
-### Projection rules
-- keep Session computed and read-only
-- preserve enough source and trace information for later UI inspection
-- represent partial resolution states without forcing persistence
+### Partial-state behavior
+- support missing families without crashing
+- represent unavailable/incomplete families explicitly
+- preserve family-level and projection-level issues
+
+### Provenance and stability
+- keep per-family provenance traces accessible for UI consumption
+- enforce deterministic ordering for stable tests and UI behavior
+- avoid UI-specific formatting logic inside projection builder
+
+### Read-only boundary
+- projection is computed, never persisted as shadow truth
+- projection builder must not write files
 
 ## Suggested Swift types
 - `SessionProjectionBuilder`
@@ -48,20 +60,29 @@ The Session UI needs one coherent computed snapshot that aggregates effective se
 - `SessionIssueSummary`
 - `SessionCompleteness`
 - `SessionProvenanceSummary`
+- `ProjectionFamilyState`
+
+## Test fixture guidance
+Create tests for:
+- full projection with all families present
+- projection with one or more missing families
+- projection with mixed valid/invalid family snapshots
+- deterministic ordering of rows/collections in projection payload
+- issue aggregation consistency across parser/resolver/validation sources
 
 ## Acceptance criteria
 - one aggregate projection can be built from representative resolved inputs
-- the projection exposes the resolved families needed by the planned Session UI
-- partial or incomplete inputs are represented cleanly instead of crashing or silently disappearing
-- no persistence layer is introduced
+- projection is stable, inspectable, and read-only
+- partial/incomplete states are explicit and non-fatal
+- Session UI packets can consume projection without invoking resolver logic
 
 ## Out of scope
-- Session UI layout
-- editing behavior
-- save preview behavior
+- Session UI layout and interaction behavior
+- editor/save-preview workflows
+- persistence/database behavior
 
 ## Done when
-- the Session UI packets can consume a single read-only projection contract without knowing the details of each resolver family
+- `SessionProjectionBuilder` can return a deterministic projection contract ready for Section F views
 
 ## Suggested next packet
-- `SECTION_E_VALIDATION`
+- `E1_VALIDATION_MODELS`

@@ -222,6 +222,8 @@ Goal: derived usage summaries, provenance UI, test hardening, and beta preparati
 - Always load this file first
 - Then load one section doc
 - Then load one packet doc
+- For `implement` tasks, execute code changes and tests in the same chat; do not stop at analysis/report output.
+- Do not wait for an extra "go implement" command when the selected task already says `implement`.
 - In chat responses, do not paste full Swift/code by default; summarize changes and reference files. Show code only if the user explicitly asks or needs to choose between code options.
 - Before implementation, check for an existing section handoff doc using:
   - `Documents/<SECTION_NAME>-handoff.md`
