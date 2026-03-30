@@ -9,6 +9,14 @@ For each numbered prompt:
 3. Then paste the prompt block exactly as written.
 4. You do not need to paste document contents or prior handoff summaries unless you are using a chat tool that cannot read local workspace files.
 
+After an implementation prompt is completed and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix `-handoff` (example: `SECTION_B_DISCOVERY-handoff.md`).
+
+Communication rule for Codex chat output:
+
+- Do not paste full Swift/code listings in chat by default.
+- Summarize what changed and reference edited file paths instead.
+- Only show code in chat when the user explicitly asks for it or when the user must make a decision between concrete code options.
+
 Do not ask the AI to work on more than one packet in a single chat.
 
 Current workspace note:
@@ -54,6 +62,7 @@ Rules:
 - Do not introduce a database, network dependency, or third-party framework.
 - Produce complete code, not partial snippets.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -94,6 +103,7 @@ Rules:
 - Detect stale or invalid bookmarks and expose a reauthorization path.
 - Keep all persistence in app-owned infrastructure only.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -134,6 +144,7 @@ Rules:
 - The UI should clearly distinguish the default global root from an override.
 - Keep Session read-only and out of scope.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -174,6 +185,7 @@ Rules:
 - The service must explain why a root was chosen and surface access issues safely.
 - Project roots must be normalized consistently and returned as stable references.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -209,6 +221,7 @@ Rules:
 - Do not mix parsing or resolver logic into this packet.
 - Make the packet depend on B1 where appropriate.
 - Include goal, why this packet exists, inputs, dependencies, deliverables, suggested Swift types, acceptance criteria, out of scope, done when, and suggested next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -244,6 +257,7 @@ Rules:
 - Keep the packet focused on shared discovery models only.
 - Do not re-implement root location or scanning in this packet.
 - Make sure later parser packets can consume these types cleanly.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -282,6 +296,7 @@ Rules:
 - Do not parse the contents of discovered files.
 - Surface inaccessible paths and partial-scan issues safely.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -319,6 +334,7 @@ Rules:
 - Do not add parsing or resolution logic.
 - The models should represent user, project, local, managed, imported, and auto-memory sources where relevant.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -357,6 +373,7 @@ Rules:
 - Separate syntax problems from later semantic validation.
 - Do not implement precedence or merging here.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -390,6 +407,7 @@ Rules:
 - Match the style and granularity of the existing packet docs.
 - Make the distinction from `settings.json` explicit.
 - Keep precedence and resolver rules out of this packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -421,6 +439,7 @@ Return:
 Rules:
 - Keep environment expansion out of this parser packet if that belongs to resolver or validation stages.
 - Keep the scope narrow enough for one implementation chat.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -452,6 +471,7 @@ Return:
 Rules:
 - Keep full import graph resolution and load order out of this packet.
 - Keep auto-memory behavior separate from user-authored instruction parsing.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -483,6 +503,7 @@ Return:
 Rules:
 - Keep duplicate-name and precedence logic out of this parser packet unless they are represented only as later semantic concerns.
 - Keep the packet focused on file parsing and typed output.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -514,6 +535,7 @@ Return:
 Rules:
 - Keep resolver behavior and active-skill semantics out of this parser packet.
 - Keep the packet small enough for one implementation chat.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -551,6 +573,7 @@ Rules:
 - Parse preferences and user or local MCP-related structures only as documented by the packet.
 - Do not implement precedence or resolver behavior here.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -588,6 +611,7 @@ Rules:
 - Do not implement cross-scope precedence here.
 - Keep parse-time diagnostics separate from later semantic validation.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -625,6 +649,7 @@ Rules:
 - Do not implement full recursive import resolution or instruction load order.
 - Keep auto-memory parsing and startup semantics out of this packet unless explicitly required by the packet doc.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -661,6 +686,7 @@ Rules:
 - Keep parser concerns separate from duplicate-name and precedence resolution.
 - Frontmatter parsing should be strict enough to surface malformed content cleanly.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -697,6 +723,7 @@ Rules:
 - Parse skill directory structure and `SKILL.md` frontmatter as defined by the packet.
 - Do not implement skill activation or resolver behavior here.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -735,6 +762,7 @@ Rules:
 - Every resolved field should be able to show effective value, winning source, participating sources, merge method, issues, and notes.
 - SessionProjection must aggregate resolved snapshots without implying persistence.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -769,6 +797,7 @@ Return:
 Rules:
 - Keep this packet focused on precedence selection, not deep merge behavior unless clearly separated for the next packet.
 - Distinguish `settings.json` from `~/.claude.json` responsibilities.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -802,6 +831,7 @@ Return:
 Rules:
 - Keep this packet focused on merge behavior, not on the broad precedence ladder itself.
 - Keep UI concerns out of this packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -835,6 +865,7 @@ Return:
 Rules:
 - Keep parsing concerns out of this packet.
 - Make the distinction between user-authored instructions and auto memory explicit.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -869,6 +900,7 @@ Return:
 Rules:
 - Keep transport parsing out of this packet.
 - Keep UI concerns out of this packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -903,6 +935,7 @@ Return:
 Rules:
 - Keep parser concerns out of this packet.
 - Keep editing behavior out of this packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -936,6 +969,7 @@ Return:
 Rules:
 - The Session view must remain computed and read-only.
 - Do not introduce persistence or a shadow database.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -972,6 +1006,7 @@ Rules:
 - Do not mix in per-key merge behavior unless the packet explicitly requires minimal hooks for it.
 - Keep `settings.json` and `~/.claude.json` responsibilities distinct.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1008,6 +1043,7 @@ Rules:
 - Keep UI rendering out of scope.
 - Keep precedence selection and merge behavior conceptually separate.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1045,6 +1081,7 @@ Rules:
 - Support recursive import resolution only to the documented depth.
 - Surface cycles, broken imports, and duplicate-content concerns cleanly.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1082,6 +1119,7 @@ Rules:
 - Keep parsing and UI concerns out of scope.
 - Surface unresolved environment-expansion issues clearly.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1119,6 +1157,7 @@ Rules:
 - Keep parser behavior and editing behavior out of scope.
 - Surface duplicate-name and unsupported-shape issues clearly.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1155,6 +1194,7 @@ Rules:
 - Do not add editing behavior.
 - The projection must aggregate resolved settings, instructions, MCP, agents, skills, provenance, issues, and confidence notes.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1186,6 +1226,7 @@ Rules:
 - Cover syntax, schema, and semantic validation responsibilities.
 - Keep validation distinct from parsing and resolution.
 - Match the style of the existing section docs.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1217,6 +1258,7 @@ Rules:
 - The Session UI must be read-only.
 - It should present resolved settings, instructions, hooks, MCP, agents, skills, provenance, and issues clearly.
 - Keep editors out of this section.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1248,6 +1290,7 @@ Return:
 Rules:
 - Cover fixture strategy, parser tests, resolver tests, and snapshot-style verification where appropriate.
 - Keep this section focused on test assets and test architecture.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1275,6 +1318,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E1_VALIDATION_MODELS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1303,6 +1347,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E2_SCHEMA_VALIDATION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1331,6 +1376,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/E3_SEMANTIC_VALIDATION.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1359,6 +1405,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F1_SESSION_SETTINGS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1387,6 +1434,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F2_SESSION_INSTRUCTIONS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1414,6 +1462,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F3_SESSION_HOOKS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1442,6 +1491,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F4_SESSION_MCP_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1470,6 +1520,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/F5_SESSION_AGENTS_SKILLS_VIEW.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1497,6 +1548,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I1_FIXTURE_LAYOUT.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1525,6 +1577,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I2_RESOLVER_TESTS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1553,6 +1606,7 @@ Return:
 1. the complete markdown for `Documents/Dev/claude/devDiscoverApp/Documents/I3_PARSER_TESTS.md`
 2. assumptions made
 3. anything that should be added back to `Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1588,6 +1642,7 @@ Rules:
 - Keep fixtures minimal but representative.
 - Include both valid and invalid cases where relevant.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1623,6 +1678,7 @@ Rules:
 - Cover acceptance criteria from the related resolver packets.
 - Prefer deterministic tests and snapshots where the packet calls for them.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1658,6 +1714,7 @@ Rules:
 - Cover the parser packets already implemented.
 - Keep parsing and validation expectations clearly separated.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1693,6 +1750,7 @@ Rules:
 - Keep the types reusable across parsers and resolvers.
 - Do not fold validation logic into the model definitions.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1728,6 +1786,7 @@ Rules:
 - Keep syntax parsing concerns out of scope.
 - Keep semantic checks for a later packet unless explicitly required.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1763,6 +1822,7 @@ Rules:
 - Focus on semantic issues such as duplicates, bad assumptions, unreachable imports, invalid tool syntax, and unresolved references.
 - Keep UI rendering out of scope.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1799,6 +1859,7 @@ Rules:
 - Show effective values, winning source, merge method, issues, and notes clearly.
 - Do not add editing controls.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1835,6 +1896,7 @@ Rules:
 - Show load order, imports, startup-loaded instructions, on-demand memory, and diagnostics clearly.
 - Do not add editing controls.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1871,6 +1933,7 @@ Rules:
 - Show effective hooks, matcher grouping, event grouping, and hook restrictions clearly.
 - Do not add editing controls.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1907,6 +1970,7 @@ Rules:
 - Show effective servers, overridden servers, source precedence, and diagnostics clearly.
 - Do not add editing controls.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1943,6 +2007,7 @@ Rules:
 - Show visibility by scope, precedence, duplicates, and diagnostics clearly.
 - Do not add editing controls.
 - End with a concise handoff summary with: files created or updated, what is complete, what remains, assumptions made, open questions, and recommended next packet.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -1975,6 +2040,7 @@ Rules:
 - Review against the project index and packet outputs, not personal preference.
 - Be concrete about what is missing.
 - Do not jump into Milestone 2 implementation unless Milestone 1 is actually complete.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -2006,6 +2072,7 @@ Rules:
 - Cover editor responsibilities, validation-before-save flow, canonical rendering, preview behavior, and atomic write-through.
 - Keep Session read-only and separate from editor workflows.
 - Match the style of the existing section docs.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -2037,6 +2104,7 @@ Rules:
 - Cover derived usage summaries, reproducible usage metadata, and any supporting fingerprint or derivation infrastructure.
 - Keep billing-grade accounting and hidden databases out of scope.
 - Match the style of the existing section docs.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```
 
 ---
@@ -2067,4 +2135,5 @@ Rules:
 - Cover release hardening, packaging, beta readiness, regression checks, and rollout preparation.
 - Keep product-scope redesign out of this section.
 - Match the style of the existing section docs.
+Handoff rule: if this prompt is an implementation prompt and tests pass, the AI MUST create a short handoff document named after the section just completed with the affix -handoff (example: SECTION_B_DISCOVERY-handoff.md).
 ```

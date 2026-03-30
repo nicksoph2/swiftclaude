@@ -1,81 +1,97 @@
 # Packet B3 - Discovery Models
 
 ## Goal
-Define the shared discovery domain models that carry normalized file and directory references from discovery into parser and resolver packets.
+Define the shared typed discovery contract that `B1_ROOT_LOCATOR` and `B2_PROJECT_SCANNER` output, and that `C*` parsers plus `D*` resolvers consume.
 
 ## Why this packet exists
-`B1_ROOT_LOCATOR` and `B2_PROJECT_SCANNER` produce path-level discovery data, but later packets need a single typed contract for identity, scope, provenance, status, and discovery issues. This packet establishes that contract so parser and resolver code does not reinterpret raw URLs.
+Discovery results must move through the system as stable, explicit models rather than ad hoc paths. This packet defines that contract once so later packets do not re-infer scope, identity, provenance, or path status.
 
 ## Inputs
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/PROJECT_INDEX.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/AI_DRAFT_OTHERS_HANDOFF.md`
 - `/Users/nicksoph/Documents/Dev/claude/devDiscoverApp/Documents/SECTION_B_DISCOVERY.md`
-- outputs from `B1_ROOT_LOCATOR`
-- outputs from `B2_PROJECT_SCANNER`
+- output models from `B1_ROOT_LOCATOR`
+- scan/classification output from `B2_PROJECT_SCANNER`
 
 ## Dependencies
 - `B1_ROOT_LOCATOR`
 - `B2_PROJECT_SCANNER`
 
 ## Deliverables
-- shared discovery model types used across discovery, parser, and resolver layers
-- typed references for discovered files and directories
-- scope identity types covering user, project, managed, and memory-related locations
-- path provenance and path-state enums
+- canonical discovery domain types shared across discovery, parser, and resolver layers
+- typed file and directory references with stable identity
+- scope identity model for user/project ownership and optional managed-source tagging
+- path provenance and path status enums
 - discovery issue model with typed targets and severity
-- ordering and identity invariants documented for downstream consumers
-- unit tests for model identity, sorting, and issue targeting
+- deterministic ordering and identity rules documented for downstream consumers
+- unit tests for identity stability, ordering, and issue targeting
 
 ## Required behavior
-### Model layering
-- keep these models content-agnostic and path-focused
-- avoid parser state, schema errors, or resolver precedence fields in discovery models
-- make models usable as read-only inputs to all `C*` and `D*` packets
+### Separation of concerns
+- keep discovery models path-focused and content-agnostic
+- do not include parser syntax/schema state in discovery nodes
+- do not include precedence, merge method, or effective-value fields
 
-### Stable identity
-- every discovered path has a stable identity object that is deterministic for the same normalized path and scope
-- identity must separate logical ownership (scope) from physical location (path)
-- identity must remain stable whether the path exists or is currently missing
+### Stable identity contract
+- every discovered node must carry a stable identity object
+- stable identity is derived from normalized absolute path + logical scope identity + node class
+- identity remains stable even when status changes (`present` to `missing`, `present` to `unreadable`, etc.)
+- parser and resolver packets must be able to key caches and traces off this identity
+
+### Typed file and directory references
+- represent discovered paths as explicit file or directory nodes, not a single loose path type
+- include normalized absolute path for deterministic machine behavior
+- include display path helper(s) for UI labels without losing normalized identity
+- include node kind enums that map to supported Section B file classes
 
 ### Scope identity
-- represent top-level scope as user or project
-- for project scope, include a stable project identity derived from normalized project root
-- support managed/imported source annotations without changing the base scope model
-- support auto-memory paths as a first-class discovery location, not an untyped extra
+- represent logical owner scope separately from physical path
+- support user scope identity
+- support project scope identity with stable project key derived from normalized project root
+- allow optional source annotation for managed/imported provenance without replacing scope identity
+- include auto-memory location as a first-class discovery location and kind
 
-### Path provenance and status
-- represent how a path entered discovery (canonical expected path, override-root canonical path, descendant scan hit)
-- represent path state independently of provenance (present, missing, unreadable, inaccessible, unsupported)
-- preserve normalized absolute URL/path plus display path helpers for UI use
+### Path provenance
+- track how a node entered discovery, independently of whether it currently exists
+- support provenance values at minimum:
+  - `canonicalExpected`
+  - `rootOverrideCanonical`
+  - `descendantDiscovered`
+- provenance should be preserved through parser and resolver pipelines for source traces
 
-### File and directory classification
-- classify each discovered node as file or directory with explicit kind enums
-- cover all currently supported classes in Section B and Project Index
-- keep unknown/unclassified paths out of this model unless explicitly allowed by scanner policy
+### Path status
+- represent filesystem availability separately from provenance
+- support status values at minimum:
+  - `present`
+  - `missing`
+  - `unreadable`
+  - `inaccessible`
+  - `unsupported`
+- missing canonical entries must remain representable so UI and resolvers can distinguish "not found" from "not applicable"
 
-### Issue modeling
-- discovery issues must be separate from parser and semantic validation issues
-- issues must target one of: root, workspace, file, directory, or scan operation
-- include issue code, severity, and optional underlying error context for diagnostics
-- support partial discovery completion where issues coexist with usable discovered entries
+### Discovery issue model
+- discovery issues are distinct from parser and semantic validation issues
+- each issue targets one typed subject: root, workspace, file node, directory node, or scan operation
+- include stable code, severity, user-facing message, and optional diagnostic context
+- allow partial success: usable nodes may coexist with one or more discovery issues
 
 ### Deterministic ordering
-- define a single sort order for discovered files/directories and issues
-- ordering keys should be explicit and documented (scope, class, normalized path, stable id)
-- downstream layers must not need to add ad hoc sorting for deterministic behavior
+- define one canonical sort strategy for nodes and issues
+- ordering keys should be explicit and stable: scope key, node kind, normalized path, stable id
+- downstream packets should not need to impose additional sorting for deterministic behavior
 
 ## Suggested Swift types
 - `DiscoveryWorkspace`
-- `DiscoveryScope`
-- `ProjectDiscoveryScope`
-- `ScopeIdentity`
+- `DiscoveryScopeIdentity`
+- `ProjectScopeIdentity`
 - `DiscoveryPathID`
 - `DiscoveredNode`
 - `DiscoveredFile`
 - `DiscoveredDirectory`
 - `DiscoveryFileKind`
 - `DiscoveryDirectoryKind`
-- `PathProvenance`
+- `DiscoveryNodeClass`
+- `DiscoveryPathProvenance`
 - `DiscoveryPathStatus`
 - `DiscoveryIssue`
 - `DiscoveryIssueTarget`
@@ -84,31 +100,63 @@ Define the shared discovery domain models that carry normalized file and directo
 - `DiscoveryOrdering`
 
 ## Suggested type-shape expectations
-- `ScopeIdentity`: logical scope key (`user` or project id), optional project root identity, optional managed/imported source tag
-- `DiscoveryPathID`: stable id derived from normalized path + scope identity + node class
-- `DiscoveredFile` / `DiscoveredDirectory`: identity, scope, kind, normalized path, provenance, status
-- `DiscoveryWorkspace`: resolved root references plus discovered nodes plus discovery issues
-- `PathProvenance`: `canonicalExpected`, `rootOverrideCanonical`, `descendantDiscovered`
-- `DiscoveryPathStatus`: `present`, `missing`, `unreadable`, `inaccessible`, `unsupported`
-- `DiscoveryIssue`: id, target, code, severity, message, optional underlying error payload
+- `DiscoveryWorkspace`
+  - resolved root references (from `B1`)
+  - discovered file and directory nodes (from `B2`)
+  - discovery issues
+  - scan timestamp or monotonic scan token if needed for change detection
+
+- `DiscoveryScopeIdentity`
+  - `scopeKind` (`user` or `project`)
+  - `projectID` (present when `project`)
+  - optional managed/imported source descriptor
+
+- `DiscoveryPathID`
+  - stable deterministic key built from:
+    - normalized absolute path
+    - `DiscoveryScopeIdentity`
+    - `DiscoveryNodeClass` (`file` or `directory`)
+
+- `DiscoveredFile` and `DiscoveredDirectory`
+  - `id: DiscoveryPathID`
+  - `scope: DiscoveryScopeIdentity`
+  - typed `kind`
+  - normalized absolute path
+  - display path helper
+  - provenance
+  - status
+
+- `DiscoveryIssue`
+  - stable issue id
+  - typed target
+  - code
+  - severity
+  - user message
+  - optional underlying error/debug context
+
+## Parser and resolver handoff contract
+- `C*` parser packets consume only `DiscoveredFile` entries with compatible `DiscoveryFileKind`
+- parser outputs should carry the originating `DiscoveryPathID` for traceability
+- `D*` resolver packets can use scope identity, provenance, and status without re-walking filesystem paths
+- resolver/source-trace models should be able to reference discovery identity directly
 
 ## Acceptance criteria
-- scanner output can be represented fully with these models without lossy ad hoc fields
-- parser packets can consume discovered file references without redefining scope or path identity
-- resolver packets can inspect provenance/scope/status without re-walking filesystem paths
-- missing canonical paths and inaccessible paths are modeled explicitly and distinctly
-- discovery issues can coexist with partial success and still allow downstream work
+- `B2` scanner output can be represented without lossy adapter fields
+- all supported Section B file classes map to explicit file/directory kinds
+- scope identity, provenance, and status are explicit and non-overlapping
+- missing and inaccessible states are modeled distinctly and survive handoff to downstream packets
+- parser and resolver packet drafts can reference these models without redefining discovery identity
 - deterministic ordering is reproducible for equivalent discovery inputs
 
 ## Out of scope
-- root selection policy and resolution logic (`B1_ROOT_LOCATOR`)
-- recursive traversal and classification execution (`B2_PROJECT_SCANNER`)
-- file parsing and AST/content models (`C*` packets)
-- precedence, merge, and effective-value computation (`D*` packets)
-- UI rendering structure for discovery/session views
+- global root choice policy and project root normalization logic (`B1_ROOT_LOCATOR`)
+- filesystem traversal and path classification execution (`B2_PROJECT_SCANNER`)
+- parser AST/content schemas (`C*` packets)
+- precedence, merge algorithms, and effective value computation (`D*` packets)
+- UI rendering concerns
 
 ## Done when
-Discovery, parser, and resolver packets can all share these discovery models as the single path-level contract without introducing duplicate identity/provenance abstractions.
+Discovery, parser, and resolver layers share one path-level contract for identity, scope, provenance, status, and discovery issues, with no duplicate abstractions for those concerns.
 
 ## Suggested next packet
 - `C1_SETTINGS_JSON_PARSER`

@@ -1,14 +1,17 @@
 # Claude Config Manager - Project Index
 
 ## Product goal
+
 Build a native macOS application that inspects, validates, and edits the real configuration surface used by Claude Code.
 
 The app is not a second source of truth. It reads Claude-owned files on demand, computes the effective state in memory, and writes changes back atomically to the correct files.
 
 ## V1 scope
+
 V1 is a read-first, resolver-first release with limited editing after the core is stable.
 
 ### Included in V1
+
 - Native macOS app built with Swift and SwiftUI
 - Sidebar with four scopes: Managed, User, Project, Session
 - Global settings root picker
@@ -33,6 +36,7 @@ V1 is a read-first, resolver-first release with limited editing after the core i
 - Derived usage summary groundwork only
 
 ### Explicit non-goals for initial implementation
+
 - Hidden database or shadow config store
 - Billing-grade usage ledger
 - Cloud sync layer
@@ -41,6 +45,7 @@ V1 is a read-first, resolver-first release with limited editing after the core i
 - Editing every file type on day one
 
 ## Core product rules
+
 - Claude files are authoritative
 - No shadow database
 - Resolved views are computed, not persisted
@@ -49,7 +54,9 @@ V1 is a read-first, resolver-first release with limited editing after the core i
 - Writes must validate, render canonical output, and replace files atomically
 
 ## Architecture summary
+
 The app is split into:
+
 - SwiftUI app shell and navigation
 - Discovery layer for user root and project roots
 - Parsers for each Claude-related file type
@@ -59,12 +66,14 @@ The app is split into:
 - Small app-owned JSON files for project registry and reproducible derived summaries
 
 ### Scope model
+
 - Managed
 - User
 - Project
 - Session
 
 ### Main file classes
+
 - `~/.claude/settings.json`
 - `<project>/.claude/settings.json`
 - `<project>/.claude/settings.local.json`
@@ -78,13 +87,16 @@ The app is split into:
 - skill directories under `.claude/skills/`
 
 ## Module map
+
 ### App shell
+
 - `ClaudeConfigManagerApp`
 - `AppRouter`
 - `SidebarState`
 - `DocumentSelectionState`
 
 ### Discovery and pathing
+
 - `ProjectRegistry`
 - `RootLocator`
 - `BookmarkStore`
@@ -92,6 +104,7 @@ The app is split into:
 - `FileWatcher`
 
 ### Parsers
+
 - `SettingsParser`
 - `ClaudeJsonParser`
 - `ClaudeMdParser`
@@ -101,6 +114,7 @@ The app is split into:
 - `HookParser`
 
 ### Resolver layer
+
 - `ScopeResolver`
 - `SettingsResolver`
 - `InstructionResolver`
@@ -111,6 +125,7 @@ The app is split into:
 - `SessionProjectionBuilder`
 
 ### Validation and save
+
 - `ValidationEngine`
 - `SchemaValidator`
 - `SemanticValidator`
@@ -118,14 +133,18 @@ The app is split into:
 - `AtomicWriter`
 
 ### Derived state
+
 - `UsageDeriver`
 - `FingerprintStore`
 
 ## Milestones
+
 ### Milestone 1 - Read-only core
+
 Goal: choose roots, scan files, parse them, resolve Session state, and display results read-only.
 
 Included packets:
+
 - `A1_XCODE_SETUP`
 - `A2_APP_SANDBOX_AND_BOOKMARKS`
 - `A3_GLOBAL_AND_PROJECT_ROOT_PICKERS`
@@ -135,19 +154,24 @@ Included packets:
 - resolver packets beginning with `D1_RESOLVER_MODELS`
 
 ### Milestone 2 - Editing core
+
 Goal: edit supported files safely, validate before save, preview writes, and use atomic write-through behavior.
 
 ### Milestone 3 - Usage and polish
+
 Goal: derived usage summaries, provenance UI, test hardening, and beta preparation.
 
 ## Current status
+
 - Product direction is defined
 - Planning structure covers discovery, parsers, resolver, validation, Session UI, and test scaffolding
 - No implementation files assumed yet
 - Immediate next target is Milestone 1
 
 ## Documentation map
+
 ### Section docs
+
 - `Docs/Sections/SECTION_A_APP_SHELL.md`
 - `Docs/Sections/SECTION_B_DISCOVERY.md`
 - `Docs/Sections/SECTION_C_PARSERS.md`
@@ -157,6 +181,7 @@ Goal: derived usage summaries, provenance UI, test hardening, and beta preparati
 - `Docs/Sections/SECTION_I_FIXTURES_AND_TESTS.md`
 
 ### Packet docs created now
+
 - `Docs/Packets/A1_XCODE_SETUP.md`
 - `Docs/Packets/A2_APP_SANDBOX_AND_BOOKMARKS.md`
 - `Docs/Packets/A3_GLOBAL_AND_PROJECT_ROOT_PICKERS.md`
@@ -189,24 +214,30 @@ Goal: derived usage summaries, provenance UI, test hardening, and beta preparati
 - `Docs/Packets/I3_PARSER_TESTS.md`
 
 ### Handoff doc
+
 - `Docs/AI_DRAFT_OTHERS_HANDOFF.md`
 
 ## Working conventions for future AI sessions
+
 - Always load this file first
 - Then load one section doc
 - Then load one packet doc
-- Before implementation, check for an existing packet handoff doc using:
-  - `Documents/<PACKET_NAME>-handoff.md`
-  - example: `Documents/A2_APP_SANDBOX_AND_BOOKMARKS-handoff.md`
+- In chat responses, do not paste full Swift/code by default; summarize changes and reference files. Show code only if the user explicitly asks or needs to choose between code options.
+- Before implementation, check for an existing section handoff doc using:
+  - `Documents/<SECTION_NAME>-handoff.md`
+  - example: `Documents/SECTION_B_DISCOVERY-handoff.md`
 - Keep implementation scoped to the selected packet
 - End each implementation chat with:
   - files created or updated
   - assumptions made
   - open questions
   - next recommended packet
+  - after testing has passed, the AI MUST create a short `.md` handoff document named after the section just completed with the affix `-handoff` (example: `SECTION_B_DISCOVERY-handoff.md`)
 
 ## Packet quality bar
+
 Every packet should define:
+
 - Goal
 - Inputs
 - Dependencies
@@ -216,6 +247,7 @@ Every packet should define:
 - Done when
 
 ## Open decisions to track later
+
 - Canonical JSON formatting rules
 - Markdown import graph visualization style
 - Exact validation severity taxonomy
