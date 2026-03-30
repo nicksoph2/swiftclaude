@@ -1,4 +1,6 @@
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Xcode user and build state
 .derivedData/
@@ -6,9 +8,30 @@ DerivedData/
 build/
 *.xcuserstate
 xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.pbxuser
+!default.pbxuser
 
-# SwiftPM build artifacts
+# Xcode workspace user data
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# SwiftPM and package-generated build artifacts
 .build/
+.swiftpm/
+Packages/
+
+# Test and profiling output
+*.profdata
+*.xccovarchive
+*.xcresult
 
 # Editor state
 .vscode/
+
+# Common local environment files
+.env
+.env.*
+!.env.example
