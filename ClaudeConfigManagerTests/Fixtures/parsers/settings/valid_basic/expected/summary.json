@@ -1,0 +1,9 @@
+{
+  "hasErrors": false,
+  "expectedKeyPaths": [
+    "$schema",
+    "cleanupPeriodDays",
+    "includeGitInstructions",
+    "env.FOO"
+  ]
+}

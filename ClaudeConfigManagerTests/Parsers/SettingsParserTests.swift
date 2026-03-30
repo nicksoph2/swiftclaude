@@ -100,6 +100,39 @@ final class SettingsParserTests: XCTestCase {
         XCTAssertEqual(document.value.pluginSettings["plugins"]?.isObject, true)
         XCTAssertTrue(result.issues.contains(where: { $0.code == .preservedUnsupportedKey && $0.keyPath == "futureSetting" }))
     }
+
+    func testParseFixtureFileFromCanonicalParserLayout() throws {
+        let loader = FixtureLoader.shared
+        let jsonString = try loader.loadString(
+            familyPath: "parsers/settings",
+            caseID: "valid_basic",
+            section: "input",
+            fileName: "settings.json"
+        )
+
+        let result = parser.parse(jsonString: jsonString, sourceURL: sourceURL)
+        let document = try XCTUnwrap(result.value)
+        XCTAssertFalse(result.hasErrors)
+        XCTAssertEqual(document.value.cleanupPeriodDays, 30)
+        XCTAssertEqual(document.value.includeGitInstructions, true)
+        XCTAssertEqual(document.value.env?.values["FOO"], "bar")
+    }
+
+    func testSharedFixtureCaseCanBeReusedByParserSuite() throws {
+        let loader = FixtureLoader.shared
+        let projectLocalJSON = try loader.loadString(
+            familyPath: "shared/settings",
+            caseID: "override_project_wins",
+            section: "input",
+            fileName: "project.settings.local.json"
+        )
+
+        let result = parser.parse(jsonString: projectLocalJSON, sourceURL: sourceURL)
+        let document = try XCTUnwrap(result.value)
+        XCTAssertFalse(result.hasErrors)
+        XCTAssertEqual(document.value.cleanupPeriodDays, 30)
+        XCTAssertEqual(document.value.includeGitInstructions, true)
+    }
 }
 
 private enum SettingsParserFixtures {

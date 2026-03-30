@@ -1,0 +1,6 @@
+{
+  "codes": [
+    "schema.settings.permissionsAllowDenyOverlap",
+    "schema.settings.permissionsModeWithAllowDeny"
+  ]
+}

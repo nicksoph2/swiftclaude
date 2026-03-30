@@ -1,0 +1,11 @@
+{
+  "availableFamilies": [
+    "settings",
+    "instructions",
+    "mcp"
+  ],
+  "expectedIssueCodes": [
+    "semantic.unresolvedImport",
+    "schema.mcp.argsWithoutCommand"
+  ]
+}

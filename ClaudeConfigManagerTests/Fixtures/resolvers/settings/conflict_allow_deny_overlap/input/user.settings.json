@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": ["Read(./**)", "Bash(git status)"],
+    "deny": ["Bash(rm -rf /)"],
+    "mode": "default"
+  }
+}

@@ -378,6 +378,60 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(entry.value.issues.contains(where: { $0.code == .typeMismatch && $0.source?.identifier == "project-local-settings" }))
     }
 
+    func testSharedFixtureCaseCanBeReusedByResolverSuite() throws {
+        let loader = FixtureLoader.shared
+        let parser = SettingsParser()
+
+        let userJSON = try loader.loadString(
+            familyPath: "shared/settings",
+            caseID: "override_project_wins",
+            section: "input",
+            fileName: "user.settings.json"
+        )
+        let localJSON = try loader.loadString(
+            familyPath: "shared/settings",
+            caseID: "override_project_wins",
+            section: "input",
+            fileName: "project.settings.local.json"
+        )
+
+        let userDocument = try XCTUnwrap(
+            parser.parse(
+                jsonString: userJSON,
+                sourceURL: URL(fileURLWithPath: "/tmp/.claude/settings.json", isDirectory: false)
+            ).value
+        )
+        let localDocument = try XCTUnwrap(
+            parser.parse(
+                jsonString: localJSON,
+                sourceURL: URL(fileURLWithPath: "/tmp/project/.claude/settings.local.json", isDirectory: false)
+            ).value
+        )
+
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: userDocument.rawTopLevelObject
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: localDocument.rawTopLevelObject
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+        let cleanupEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "cleanupPeriodDays")
+
+        XCTAssertEqual(cleanupEntry.value.winningSource?.identifier, "project-local-settings")
+        XCTAssertEqual(cleanupEntry.value.effectiveValue, .number(30))
+    }
+
     func testResolutionTraceDeduplicatesParticipantsPreservingFirstSeenOrder() {
         let sourceA = makeSource(identifier: "user-settings", sourcePath: "/tmp/.claude/settings.json")
         let sourceB = makeSource(identifier: "project-settings", scope: .project, sourcePath: "/tmp/project/.claude/settings.json")
@@ -2425,6 +2479,418 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(viewModel.summaryNotes.contains(where: { $0.contains("partial provenance") }))
     }
 
+    func testSessionMCPViewModelSupportsMissingState() {
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input())
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .missing)
+        XCTAssertTrue(viewModel.serverRows.isEmpty)
+        XCTAssertEqual(viewModel.conflictCount, 0)
+        XCTAssertEqual(viewModel.environmentNoteCount, 0)
+        XCTAssertTrue(viewModel.summaryNotes.contains(where: { $0.contains("missing families") }))
+    }
+
+    func testSessionMCPViewModelSupportsEmptySnapshotState() {
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(mcp: ResolvedMcpSnapshot(servers: []))
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .empty)
+        XCTAssertEqual(viewModel.serverRows.count, 0)
+        XCTAssertEqual(viewModel.overriddenServers.count, 0)
+    }
+
+    func testSessionMCPViewModelSortsRowsDeterministicallyAndMapsSingleSourceProvenance() {
+        let source = makeSource(identifier: "project-mcp", scope: .project, sourcePath: "/tmp/project/.mcp.json")
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "zeta",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("zeta-cmd")]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedMcpServerEntry(
+                    serverID: "alpha",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("alpha-cmd")]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .populated)
+        XCTAssertEqual(viewModel.serverRows.map(\.serverID), ["alpha", "zeta"])
+        XCTAssertEqual(viewModel.serverRows.first?.winningSourceChip?.label, "/tmp/project/.mcp.json")
+        XCTAssertEqual(viewModel.serverRows.first?.mergeMethodLabel, "Select Highest")
+        XCTAssertEqual(viewModel.serverRows.first?.participantSourceChips.map(\.label), ["/tmp/project/.mcp.json"])
+    }
+
+    func testSessionMCPViewModelShowsOverriddenDefinitionDetails() {
+        let local = makeSource(identifier: "local-mcp", scope: .projectLocal, sourcePath: "/tmp/project/.mcp.local.json")
+        let user = makeSource(identifier: "user-mcp", scope: .user, sourcePath: "/tmp/.mcp.json")
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "filesystem",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("npx")]),
+                        winningSource: local,
+                        trace: ResolutionTrace(
+                            participants: [local, user],
+                            overridden: [user],
+                            notes: ["Local MCP definition overrides user definition by precedence."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.overriddenServers.count, 1)
+        XCTAssertEqual(viewModel.overriddenServers.first?.serverID, "filesystem")
+        XCTAssertEqual(viewModel.overriddenServers.first?.overriddenSourceLabels, ["/tmp/.mcp.json"])
+        XCTAssertTrue(viewModel.overriddenServers.first?.reason.contains("overrides") == true)
+    }
+
+    func testSessionMCPViewModelExposesConflictInvalidAndEnvironmentDiagnostics() {
+        let source = makeSource(identifier: "project-mcp", scope: .project, sourcePath: "/tmp/project/.mcp.json")
+        let duplicateIssue = ResolutionIssue(
+            code: .duplicateIdentifier,
+            severity: .warning,
+            message: "Duplicate MCP server id 'filesystem' found within source.",
+            source: source,
+            keyPath: "mcpServers.filesystem"
+        )
+        let conflictIssue = ResolutionIssue(
+            code: .conflict,
+            severity: .error,
+            message: "Conflicting MCP transport definitions for 'filesystem'.",
+            source: source,
+            keyPath: "mcpServers.filesystem"
+        )
+        let invalidIssue = ResolutionIssue(
+            code: .typeMismatch,
+            severity: .error,
+            message: "MCP server must define either command or url transport.",
+            source: source,
+            keyPath: "mcpServers.filesystem"
+        )
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "filesystem",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object([
+                            "command": .string("npx"),
+                            "env": .object(["API_KEY": .string("${API_KEY}")])
+                        ]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence,
+                        issues: [invalidIssue]
+                    ),
+                    environmentNotes: [
+                        McpEnvironmentNote(
+                            fieldPath: "env.API_KEY",
+                            classification: .containsReference,
+                            message: "MCP field 'env.API_KEY' contains an environment reference pattern."
+                        )
+                    ]
+                )
+            ],
+            issues: [duplicateIssue, conflictIssue]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.conflictCount, 2)
+        XCTAssertEqual(viewModel.invalidDefinitionCount, 1)
+        XCTAssertEqual(viewModel.environmentNoteCount, 1)
+        XCTAssertEqual(viewModel.errorCount, 2)
+        XCTAssertEqual(viewModel.warningCount, 1)
+        XCTAssertTrue(viewModel.issueBadges.contains(where: { $0.severity == .error && $0.count == 2 }))
+        XCTAssertTrue(viewModel.issueBadges.contains(where: { $0.severity == .warning && $0.count == 1 }))
+        XCTAssertTrue(viewModel.diagnostics.contains(where: { $0.message.contains("environment reference pattern") }))
+    }
+
+    func testSessionMCPViewModelSupportsPartialStateWhenWinningSourceIsMissing() {
+        let participant = makeSource(identifier: "user-mcp", scope: .user, sourcePath: "/tmp/.mcp.json")
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "unresolved",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: nil,
+                        winningSource: nil,
+                        trace: ResolutionTrace(participants: [participant]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .populated)
+        XCTAssertTrue(viewModel.isPartial)
+        XCTAssertEqual(viewModel.stateLabel, "Partial")
+        XCTAssertTrue(viewModel.summaryNotes.contains(where: { $0.contains("partial provenance") }))
+    }
+
+    func testSessionAgentsSkillsViewModelSupportsMissingState() {
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input())
+
+        let viewModel = SessionAgentsSkillsViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .missing)
+        XCTAssertTrue(viewModel.agentRows.isEmpty)
+        XCTAssertTrue(viewModel.skillRows.isEmpty)
+        XCTAssertTrue(viewModel.summaryNotes.contains(where: { $0.contains("missing families") }))
+    }
+
+    func testSessionAgentsSkillsViewModelSortsRowsDeterministicallyInEffectiveState() {
+        let userAgentSource = makeSource(identifier: "user-agent-zeta", scope: .user, sourcePath: "/tmp/.claude/agents/zeta.md")
+        let projectAgentSource = makeSource(identifier: "project-agent-alpha", scope: .project, sourcePath: "/tmp/project/.claude/agents/alpha.md")
+        let userSkillSource = makeSource(identifier: "user-skill-zeta", scope: .user, sourcePath: "/tmp/.claude/skills/zeta/SKILL.md")
+        let projectSkillSource = makeSource(identifier: "project-skill-alpha", scope: .project, sourcePath: "/tmp/project/.claude/skills/alpha/SKILL.md")
+
+        let agentSnapshot = ResolvedAgentSnapshot(
+            agents: [
+                makeResolvedAgentEntry(agentID: "zeta", source: userAgentSource, visibility: .effective),
+                makeResolvedAgentEntry(agentID: "alpha", source: projectAgentSource, visibility: .effective)
+            ]
+        )
+        let skillSnapshot = ResolvedSkillSnapshot(
+            skills: [
+                makeResolvedSkillEntry(skillID: "zeta", source: userSkillSource, visibility: .effective),
+                makeResolvedSkillEntry(skillID: "alpha", source: projectSkillSource, visibility: .effective)
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(agents: agentSnapshot, skills: skillSnapshot)
+        )
+
+        let viewModel = SessionAgentsSkillsViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .populated)
+        XCTAssertFalse(viewModel.isPartial)
+        XCTAssertEqual(viewModel.agentRows.map(\.agentID), ["alpha", "zeta"])
+        XCTAssertEqual(viewModel.skillRows.map(\.skillID), ["alpha", "zeta"])
+        XCTAssertEqual(viewModel.overriddenCount, 0)
+    }
+
+    func testSessionAgentsSkillsViewModelShowsOverriddenEntriesAndDuplicateDiagnostics() {
+        let projectAgentSource = makeSource(identifier: "project-agent-reviewer", scope: .project, sourcePath: "/tmp/project/.claude/agents/reviewer.md")
+        let userAgentSource = makeSource(identifier: "user-agent-reviewer", scope: .user, sourcePath: "/tmp/.claude/agents/reviewer.md")
+        let projectSkillSource = makeSource(identifier: "project-skill-release", scope: .project, sourcePath: "/tmp/project/.claude/skills/release/SKILL.md")
+        let userSkillSource = makeSource(identifier: "user-skill-release", scope: .user, sourcePath: "/tmp/.claude/skills/release/SKILL.md")
+
+        let duplicateAgentIssue = ResolutionIssue(
+            code: .duplicateIdentifier,
+            severity: .warning,
+            message: "Agent identity 'reviewer' was overridden by a higher-precedence definition.",
+            source: userAgentSource,
+            keyPath: "reviewer",
+            relatedSources: [projectAgentSource, userAgentSource]
+        )
+        let duplicateSkillIssue = ResolutionIssue(
+            code: .duplicateIdentifier,
+            severity: .warning,
+            message: "Skill identity 'release' was overridden by a higher-precedence definition.",
+            source: userSkillSource,
+            keyPath: "release",
+            relatedSources: [projectSkillSource, userSkillSource]
+        )
+
+        let agents = ResolvedAgentSnapshot(
+            agents: [
+                makeResolvedAgentEntry(
+                    agentID: "reviewer",
+                    source: projectAgentSource,
+                    visibility: .effective,
+                    participants: [projectAgentSource, userAgentSource],
+                    overridden: [userAgentSource],
+                    winner: projectAgentSource
+                ),
+                makeResolvedAgentEntry(
+                    agentID: "reviewer",
+                    source: userAgentSource,
+                    visibility: .overridden,
+                    participants: [projectAgentSource, userAgentSource],
+                    overridden: [userAgentSource],
+                    winner: projectAgentSource,
+                    issues: [duplicateAgentIssue]
+                )
+            ],
+            issues: [duplicateAgentIssue]
+        )
+        let skills = ResolvedSkillSnapshot(
+            skills: [
+                makeResolvedSkillEntry(
+                    skillID: "release",
+                    source: projectSkillSource,
+                    visibility: .effective,
+                    participants: [projectSkillSource, userSkillSource],
+                    overridden: [userSkillSource],
+                    winner: projectSkillSource
+                ),
+                makeResolvedSkillEntry(
+                    skillID: "release",
+                    source: userSkillSource,
+                    visibility: .overridden,
+                    participants: [projectSkillSource, userSkillSource],
+                    overridden: [userSkillSource],
+                    winner: projectSkillSource,
+                    issues: [duplicateSkillIssue]
+                )
+            ],
+            issues: [duplicateSkillIssue]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(agents: agents, skills: skills)
+        )
+
+        let viewModel = SessionAgentsSkillsViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.overriddenCount, 2)
+        XCTAssertEqual(viewModel.overrides.count, 2)
+        XCTAssertEqual(viewModel.warningCount, 2)
+        XCTAssertTrue(viewModel.diagnostics.contains(where: { $0.message.contains("Agent identity 'reviewer'") }))
+        XCTAssertTrue(viewModel.diagnostics.contains(where: { $0.message.contains("Skill identity 'release'") }))
+    }
+
+    func testSessionAgentsSkillsViewModelSurfacesInvalidDefinitionDiagnostics() {
+        let invalidAgentSource = makeSource(identifier: "invalid-agent", scope: .project, sourcePath: "/tmp/project/.claude/agents/invalid.md")
+        let invalidSkillSource = makeSource(identifier: "invalid-skill", scope: .project, sourcePath: "/tmp/project/.claude/skills/invalid/SKILL.md")
+        let invalidAgentIssue = ResolutionIssue(
+            code: .invalidSource,
+            severity: .error,
+            message: "Agent source is present but did not produce a parsed document.",
+            source: invalidAgentSource,
+            keyPath: "invalid-agent"
+        )
+        let invalidSkillIssue = ResolutionIssue(
+            code: .unsupportedShape,
+            severity: .error,
+            message: "Skill directory is missing SKILL.md and remains discovered but unavailable for effective visibility.",
+            source: invalidSkillSource,
+            keyPath: "invalid-skill"
+        )
+
+        let agents = ResolvedAgentSnapshot(
+            agents: [
+                makeResolvedAgentEntry(
+                    agentID: "invalid-agent",
+                    source: invalidAgentSource,
+                    visibility: .invalid,
+                    issues: [invalidAgentIssue],
+                    includeDefinitionDocument: false
+                )
+            ],
+            issues: [invalidAgentIssue]
+        )
+        let skills = ResolvedSkillSnapshot(
+            skills: [
+                makeResolvedSkillEntry(
+                    skillID: "invalid-skill",
+                    source: invalidSkillSource,
+                    visibility: .invalid,
+                    issues: [invalidSkillIssue],
+                    includeDefinitionDocument: false
+                )
+            ],
+            issues: [invalidSkillIssue]
+        )
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(agents: agents, skills: skills)
+        )
+
+        let viewModel = SessionAgentsSkillsViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.state, .populated)
+        XCTAssertTrue(viewModel.isPartial)
+        XCTAssertEqual(viewModel.invalidCount, 2)
+        XCTAssertEqual(viewModel.errorCount, 2)
+        XCTAssertTrue(viewModel.diagnostics.contains(where: { $0.message.contains("did not produce a parsed document") }))
+        XCTAssertTrue(viewModel.diagnostics.contains(where: { $0.message.contains("missing SKILL.md") }))
+    }
+
+    func testSessionAgentsSkillsViewModelSupportsEmptyAndPartialFamilyStates() {
+        let emptyProjection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(
+                agents: ResolvedAgentSnapshot(agents: []),
+                skills: ResolvedSkillSnapshot(skills: [])
+            )
+        )
+        let emptyViewModel = SessionAgentsSkillsViewModel(projection: emptyProjection)
+        XCTAssertEqual(emptyViewModel.state, .empty)
+
+        let agentSource = makeSource(identifier: "project-agent-only", scope: .project, sourcePath: "/tmp/project/.claude/agents/only.md")
+        let unavailableAgentSource = ResolutionSource(
+            scope: .user,
+            kind: .file,
+            identifier: "user-agent-unavailable",
+            sourcePath: "/tmp/.claude/agents/unavailable.md",
+            availability: .missing
+        )
+        let unavailableIssue = ResolutionIssue(
+            code: .missingSource,
+            severity: .warning,
+            message: "Agent source is missing and was skipped.",
+            source: unavailableAgentSource,
+            keyPath: "unavailable"
+        )
+        let partialProjection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(
+                agents: ResolvedAgentSnapshot(
+                    agents: [
+                        makeResolvedAgentEntry(agentID: "only", source: agentSource, visibility: .effective),
+                        makeResolvedAgentEntry(
+                            agentID: "unavailable",
+                            source: unavailableAgentSource,
+                            visibility: .unavailable,
+                            issues: [unavailableIssue],
+                            includeDefinitionDocument: false
+                        )
+                    ],
+                    issues: [unavailableIssue]
+                ),
+                skills: nil
+            )
+        )
+        let partialViewModel = SessionAgentsSkillsViewModel(projection: partialProjection)
+        XCTAssertEqual(partialViewModel.state, .populated)
+        XCTAssertTrue(partialViewModel.isPartial)
+        XCTAssertEqual(partialViewModel.unavailableCount, 1)
+        XCTAssertTrue(partialViewModel.summaryNotes.contains(where: { $0.contains("Only one of agents/skills families") }))
+    }
+
     private func makeSource(
         identifier: String,
         scope: ResolutionScope = .user,
@@ -2460,6 +2926,116 @@ final class ResolverModelsTests: XCTestCase {
             source: source,
             document: makeSettingsDocument(sourcePath: sourcePath ?? "/tmp/\(identifier).json", rawTopLevel: rawTopLevel),
             issues: []
+        )
+    }
+
+    private func makeResolvedAgentEntry(
+        agentID: String,
+        source: ResolutionSource,
+        visibility: VisibilityState,
+        participants: [ResolutionSource]? = nil,
+        overridden: [ResolutionSource] = [],
+        winner: ResolutionSource? = nil,
+        issues: [ResolutionIssue] = [],
+        includeDefinitionDocument: Bool = true
+    ) -> ResolvedAgentEntry {
+        let traceParticipants = participants ?? [source]
+        let document = includeDefinitionDocument
+            ? ParsedAgentDocument(
+                source: SourceFileReference(url: URL(fileURLWithPath: source.sourcePath ?? "/tmp/\(agentID).md")),
+                frontmatter: ParsedAgentFrontmatter(
+                    name: agentID.capitalized,
+                    description: "Agent \(agentID) description.",
+                    tools: [ParsedAgentToolEntry(rawValue: "Read")],
+                    unknownFields: [:]
+                ),
+                rawFrontmatter: nil,
+                promptBody: "Prompt body."
+            )
+            : nil
+
+        return ResolvedAgentEntry(
+            agentID: agentID,
+            source: source,
+            definition: ResolvedValue(
+                effectiveValue: document,
+                winningSource: includeDefinitionDocument ? source : nil,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            ),
+            visibility: ResolvedValue(
+                effectiveValue: visibility,
+                winningSource: winner,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            ),
+            isVisible: ResolvedValue(
+                effectiveValue: visibility == .effective,
+                winningSource: winner,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            )
+        )
+    }
+
+    private func makeResolvedSkillEntry(
+        skillID: String,
+        source: ResolutionSource,
+        visibility: VisibilityState,
+        participants: [ResolutionSource]? = nil,
+        overridden: [ResolutionSource] = [],
+        winner: ResolutionSource? = nil,
+        issues: [ResolutionIssue] = [],
+        includeDefinitionDocument: Bool = true
+    ) -> ResolvedSkillEntry {
+        let traceParticipants = participants ?? [source]
+        let document = includeDefinitionDocument
+            ? ParsedSkillDocument(
+                directory: SkillDirectoryMetadata(
+                    skillRootURL: URL(fileURLWithPath: "/tmp/skills/\(skillID)"),
+                    skillMarkdownURL: URL(fileURLWithPath: source.sourcePath ?? "/tmp/skills/\(skillID)/SKILL.md"),
+                    hasSkillMarkdown: true
+                ),
+                frontmatter: ParsedSkillFrontmatter(
+                    name: skillID.capitalized,
+                    description: "Skill \(skillID) description.",
+                    version: "1.0.0",
+                    tags: ["tag"],
+                    unknownFields: [:]
+                ),
+                rawFrontmatter: nil,
+                body: "Skill body.",
+                supportingReferences: []
+            )
+            : nil
+
+        return ResolvedSkillEntry(
+            skillID: skillID,
+            source: source,
+            definition: ResolvedValue(
+                effectiveValue: document,
+                winningSource: includeDefinitionDocument ? source : nil,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            ),
+            visibility: ResolvedValue(
+                effectiveValue: visibility,
+                winningSource: winner,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            ),
+            isVisible: ResolvedValue(
+                effectiveValue: visibility == .effective,
+                winningSource: winner,
+                trace: ResolutionTrace(participants: traceParticipants, overridden: overridden),
+                mergeMethod: .selectHighestPrecedence,
+                issues: issues
+            )
         )
     }
 

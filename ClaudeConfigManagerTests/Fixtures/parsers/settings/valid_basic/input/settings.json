@@ -1,0 +1,8 @@
+{
+  "$schema": "https://example.com/schema",
+  "cleanupPeriodDays": 30,
+  "includeGitInstructions": true,
+  "env": {
+    "FOO": "bar"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "keyPath": "cleanupPeriodDays",
+  "winningSource": "project-local-settings",
+  "effectiveValue": 30
+}

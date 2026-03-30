@@ -1,0 +1,8 @@
+{
+  "cleanupPeriodDays": 14,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "command": "echo validate" }
+    ]
+  }
+}
