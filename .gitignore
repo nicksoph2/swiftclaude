@@ -1,0 +1,14 @@
+.DS_Store
+
+# Xcode user and build state
+.derivedData/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# SwiftPM build artifacts
+.build/
+
+# Editor state
+.vscode/
