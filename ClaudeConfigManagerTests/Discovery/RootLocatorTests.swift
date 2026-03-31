@@ -6,7 +6,6 @@ final class RootLocatorTests: XCTestCase {
         let state = GlobalAppState(
             globalClaudeRootSource: .overrideBookmark,
             globalClaudeRootBookmarkID: BookmarkStore.globalRootBookmarkID,
-            hasCompletedInitialGlobalRootSetup: true,
             projectRegistrations: [],
             selectedProjectRegistrationID: nil
         )
@@ -50,7 +49,6 @@ final class RootLocatorTests: XCTestCase {
         let state = GlobalAppState(
             globalClaudeRootSource: .overrideBookmark,
             globalClaudeRootBookmarkID: BookmarkStore.globalRootBookmarkID,
-            hasCompletedInitialGlobalRootSetup: true,
             projectRegistrations: [],
             selectedProjectRegistrationID: nil
         )
@@ -69,7 +67,11 @@ final class RootLocatorTests: XCTestCase {
             ]
         )
 
-        let accessChecker = MockRootDirectoryAccessChecker(statusesByPath: [:])
+        let accessChecker = MockRootDirectoryAccessChecker(
+            statusesByPath: [
+                "/users/default/.claude": .accessible
+            ]
+        )
 
         let locator = RootLocator(
             bookmarkResolver: bookmarkResolver,
@@ -80,8 +82,7 @@ final class RootLocatorTests: XCTestCase {
         let result = locator.resolveRoots(state: state)
 
         XCTAssertEqual(result.globalRoot.source, .defaultHomeClaude)
-        XCTAssertNil(result.globalRoot.normalizedPath)
-        XCTAssertEqual(result.globalRoot.accessStatus, .notAuthorized)
+        XCTAssertEqual(result.globalRoot.normalizedPath, "/users/default/.claude")
         XCTAssertEqual(result.issues.count, 1)
         XCTAssertEqual(result.issues.first?.kind, .globalOverrideRequiresReauthorization)
     }
@@ -90,13 +91,16 @@ final class RootLocatorTests: XCTestCase {
         let state = GlobalAppState(
             globalClaudeRootSource: .overrideBookmark,
             globalClaudeRootBookmarkID: BookmarkStore.globalRootBookmarkID,
-            hasCompletedInitialGlobalRootSetup: true,
             projectRegistrations: [],
             selectedProjectRegistrationID: nil
         )
 
         let bookmarkResolver = MockRootBookmarkResolver(resultsByID: [:])
-        let accessChecker = MockRootDirectoryAccessChecker(statusesByPath: [:])
+        let accessChecker = MockRootDirectoryAccessChecker(
+            statusesByPath: [
+                "/users/default/.claude": .inaccessible
+            ]
+        )
 
         let locator = RootLocator(
             bookmarkResolver: bookmarkResolver,
@@ -106,19 +110,15 @@ final class RootLocatorTests: XCTestCase {
 
         let result = locator.resolveRoots(state: state)
 
-        XCTAssertEqual(result.globalRoot.source, .defaultHomeClaude)
+        XCTAssertEqual(result.globalRoot.source, .unresolved)
         XCTAssertNil(result.globalRoot.rootURL)
-        XCTAssertEqual(result.globalRoot.accessStatus, .notAuthorized)
-        XCTAssertEqual(result.issues.map(\.kind), [.globalOverrideMissingBookmark])
+        XCTAssertEqual(result.issues.map(\.kind), [.defaultRootInaccessible, .globalOverrideMissingBookmark])
     }
 
     func testNormalizesProjectRootsIntoStableReferences() {
-        let alphaBookmarkID = "project-a"
-        let betaBookmarkID = "project-b"
         let state = GlobalAppState(
             globalClaudeRootSource: .defaultHomeClaude,
             globalClaudeRootBookmarkID: nil,
-            hasCompletedInitialGlobalRootSetup: true,
             projectRegistrations: [
                 ProjectRegistration(
                     id: "project-b",
@@ -142,34 +142,14 @@ final class RootLocatorTests: XCTestCase {
 
         let accessChecker = MockRootDirectoryAccessChecker(
             statusesByPath: [
+                "/users/default/.claude": .accessible,
                 "/users/test/work/alpha": .accessible,
                 "/users/test/work/beta": .missing
             ]
         )
 
         let locator = RootLocator(
-            bookmarkResolver: MockRootBookmarkResolver(
-                resultsByID: [
-                    alphaBookmarkID: BookmarkResolutionResult(
-                        record: BookmarkRecord(
-                            id: alphaBookmarkID,
-                            kind: .projectRoot,
-                            displayName: "Alpha",
-                            preferredPath: "/Users/Test/Work/alpha"
-                        ),
-                        status: .accessible(url: URL(fileURLWithPath: "/Users/Test/Work/alpha"))
-                    ),
-                    betaBookmarkID: BookmarkResolutionResult(
-                        record: BookmarkRecord(
-                            id: betaBookmarkID,
-                            kind: .projectRoot,
-                            displayName: "Beta",
-                            preferredPath: "/Users/Test/Work/BETA/"
-                        ),
-                        status: .accessible(url: URL(fileURLWithPath: "/Users/Test/Work/BETA/"))
-                    )
-                ]
-            ),
+            bookmarkResolver: MockRootBookmarkResolver(resultsByID: [:]),
             accessChecker: accessChecker,
             homeDirectoryProvider: { URL(fileURLWithPath: "/Users/Default") }
         )

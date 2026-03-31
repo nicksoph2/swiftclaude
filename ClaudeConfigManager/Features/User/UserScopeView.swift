@@ -26,7 +26,7 @@ struct UserScopeView: View {
             Label("Global Claude Root", systemImage: "folder.badge.gearshape")
                 .font(.largeTitle.weight(.semibold))
 
-            Text("Select the folder used for global discovery. The app uses user-granted, read-only access and does not write into Claude-managed folders.")
+            Text("Select the folder used for global discovery. This is discovery configuration only.")
                 .foregroundStyle(.secondary)
         }
         .padding(20)
@@ -43,32 +43,22 @@ struct UserScopeView: View {
                 sourceBadge
             }
 
-            Text(rootSelection.hasAuthorizedGlobalRoot ? rootSelection.selectedGlobalRootURL.path : "No authorized global folder")
+            Text(rootSelection.selectedGlobalRootURL.path)
                 .font(.system(.body, design: .monospaced))
                 .textSelection(.enabled)
 
-            Text("Recommended default: \(rootSelection.defaultGlobalRootURL.path)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            Text(rootSelection.recommendedGlobalRootIsAvailable
-                ? "The recommended Claude folder is available. Use the button below to grant read-only access."
-                : "The recommended Claude folder is not currently available, so choose another folder if you want global discovery.")
+            Text("Default root: \(rootSelection.defaultGlobalRootURL.path)")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                Button("Choose Folder…") {
-                    rootSelection.chooseGlobalRootFolder()
+                Button("Choose Override…") {
+                    rootSelection.selectGlobalRootOverride()
                 }
-                Button("Use Recommended Default") {
-                    rootSelection.authorizeRecommendedGlobalRoot()
+                Button("Use Default") {
+                    rootSelection.useDefaultGlobalRoot()
                 }
-                .disabled(!rootSelection.recommendedGlobalRootIsAvailable)
-                Button("Clear Selection") {
-                    rootSelection.clearGlobalRootSelection()
-                }
-                .disabled(!rootSelection.hasAuthorizedGlobalRoot)
+                .disabled(rootSelection.globalRootSource == .defaultHomeClaude)
             }
         }
         .padding(20)
@@ -81,7 +71,7 @@ struct UserScopeView: View {
     }
 
     private var precedenceReminderCard: some View {
-        Text("Changing this folder changes only where the app reads global Claude files from. It does not change Claude’s own configuration precedence rules.")
+        Text("Changing this root does not change Claude configuration precedence rules.")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .padding(16)
@@ -95,11 +85,9 @@ struct UserScopeView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                rootSelection.hasAuthorizedGlobalRoot
-                    ? (rootSelection.globalRootSource == .defaultHomeClaude
-                        ? Color.gray.opacity(0.18)
-                        : Color.green.opacity(0.18))
-                    : Color.orange.opacity(0.18),
+                rootSelection.globalRootSource == .defaultHomeClaude
+                    ? Color.gray.opacity(0.18)
+                    : Color.green.opacity(0.18),
                 in: Capsule()
             )
     }

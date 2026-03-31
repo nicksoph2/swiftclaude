@@ -1,8 +1,0 @@
-{
-  "apiKeyHelper": "security find-generic-password -s claude-api",
-  "forceLoginMethod": "console",
-  "forceLoginOrgUUID": "123E4567-E89B-12D3-A456-426614174000",
-  "otelHeadersHelper": "/usr/local/bin/otel-headers-helper",
-  "awsAuthRefresh": "/usr/local/bin/aws-auth-refresh",
-  "awsCredentialExport": "/usr/local/bin/aws-credential-export"
-}

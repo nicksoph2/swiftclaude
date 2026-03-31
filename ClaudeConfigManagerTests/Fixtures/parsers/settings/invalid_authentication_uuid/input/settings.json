@@ -1,5 +1,0 @@
-{
-  "forceLoginMethod": "sso",
-  "forceLoginOrgUUID": "not-a-uuid",
-  "otelHeadersHelper": "/usr/local/bin/otel-headers-helper"
-}

@@ -3,7 +3,6 @@ import SwiftUI
 struct RootSplitView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var debugMonitor: AppDebugMonitor
-    @EnvironmentObject private var rootSelection: RootSelectionViewModel
 
     var body: some View {
         NavigationSplitView {
@@ -30,9 +29,6 @@ struct RootSplitView: View {
                     #endif
                 }
         }
-        .sheet(isPresented: .constant(rootSelection.shouldPromptForInitialGlobalRootAccess)) {
-            InitialGlobalRootAccessView()
-        }
     }
 
     @ViewBuilder
@@ -47,49 +43,6 @@ struct RootSplitView: View {
         case .session:
             SessionScopeView()
         }
-    }
-}
-
-private struct InitialGlobalRootAccessView: View {
-    @EnvironmentObject private var rootSelection: RootSelectionViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Label("Authorize Your Claude Folder", systemImage: "lock.open.display")
-                .font(.title2.weight(.semibold))
-
-            Text("To stay App Store compliant, the app only reads global Claude files after you grant folder access. The recommended folder is preselected when available.")
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Recommended folder")
-                    .font(.headline)
-                Text(rootSelection.defaultGlobalRootURL.path)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-            }
-
-            HStack(spacing: 10) {
-                Button("Use Recommended Folder") {
-                    rootSelection.authorizeRecommendedGlobalRoot()
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Choose Different Folder") {
-                    rootSelection.chooseGlobalRootFolder()
-                }
-
-                Button("Skip for Now") {
-                    rootSelection.skipInitialGlobalRootSetup()
-                }
-            }
-
-            Text("You can change this later in Settings > Global Root.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(24)
-        .frame(width: 560)
     }
 }
 

@@ -41,24 +41,6 @@ final class FixtureLayoutContractTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: invalidDescriptor.expectedDirectoryURL.path))
     }
 
-    func testParserFixtureMatrixIncludesAllFamiliesCoveredInPacketI3() throws {
-        let loader = FixtureLoader.shared
-        let requiredCases: [(familyPath: String, caseID: FixtureCaseID)] = [
-            ("parsers/settings", "valid_basic"),
-            ("parsers/claude_json", "valid_basic"),
-            ("parsers/claude_md", "valid_multiple_imports"),
-            ("parsers/agent", "valid_basic"),
-            ("parsers/skill", "valid_basic"),
-            ("parsers/mcp_json", "valid_command_and_url")
-        ]
-
-        for required in requiredCases {
-            let descriptor = try loader.descriptor(familyPath: required.familyPath, caseID: required.caseID)
-            XCTAssertTrue(FileManager.default.fileExists(atPath: descriptor.inputDirectoryURL.path))
-            XCTAssertTrue(FileManager.default.fileExists(atPath: descriptor.expectedDirectoryURL.path))
-        }
-    }
-
     func testExpectedIssueSetLoadsDeterministicallyFromValidationFixture() throws {
         let loader = FixtureLoader.shared
         let issueSet = try loader.loadExpectedIssueSet(
@@ -87,24 +69,6 @@ final class FixtureLayoutContractTests: XCTestCase {
                 atPath: sessionDescriptor.expectedSnapshot(named: "projection_summary.json").url.path
             )
         )
-    }
-
-    func testResolverFixtureMatrixIncludesAllResolverFamiliesCoveredInPacketI2() throws {
-        let loader = FixtureLoader.shared
-        let requiredCases: [(familyPath: String, caseID: FixtureCaseID)] = [
-            ("resolvers/settings", "override_project_wins"),
-            ("resolvers/settings", "conflict_allow_deny_overlap"),
-            ("resolvers/instructions", "cycle_and_missing_import"),
-            ("resolvers/mcp", "fallback_and_env_notes"),
-            ("resolvers/agents_skills", "override_and_invalid_entries"),
-            ("resolvers/projection", "partial_settings_only")
-        ]
-
-        for required in requiredCases {
-            let descriptor = try loader.descriptor(familyPath: required.familyPath, caseID: required.caseID)
-            XCTAssertTrue(FileManager.default.fileExists(atPath: descriptor.inputDirectoryURL.path))
-            XCTAssertTrue(FileManager.default.fileExists(atPath: descriptor.expectedDirectoryURL.path))
-        }
     }
 }
 

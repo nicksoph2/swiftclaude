@@ -218,13 +218,7 @@ struct ResolutionIssue: Equatable, Identifiable, Sendable {
             return .typeMismatch
         case .invalidJSON,
              .topLevelNotObject,
-             .ambiguousMcpTransport,
-             .missingMcpTransport,
-             .deprecatedMcpTransport,
-             .invalidMcpRestrictionRule,
-             .managedOnlySettingInNonManagedScope,
              .invalidHookShape,
-             .preservedUnknownHookEvent,
              .invalidPermissionsShape,
              .invalidEnvShape,
              .invalidAttributionShape,
@@ -232,14 +226,12 @@ struct ResolutionIssue: Equatable, Identifiable, Sendable {
              .invalidClaudeJsonMcpShape,
              .invalidTrustStateShape,
              .settingsFamilyKeyInClaudeJson,
-             .claudeJsonOnlyKeyInSettings,
              .preservedUnsupportedKey,
              .invalidFrontmatterFence,
              .invalidYAMLFrontmatter,
              .frontmatterTopLevelNotObject,
              .missingSkillMarkdown,
-             .invalidMarkdownReferenceToken,
-             .preservedUnknownValue:
+             .invalidMarkdownReferenceToken:
             return .parserSyntaxIssue
         }
     }
@@ -951,6 +943,20 @@ struct SchemaValidator {
             )
         }
 
+        if let topLevelValue = document.value.includeCoAuthoredBy,
+           let attributionValue = document.value.attribution?.includeCoAuthoredBy,
+           topLevelValue != attributionValue {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.attributionConflict"),
+                    severity: .warning,
+                    message: "Top-level includeCoAuthoredBy conflicts with attribution.includeCoAuthoredBy.",
+                    context: context,
+                    keyPath: "attribution.includeCoAuthoredBy"
+                )
+            )
+        }
+
         if let permissions = document.value.permissions {
             if permissions.mode != nil, permissions.allow != nil || permissions.deny != nil {
                 issues.append(
@@ -981,8 +987,9 @@ struct SchemaValidator {
         }
 
         if let hooks = document.value.hooks {
-            for event in hooks.events.values.sorted(by: { $0.eventName < $1.eventName }) {
-                let eventPath = "hooks.\(event.eventName)"
+            for eventName in hooks.events.keys.sorted() {
+                guard let event = hooks.events[eventName] else { continue }
+                let eventPath = "hooks.\(eventName)"
 
                 if event.actions.isEmpty {
                     issues.append(
@@ -1037,14 +1044,14 @@ struct SchemaValidator {
                         }
                     }
 
-                    if let timeout = action.timeout, timeout < 0 {
+                    if let timeoutMs = action.timeoutMs, timeoutMs < 0 {
                         issues.append(
                             makeIssue(
                                 code: .schema("settings.hookActionNegativeTimeout"),
                                 severity: .error,
-                                message: "Hook action timeout must be non-negative.",
+                                message: "Hook action timeoutMs must be non-negative.",
                                 context: context,
-                                keyPath: "\(actionPath).timeout"
+                                keyPath: "\(actionPath).timeoutMs"
                             )
                         )
                     }
@@ -1463,56 +1470,22 @@ struct SchemaValidator {
         context: SchemaValidationContext
     ) -> [ValidationIssue] {
         var issues: [ValidationIssue] = []
-        switch server.transportType {
-        case .stdio:
-            if !isNonEmpty(server.command) {
-                issues.append(
-                    makeIssue(
-                        code: .schema("mcp.serverTransportShape"),
-                        severity: .error,
-                        message: "MCP stdio server requires command to be set.",
-                        context: context,
-                        keyPath: keyPath
-                    )
-                )
-            }
-        case .http, .sse:
-            if !isNonEmpty(server.url) {
-                issues.append(
-                    makeIssue(
-                        code: .schema("mcp.serverTransportShape"),
-                        severity: .error,
-                        message: "MCP URL-based server requires url to be set.",
-                        context: context,
-                        keyPath: keyPath
-                    )
-                )
-            }
-        case .plugin:
-            if !isNonEmpty(server.pluginId) {
-                issues.append(
-                    makeIssue(
-                        code: .schema("mcp.serverTransportShape"),
-                        severity: .error,
-                        message: "Plugin-provided MCP server requires pluginId to be set.",
-                        context: context,
-                        keyPath: keyPath
-                    )
-                )
-            }
-        case .unknown:
+        let hasCommand = isNonEmpty(server.command)
+        let hasURL = isNonEmpty(server.url)
+
+        if hasCommand == hasURL {
             issues.append(
                 makeIssue(
                     code: .schema("mcp.serverTransportShape"),
                     severity: .error,
-                    message: "MCP server must define a supported transport.",
+                    message: "MCP server must define exactly one of command or url.",
                     context: context,
                     keyPath: keyPath
                 )
             )
         }
 
-        if server.args != nil, server.transportType == .unknown {
+        if server.args != nil, !hasCommand {
             issues.append(
                 makeIssue(
                     code: .schema("mcp.argsWithoutCommand"),
@@ -1524,7 +1497,7 @@ struct SchemaValidator {
             )
         }
 
-        if server.headers != nil, server.transportType == .unknown {
+        if server.headers != nil, !hasURL {
             issues.append(
                 makeIssue(
                     code: .schema("mcp.headersWithoutUrl"),
@@ -1748,20 +1721,17 @@ enum SettingsSourceTier: Int, Comparable, CaseIterable, Sendable {
 
 struct SettingsSourceCandidate: Equatable, Sendable {
     let tier: SettingsSourceTier
-    let precedenceRank: Int
     let source: ResolutionSource
     let document: ParsedSettingsDocument?
     let issues: [ResolutionIssue]
 
     init(
         tier: SettingsSourceTier,
-        precedenceRank: Int = 0,
         source: ResolutionSource,
         document: ParsedSettingsDocument?,
         issues: [ResolutionIssue] = []
     ) {
         self.tier = tier
-        self.precedenceRank = precedenceRank
         self.source = source
         self.document = document
         self.issues = issues.sorted { $0.id < $1.id }
@@ -1806,250 +1776,7 @@ struct ResolvedSettingsSourceSelection: Equatable, Sendable {
     }
 }
 
-enum ManagedSettingsTierKind: String, Equatable, Sendable {
-    case serverManaged
-    case mdmPolicy
-    case fileBased
-
-    var displayName: String {
-        switch self {
-        case .serverManaged:
-            return "Server-managed settings"
-        case .mdmPolicy:
-            return "MDM / OS policy"
-        case .fileBased:
-            return "File-based managed settings"
-        }
-    }
-}
-
-struct ManagedSettingsActiveTier: Equatable, Sendable {
-    let kind: ManagedSettingsTierKind
-    let sources: [ResolutionSource]
-    let notes: [String]
-
-    init(
-        kind: ManagedSettingsTierKind,
-        sources: [ResolutionSource],
-        notes: [String] = []
-    ) {
-        self.kind = kind
-        self.sources = ResolutionTrace(participants: sources).participants
-        self.notes = notes
-    }
-}
-
-struct ManagedSettingsResolution: Equatable, Sendable {
-    let activeTier: ManagedSettingsActiveTier?
-    let settingsCandidates: [SettingsSourceCandidate]
-    let managedMcpDocuments: [McpDocumentCandidate]
-    let issues: [ResolutionIssue]
-    let notes: [String]
-
-    init(
-        activeTier: ManagedSettingsActiveTier?,
-        settingsCandidates: [SettingsSourceCandidate],
-        managedMcpDocuments: [McpDocumentCandidate],
-        issues: [ResolutionIssue] = [],
-        notes: [String] = []
-    ) {
-        self.activeTier = activeTier
-        self.settingsCandidates = settingsCandidates
-        self.managedMcpDocuments = managedMcpDocuments
-        self.issues = issues.sorted { $0.id < $1.id }
-        self.notes = notes
-    }
-}
-
-struct ManagedScopeStatusModel: Equatable, Sendable {
-    let title: String
-    let detail: String
-    let activeTierLabel: String
-    let sourceSummaries: [String]
-    /// Describes whether the managed root path could be read, is genuinely absent, or was
-    /// blocked by sandbox policy. Views use this to show an explicit fallback banner rather than
-    /// silently treating inaccessible managed paths as "no policy".
-    let accessOutcome: ManagedAccessOutcome
-
-    /// Convenience initialiser for backward-compatible call sites that do not yet supply an
-    /// access outcome. Defaults to `.missing` (no managed config deployed).
-    init(resolution: ManagedSettingsResolution?) {
-        self.init(resolution: resolution, accessOutcome: .missing)
-    }
-
-    /// Designated initialiser. `accessOutcome` describes how the managed path probe went
-    /// regardless of whether any resolution was produced.
-    init(resolution: ManagedSettingsResolution?, accessOutcome: ManagedAccessOutcome) {
-        self.accessOutcome = accessOutcome
-
-        if let activeTier = resolution?.activeTier {
-            self.title = "Active managed tier"
-            self.detail = activeTier.kind.displayName
-            self.activeTierLabel = activeTier.kind.rawValue
-            self.sourceSummaries = activeTier.sources.map {
-                $0.displayName ?? $0.sourcePath ?? $0.identifier
-            }
-        } else {
-            self.title = "No managed tier active"
-            self.detail = "No server-managed settings, MDM policy, or file-based managed settings are currently active."
-            self.activeTierLabel = "none"
-            self.sourceSummaries = []
-        }
-    }
-}
-
-struct ManagedSettingsResolver {
-    struct Input: Equatable, Sendable {
-        let serverManagedSettings: SettingsSourceCandidate?
-        let mdmManagedSettings: SettingsSourceCandidate?
-        let fileBasedSettings: [SettingsSourceCandidate]
-        let fileBasedManagedMcp: McpDocumentCandidate?
-
-        init(
-            serverManagedSettings: SettingsSourceCandidate? = nil,
-            mdmManagedSettings: SettingsSourceCandidate? = nil,
-            fileBasedSettings: [SettingsSourceCandidate] = [],
-            fileBasedManagedMcp: McpDocumentCandidate? = nil
-        ) {
-            self.serverManagedSettings = serverManagedSettings
-            self.mdmManagedSettings = mdmManagedSettings
-            self.fileBasedSettings = fileBasedSettings
-            self.fileBasedManagedMcp = fileBasedManagedMcp
-        }
-    }
-
-    func resolve(input: Input) -> ManagedSettingsResolution {
-        if let serverManaged = input.serverManagedSettings, isManagedTierPresent(serverManaged) {
-            return ManagedSettingsResolution(
-                activeTier: ManagedSettingsActiveTier(
-                    kind: .serverManaged,
-                    sources: [serverManaged.source],
-                    notes: ["Server-managed settings are active and suppress lower managed tiers."]
-                ),
-                settingsCandidates: [serverManaged],
-                managedMcpDocuments: [],
-                issues: serverManaged.issues,
-                notes: [
-                    "Server-managed settings are active.",
-                    "MDM / OS policy and file-based managed settings were suppressed."
-                ]
-            )
-        }
-
-        if let mdmManaged = input.mdmManagedSettings, isManagedTierPresent(mdmManaged) {
-            return ManagedSettingsResolution(
-                activeTier: ManagedSettingsActiveTier(
-                    kind: .mdmPolicy,
-                    sources: [mdmManaged.source],
-                    notes: ["MDM / OS policy is active and suppresses file-based managed settings."]
-                ),
-                settingsCandidates: [mdmManaged],
-                managedMcpDocuments: [],
-                issues: mdmManaged.issues,
-                notes: [
-                    "MDM / OS policy is active.",
-                    "File-based managed settings were suppressed because a higher managed tier is active."
-                ]
-            )
-        }
-
-        let fileBasedCandidates = activeFileBasedCandidates(from: input.fileBasedSettings)
-        if !fileBasedCandidates.isEmpty {
-            let activeTier = ManagedSettingsActiveTier(
-                kind: .fileBased,
-                sources: fileBasedCandidates.map(\.source),
-                notes: ["File-based managed settings merge internally in deterministic order."]
-            )
-
-            var issues = fileBasedCandidates.flatMap(\.issues)
-            if let managedMcp = input.fileBasedManagedMcp {
-                issues.append(contentsOf: managedMcp.issues)
-            }
-
-            return ManagedSettingsResolution(
-                activeTier: activeTier,
-                settingsCandidates: fileBasedCandidates,
-                managedMcpDocuments: input.fileBasedManagedMcp.map { [$0] } ?? [],
-                issues: deduplicatedIssues(issues),
-                notes: [
-                    "File-based managed settings are active.",
-                    "managed-settings.json loads before managed-settings.d/*.json.",
-                    "Drop-in fragments are ordered lexicographically by path, and later fragments take precedence."
-                ]
-            )
-        }
-
-        return ManagedSettingsResolution(
-            activeTier: nil,
-            settingsCandidates: [],
-            managedMcpDocuments: [],
-            notes: ["No managed settings tier is active."]
-        )
-    }
-
-    private func isManagedTierPresent(_ candidate: SettingsSourceCandidate) -> Bool {
-        candidate.source.availability != .missing
-    }
-
-    private func activeFileBasedCandidates(from candidates: [SettingsSourceCandidate]) -> [SettingsSourceCandidate] {
-        let available = candidates.filter { isManagedTierPresent($0) }
-        guard !available.isEmpty else {
-            return []
-        }
-
-        let loadOrder = available.sorted(by: Self.fileBasedLoadOrder)
-        let highPrecedenceFirst = Array(loadOrder.reversed())
-
-        return highPrecedenceFirst.enumerated().map { index, candidate in
-            SettingsSourceCandidate(
-                tier: candidate.tier,
-                precedenceRank: index,
-                source: candidate.source,
-                document: candidate.document,
-                issues: candidate.issues
-            )
-        }
-    }
-
-    private static func fileBasedLoadOrder(lhs: SettingsSourceCandidate, rhs: SettingsSourceCandidate) -> Bool {
-        let lhsPriority = fileBasedPathPriority(lhs.source.sourcePath)
-        let rhsPriority = fileBasedPathPriority(rhs.source.sourcePath)
-
-        if lhsPriority != rhsPriority {
-            return lhsPriority < rhsPriority
-        }
-
-        let lhsPath = lhs.source.sourcePath ?? lhs.source.id
-        let rhsPath = rhs.source.sourcePath ?? rhs.source.id
-        return lhsPath.localizedStandardCompare(rhsPath) == .orderedAscending
-    }
-
-    private static func fileBasedPathPriority(_ path: String?) -> Int {
-        guard let path else { return 2 }
-        if path.hasSuffix("/managed-settings.json") {
-            return 0
-        }
-        if path.contains("/managed-settings.d/") {
-            return 1
-        }
-        return 2
-    }
-
-    private func deduplicatedIssues(_ issues: [ResolutionIssue]) -> [ResolutionIssue] {
-        var seen = Set<String>()
-        return issues
-            .sorted { $0.id < $1.id }
-            .filter { seen.insert($0.id).inserted }
-    }
-}
-
 struct SettingsResolver {
-    private let registry: SettingsKeyRegistry
-
-    init(registry: SettingsKeyRegistry = .shared) {
-        self.registry = registry
-    }
-
     func resolvePrecedence(candidates: [SettingsSourceCandidate]) -> ResolvedSettingsSourceSelection {
         let orderedCandidates = Self.sortCandidates(candidates)
         let allIssues = Self.collectCandidateIssues(orderedCandidates)
@@ -2093,7 +1820,6 @@ struct SettingsResolver {
 
     func buildSnapshot(from selection: ResolvedSettingsSourceSelection) -> ResolvedSettingsSnapshot {
         let candidatesBySourceID = Dictionary(uniqueKeysWithValues: selection.candidates.map { ($0.source.id, $0) })
-        let hasManagedCandidate = selection.candidates.contains(where: { $0.tier == .managed && $0.source.availability == .present })
         var mergedEntries: [ResolvedSettingsEntry] = []
         var aggregateIssues = selection.issues
 
@@ -2113,55 +1839,21 @@ struct SettingsResolver {
             )
             aggregateIssues.append(contentsOf: mergeResult.issues)
 
-            var entryNotes = mergeResult.notes
-
-            let isManagedOnlyKey = registry.definition(for: entry.keyPath)?.isManagedOnly == true
-            let winnerIsManaged = mergeResult.winningSource.map { source in
-                source.scope == .managed
-            } ?? false
-            let hasOverriddenLowerScope = mergeResult.overriddenSources.contains(where: { $0.scope != .managed })
-
-            if winnerIsManaged && hasOverriddenLowerScope {
-                entryNotes.append("Managed policy is active for '\(entry.keyPath)'; lower-scope values are ineffective.")
-            }
-
-            if isManagedOnlyKey && !winnerIsManaged && !participantPairs.isEmpty {
-                let nonManagedSources = participantPairs.filter { $0.0.scope != .managed }
-                if !nonManagedSources.isEmpty {
-                    let sourceNames = nonManagedSources.map { $0.0.identifier }.joined(separator: ", ")
-                    aggregateIssues.append(
-                        ResolutionIssue(
-                            code: .conflict,
-                            severity: .warning,
-                            message: "Key '\(entry.keyPath)' is managed-only but appears in non-managed source(s): \(sourceNames).",
-                            source: nonManagedSources.first?.0,
-                            keyPath: entry.keyPath,
-                            relatedSources: nonManagedSources.map(\.0)
-                        )
-                    )
-                    entryNotes.append("Key '\(entry.keyPath)' is managed-only; non-managed contributions are reported as issues.")
-                }
-            }
-
             let value = ResolvedValue(
                 effectiveValue: mergeResult.effectiveValue,
                 winningSource: mergeResult.winningSource,
                 trace: ResolutionTrace(
                     participants: entry.participants,
                     overridden: mergeResult.overriddenSources,
-                    notes: entryNotes
+                    notes: mergeResult.notes
                 ),
                 mergeMethod: mergeResult.mergeMethod,
-                issues: mergeResult.issues,
-                notes: entryNotes
+                issues: mergeResult.issues
             )
             mergedEntries.append(ResolvedSettingsEntry(keyPath: entry.keyPath, value: value))
         }
 
-        var mergedNotes = selection.notes + ["Settings merge rules applied by key family."]
-        if hasManagedCandidate {
-            mergedNotes.append("Managed policy is active and takes precedence over all other scopes.")
-        }
+        let mergedNotes = selection.notes + ["Settings merge rules applied by key family."]
         return ResolvedSettingsSnapshot(entries: mergedEntries, issues: aggregateIssues, notes: mergedNotes)
     }
 
@@ -2183,12 +1875,37 @@ struct SettingsResolver {
         let notes: [String]
     }
 
+    private static let replaceKeys: Set<String> = [
+        "$schema",
+        "apiKeyHelper",
+        "autoMemoryDirectory",
+        "cleanupPeriodDays",
+        "companyAnnouncements",
+        "includeCoAuthoredBy",
+        "includeGitInstructions",
+        "autoMode",
+        "disableAutoMode",
+        "useAutoModeDuringPlan",
+        "disableDeepLinkRegistration",
+        "allowManagedHooksOnly"
+    ]
+
+    private static let deepMergeObjectKeys: Set<String> = [
+        "env",
+        "attribution"
+    ]
+
+    private static let appendUniqueKeys: Set<String> = [
+        "allowedHttpHookUrls",
+        "httpHookAllowedEnvVars"
+    ]
+
     private func mergeEntry(
         keyPath: String,
         participants: [(ResolutionSource, JSONValue)],
         inheritedIssues: [ResolutionIssue]
     ) -> EntryMergeResult {
-        let rule = mergeRule(for: keyPath)
+        let rule = Self.mergeRule(for: keyPath)
         switch rule {
         case .replace:
             return mergeByReplace(participants: participants, keyPath: keyPath, inheritedIssues: inheritedIssues)
@@ -2205,34 +1922,23 @@ struct SettingsResolver {
         }
     }
 
-    private func mergeRule(for keyPath: String) -> SettingsMergeRule {
+    private static func mergeRule(for keyPath: String) -> SettingsMergeRule {
+        if replaceKeys.contains(keyPath) {
+            return .replace
+        }
+        if deepMergeObjectKeys.contains(keyPath) {
+            return .deepMergeObject
+        }
+        if appendUniqueKeys.contains(keyPath) {
+            return .appendUnique
+        }
         if keyPath == "permissions" {
             return .permissions
         }
         if keyPath == "hooks" {
             return .hooks
         }
-
-        if let definition = registry.definition(for: keyPath) {
-            return Self.mapMergeHint(definition.mergeHint)
-        }
-
         return .passthrough
-    }
-
-    private static func mapMergeHint(_ hint: MergeMethod) -> SettingsMergeRule {
-        switch hint {
-        case .selectHighestPrecedence, .replace:
-            return .replace
-        case .deepMergeObject:
-            return .deepMergeObject
-        case .append, .appendUnique, .setUnion:
-            return .appendUnique
-        case .keyedByIdentifier:
-            return .hooks
-        case .passthrough:
-            return .passthrough
-        }
     }
 
     private func mergeByReplace(
@@ -2587,7 +2293,6 @@ struct SettingsResolver {
 
         for (source, objectValue) in objectParticipants {
             for eventName in objectValue.keys.sorted() {
-                let normalizedEventName = HookEventType(eventName: eventName).storageKey
                 let eventPath = "\(keyPath).\(eventName)"
                 guard let parsedEvent = parseHookEvent(
                     eventValue: objectValue[eventName] ?? .null,
@@ -2598,15 +2303,15 @@ struct SettingsResolver {
                     continue
                 }
 
-                guard let existing = mergedEvents[normalizedEventName] else {
-                    mergedEvents[normalizedEventName] = parsedEvent
+                guard let existing = mergedEvents[eventName] else {
+                    mergedEvents[eventName] = parsedEvent
                     continue
                 }
 
                 switch (existing, parsedEvent) {
                 case let (.array(existingActions), .array(newActions)):
                     let mergedActions = Self.appendUniqueJSONArrays([existingActions, newActions])
-                    mergedEvents[normalizedEventName] = .array(actions: mergedActions)
+                    mergedEvents[eventName] = .array(actions: mergedActions)
                 case let (.object(existingMatcher, existingActions, existingExtras), .object(newMatcher, newActions, newExtras)):
                     let mergedActions = Self.appendUniqueJSONArrays([existingActions, newActions])
                     var mergedExtras = existingExtras
@@ -2614,7 +2319,7 @@ struct SettingsResolver {
                         mergedExtras[extraKey] = extraValue
                     }
                     let mergedMatcher = existingMatcher ?? newMatcher
-                    mergedEvents[normalizedEventName] = .object(matcher: mergedMatcher, actions: mergedActions, extras: mergedExtras)
+                    mergedEvents[eventName] = .object(matcher: mergedMatcher, actions: mergedActions, extras: mergedExtras)
                 default:
                     issues.append(
                         ResolutionIssue(
@@ -2779,9 +2484,6 @@ struct SettingsResolver {
         candidates.sorted {
             if $0.tier != $1.tier {
                 return $0.tier < $1.tier
-            }
-            if $0.precedenceRank != $1.precedenceRank {
-                return $0.precedenceRank < $1.precedenceRank
             }
             return $0.source.id < $1.source.id
         }
@@ -4194,7 +3896,6 @@ struct SessionProvenanceSummary: Equatable, Sendable {
 
 struct ResolvedHookEventEntry: Equatable, Sendable {
     let eventID: String
-    let eventType: HookEventType
     let hooks: ResolvedValue<[JSONValue]>
 }
 
@@ -4204,12 +3905,7 @@ struct ResolvedHookSnapshot: Equatable, Sendable {
     let notes: [String]
 
     init(events: [ResolvedHookEventEntry], issues: [ResolutionIssue] = [], notes: [String] = []) {
-        self.events = events.sorted { lhs, rhs in
-            if lhs.eventType.sortKey != rhs.eventType.sortKey {
-                return lhs.eventType.sortKey < rhs.eventType.sortKey
-            }
-            return lhs.eventID < rhs.eventID
-        }
+        self.events = events.sorted { $0.eventID < $1.eventID }
         self.issues = issues.sorted { $0.id < $1.id }
         self.notes = notes
     }
@@ -4391,7 +4087,6 @@ struct SessionProjectionBuilder {
         for eventID in rootObject.keys.sorted() {
             let eventPath = "hooks.\(eventID)"
             guard let rawEventValue = rootObject[eventID] else { continue }
-            let eventType = HookEventType(eventName: eventID)
 
             let extraction = extractHookActions(
                 eventID: eventID,
@@ -4411,7 +4106,7 @@ struct SessionProjectionBuilder {
                 issues: deduplicatedIssues(hookEntry.value.issues + extraction.issues),
                 notes: deduplicatedNotes(hookEntry.value.notes + extraction.notes)
             )
-            events.append(ResolvedHookEventEntry(eventID: eventID, eventType: eventType, hooks: value))
+            events.append(ResolvedHookEventEntry(eventID: eventID, hooks: value))
         }
 
         if events.isEmpty {

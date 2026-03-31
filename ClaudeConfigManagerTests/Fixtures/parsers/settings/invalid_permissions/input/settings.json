@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "defaultMode": "yolo",
-    "additionalDirectories": "not-an-array",
-    "disableBypassPermissionsMode": true
-  }
-}

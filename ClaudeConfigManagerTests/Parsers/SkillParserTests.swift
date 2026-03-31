@@ -106,52 +106,6 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(document.supportingReferences[1].normalizedPath, "../shared/tool.sh")
         XCTAssertTrue(document.supportingReferences[1].isParseableLocalFileReference)
     }
-
-    func testParseFixtureValidBasicFromCanonicalParserLayout() throws {
-        let loader = FixtureLoader.shared
-        let markdown = try loader.loadString(
-            familyPath: "parsers/skill",
-            caseID: "valid_basic",
-            section: "input",
-            fileName: "SKILL.md"
-        )
-
-        let result = parser.parse(skillDirectoryURL: skillDirectoryURL, markdownString: markdown)
-        let document = try XCTUnwrap(result.value)
-        let frontmatter = try XCTUnwrap(document.frontmatter)
-
-        XCTAssertFalse(result.hasErrors)
-        XCTAssertEqual(frontmatter.name, "parser-skill")
-        XCTAssertEqual(frontmatter.tags, ["swift", "parsing"])
-        XCTAssertEqual(frontmatter.unknownFields["owner"], .string("platform"))
-        XCTAssertEqual(document.supportingReferences.map(\.normalizedPath), [
-            "references/guide.md",
-            "assets/diagram.png",
-            "https://example.com/spec"
-        ])
-    }
-
-    func testParseFixtureMalformedReferenceIncludesExpectedIssueCode() throws {
-        let loader = FixtureLoader.shared
-        let markdown = try loader.loadString(
-            familyPath: "parsers/skill",
-            caseID: "malformed_reference_token",
-            section: "input",
-            fileName: "SKILL.md"
-        )
-        let expected = try loader.loadExpectedIssueSet(
-            familyPath: "parsers/skill",
-            caseID: "malformed_reference_token",
-            fileName: "parser_issues.json"
-        )
-
-        let result = parser.parse(skillDirectoryURL: skillDirectoryURL, markdownString: markdown)
-        XCTAssertTrue(result.hasErrors)
-        let issueCodes = Set(result.issues.map(\.code.rawValue))
-        for code in expected.codes {
-            XCTAssertTrue(issueCodes.contains(code))
-        }
-    }
 }
 
 private enum SkillParserFixtures {
