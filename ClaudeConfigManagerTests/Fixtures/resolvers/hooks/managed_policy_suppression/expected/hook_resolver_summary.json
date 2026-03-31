@@ -1,0 +1,7 @@
+{
+  "eventCount": 4,
+  "policyEffectReasons": ["disableAllHooks", "allowManagedHooksOnly"],
+  "allEventsSuppressed": true,
+  "suppressionReason": "disableAllHooks",
+  "handlerTypes": ["command", "http", "prompt", "agent"]
+}

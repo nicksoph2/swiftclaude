@@ -197,10 +197,7 @@ final class ProjectRegistry {
         try globalStateStore.saveState(state)
     }
 
-    func setGlobalRootOverride(folderURL: URL, now: Date = Date()) throws {
-        guard folderURL.lastPathComponent == ".claude" else {
-            throw BookmarkError.failedToCreateBookmark
-        }
+    func setGlobalRoot(folderURL: URL, source: GlobalClaudeRootSource, now: Date = Date()) throws {
         guard let bookmarkStore else {
             throw BookmarkError.failedToSaveMetadata
         }
@@ -214,17 +211,25 @@ final class ProjectRegistry {
         )
 
         var state = try globalStateStore.loadState()
-        state.globalClaudeRootSource = .overrideBookmark
+        state.globalClaudeRootSource = source
         state.globalClaudeRootBookmarkID = BookmarkStore.globalRootBookmarkID
+        state.hasCompletedInitialGlobalRootSetup = true
         try globalStateStore.saveState(state)
     }
 
-    func clearGlobalRootOverride() throws {
+    func clearGlobalRootSelection() throws {
         var state = try globalStateStore.loadState()
         state.globalClaudeRootSource = .defaultHomeClaude
         state.globalClaudeRootBookmarkID = nil
+        state.hasCompletedInitialGlobalRootSetup = true
         try globalStateStore.saveState(state)
         try bookmarkStore?.removeBookmark(id: BookmarkStore.globalRootBookmarkID)
+    }
+
+    func markInitialGlobalRootSetupCompleted() throws {
+        var state = try globalStateStore.loadState()
+        state.hasCompletedInitialGlobalRootSetup = true
+        try globalStateStore.saveState(state)
     }
 
     static func normalizePath(_ path: String) -> String {
@@ -255,6 +260,8 @@ final class RootSelectionViewModel: ObservableObject {
     @Published private(set) var defaultGlobalRootURL: URL
     @Published private(set) var selectedGlobalRootURL: URL
     @Published private(set) var globalRootSource: GlobalClaudeRootSource
+    @Published private(set) var hasAuthorizedGlobalRoot: Bool
+    @Published private(set) var hasCompletedInitialGlobalRootSetup: Bool
     @Published private(set) var projectRegistrations: [ProjectRegistration]
     @Published var selectedProjectRegistrationID: String?
     @Published var issue: RootSelectionIssue?
@@ -262,21 +269,26 @@ final class RootSelectionViewModel: ObservableObject {
     private let bookmarkStore: BookmarkStore?
     private let projectRegistry: ProjectRegistry
     private let folderSelector: FolderSelecting
+    private let accessChecker: RootDirectoryAccessChecking
 
     init(
         bookmarkStore: BookmarkStore?,
         projectRegistry: ProjectRegistry,
-        folderSelector: FolderSelecting
+        folderSelector: FolderSelecting,
+        accessChecker: RootDirectoryAccessChecking = FileSystemRootDirectoryAccessChecker()
     ) {
         self.bookmarkStore = bookmarkStore
         self.projectRegistry = projectRegistry
         self.folderSelector = folderSelector
+        self.accessChecker = accessChecker
 
         let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude", isDirectory: true)
         self.defaultGlobalRootURL = defaultRoot
         self.selectedGlobalRootURL = defaultRoot
         self.globalRootSource = .defaultHomeClaude
+        self.hasAuthorizedGlobalRoot = false
+        self.hasCompletedInitialGlobalRootSetup = false
         self.projectRegistrations = []
         self.selectedProjectRegistrationID = nil
 
@@ -284,68 +296,126 @@ final class RootSelectionViewModel: ObservableObject {
     }
 
     var globalRootSourceLabel: String {
+        guard hasAuthorizedGlobalRoot else {
+            return "Not Authorized"
+        }
+
         switch globalRootSource {
         case .defaultHomeClaude:
             return "Default"
         case .overrideBookmark:
-            return "Override"
+            return "Custom"
         }
+    }
+
+    var recommendedGlobalRootIsAvailable: Bool {
+        accessChecker.accessStatus(forDirectoryAt: defaultGlobalRootURL) == .accessible
+    }
+
+    var shouldPromptForInitialGlobalRootAccess: Bool {
+        !hasCompletedInitialGlobalRootSetup && !hasAuthorizedGlobalRoot && recommendedGlobalRootIsAvailable
     }
 
     func refreshFromStores() {
         do {
             let state = try projectRegistry.loadState()
             globalRootSource = state.globalClaudeRootSource
+            hasCompletedInitialGlobalRootSetup = state.hasCompletedInitialGlobalRootSetup
             projectRegistrations = state.projectRegistrations
             selectedProjectRegistrationID = state.selectedProjectRegistrationID
 
-            if globalRootSource == .overrideBookmark,
-               let globalRecord = try bookmarkStore?.allRecords().first(where: {
-                   $0.id == BookmarkStore.globalRootBookmarkID
-               }) {
+            if let globalRecord = try bookmarkStore?.allRecords().first(where: {
+                $0.id == BookmarkStore.globalRootBookmarkID
+            }) {
                 selectedGlobalRootURL = URL(fileURLWithPath: globalRecord.preferredPath, isDirectory: true)
+                hasAuthorizedGlobalRoot = true
             } else {
                 selectedGlobalRootURL = defaultGlobalRootURL
+                hasAuthorizedGlobalRoot = false
             }
         } catch {
             issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 
-    func selectGlobalRootOverride() {
+    func chooseGlobalRootFolder() {
         let candidate = folderSelector.selectFolder(
-            title: "Select Claude Root Folder",
-            message: "Choose the .claude folder that should be used for global discovery.",
-            prompt: "Use Override",
+            title: "Choose Global Claude Folder",
+            message: "Choose the folder to inspect for global Claude configuration. The app requests read-only access.",
+            prompt: "Grant Access",
             initialDirectory: selectedGlobalRootURL
         )
         guard let candidate else {
             return
         }
 
-        guard candidate.lastPathComponent == ".claude" else {
-            issue = .invalidGlobalRoot(path: candidate.path)
+        guard accessChecker.accessStatus(forDirectoryAt: candidate) == .accessible else {
+            issue = .unreadableGlobalRoot(path: candidate.path)
             return
         }
 
         do {
-            try projectRegistry.setGlobalRootOverride(folderURL: candidate)
+            let normalizedCandidate = RootLocator.normalizedIdentityPath(candidate.path)
+            let normalizedDefault = RootLocator.normalizedIdentityPath(defaultGlobalRootURL.path)
+            let source: GlobalClaudeRootSource = normalizedCandidate == normalizedDefault ? .defaultHomeClaude : .overrideBookmark
+            try projectRegistry.setGlobalRoot(folderURL: candidate, source: source)
             issue = nil
             refreshFromStores()
-        } catch BookmarkError.failedToCreateBookmark {
-            issue = .invalidGlobalRoot(path: candidate.path)
         } catch {
             issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 
-    func useDefaultGlobalRoot() {
+    func authorizeRecommendedGlobalRoot() {
+        guard recommendedGlobalRootIsAvailable else {
+            issue = .recommendedGlobalRootUnavailable(path: defaultGlobalRootURL.path)
+            return
+        }
+
+        let candidate = folderSelector.selectFolder(
+            title: "Authorize Recommended Claude Folder",
+            message: "Grant read-only access to the recommended Claude folder so the app can inspect your global configuration.",
+            prompt: "Grant Access",
+            initialDirectory: defaultGlobalRootURL.deletingLastPathComponent()
+        )
+        guard let candidate else {
+            return
+        }
+
+        guard accessChecker.accessStatus(forDirectoryAt: candidate) == .accessible else {
+            issue = .unreadableGlobalRoot(path: candidate.path)
+            return
+        }
+
         do {
-            try projectRegistry.clearGlobalRootOverride()
+            let normalizedCandidate = RootLocator.normalizedIdentityPath(candidate.path)
+            let normalizedDefault = RootLocator.normalizedIdentityPath(defaultGlobalRootURL.path)
+            let source: GlobalClaudeRootSource = normalizedCandidate == normalizedDefault ? .defaultHomeClaude : .overrideBookmark
+            try projectRegistry.setGlobalRoot(folderURL: candidate, source: source)
             issue = nil
             refreshFromStores()
         } catch {
             issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func clearGlobalRootSelection() {
+        do {
+            try projectRegistry.clearGlobalRootSelection()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func skipInitialGlobalRootSetup() {
+        do {
+            try projectRegistry.markInitialGlobalRootSetupCompleted()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 

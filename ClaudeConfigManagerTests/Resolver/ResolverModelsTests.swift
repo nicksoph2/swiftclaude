@@ -151,6 +151,272 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(selection.entries.isEmpty)
     }
 
+    func testManagedSettingsResolverPrefersServerManagedTierOverMdmAndFileBased() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+
+        let serverManaged = makeCandidate(
+            tier: .managed,
+            identifier: "server-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/server-managed.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(90)]
+        )
+        let mdmManaged = makeCandidate(
+            tier: .managed,
+            identifier: "mdm-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/mdm-policy.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(60)]
+        )
+        let baseManaged = makeCandidate(
+            tier: .managed,
+            identifier: "managed-settings",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(30)]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                serverManagedSettings: serverManaged,
+                mdmManagedSettings: mdmManaged,
+                fileBasedSettings: [baseManaged],
+                fileBasedManagedMcp: makeMcpDocument(
+                    tier: .managed,
+                    scope: .managed,
+                    identifier: "managed-mcp",
+                    sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+                    servers: [makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed")])]
+                )
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .serverManaged)
+        XCTAssertEqual(resolution.settingsCandidates.map(\.source.identifier), ["server-managed"])
+        XCTAssertTrue(resolution.managedMcpDocuments.isEmpty)
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(10)]
+        )
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let entry = selection.entries.first(where: { $0.keyPath == "cleanupPeriodDays" })
+
+        XCTAssertEqual(entry?.winningSource?.identifier, "server-managed")
+        XCTAssertEqual(entry?.participants.map(\.identifier), ["server-managed", "user-settings"])
+    }
+
+    func testManagedSettingsResolverPrefersMdmTierWhenServerManagedIsAbsent() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+
+        let mdmManaged = makeCandidate(
+            tier: .managed,
+            identifier: "mdm-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/mdm-policy.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(60)]
+        )
+        let dropIn = makeCandidate(
+            tier: .managed,
+            identifier: "drop-in",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/10-override.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(30)]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                mdmManagedSettings: mdmManaged,
+                fileBasedSettings: [dropIn],
+                fileBasedManagedMcp: makeMcpDocument(
+                    tier: .managed,
+                    scope: .managed,
+                    identifier: "managed-mcp",
+                    sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+                    servers: [makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed")])]
+                )
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .mdmPolicy)
+        XCTAssertEqual(resolution.settingsCandidates.map(\.source.identifier), ["mdm-managed"])
+        XCTAssertTrue(resolution.managedMcpDocuments.isEmpty)
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(10)]
+        )
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let entry = selection.entries.first(where: { $0.keyPath == "cleanupPeriodDays" })
+
+        XCTAssertEqual(entry?.winningSource?.identifier, "mdm-managed")
+    }
+
+    func testManagedSettingsResolverMergesFileBasedTierDeterministicallyAndIncludesManagedMcp() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+        let mcpResolver = MCPResolver()
+
+        let base = makeCandidate(
+            tier: .managed,
+            identifier: "managed-settings",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(15),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/base")]),
+                "env": .object(["BASE": .string("1"), "SHARED": .string("base")])
+            ]
+        )
+        let firstDropIn = makeCandidate(
+            tier: .managed,
+            identifier: "01-base",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/01-base.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(20),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/one")]),
+                "env": .object(["SHARED": .string("one")])
+            ]
+        )
+        let secondDropIn = makeCandidate(
+            tier: .managed,
+            identifier: "02-override",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/02-override.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(30),
+                "allowedHttpHookUrls": .array([
+                    .string("https://hooks.example.com/one"),
+                    .string("https://hooks.example.com/two")
+                ]),
+                "env": .object(["FINAL": .string("2"), "SHARED": .string("two")])
+            ]
+        )
+
+        let managedMcp = makeMcpDocument(
+            tier: .managed,
+            scope: .managed,
+            identifier: "managed-mcp",
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+            servers: [
+                makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed-filesystem")])
+            ]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                fileBasedSettings: [secondDropIn, base, firstDropIn],
+                fileBasedManagedMcp: managedMcp
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .fileBased)
+        XCTAssertEqual(
+            resolution.settingsCandidates.map(\.source.identifier),
+            ["02-override", "01-base", "managed-settings"]
+        )
+        XCTAssertEqual(resolution.managedMcpDocuments.map(\.source.identifier), ["managed-mcp"])
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(5),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/user")]),
+                "env": .object(["USER": .string("1"), "SHARED": .string("user")])
+            ]
+        )
+
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let snapshot = settingsResolver.buildSnapshot(from: selection)
+
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "cleanupPeriodDays").value.effectiveValue,
+            .number(30)
+        )
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "allowedHttpHookUrls").value.effectiveValue,
+            .array([
+                .string("https://hooks.example.com/one"),
+                .string("https://hooks.example.com/two"),
+                .string("https://hooks.example.com/base"),
+                .string("https://hooks.example.com/user")
+            ])
+        )
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "env").value.effectiveValue,
+            .object([
+                "BASE": .string("1"),
+                "FINAL": .string("2"),
+                "SHARED": .string("two"),
+                "USER": .string("1")
+            ])
+        )
+
+        let mcpSnapshot = mcpResolver.resolve(
+            documents: resolution.managedMcpDocuments + [
+                makeMcpDocument(
+                    tier: .user,
+                    scope: .user,
+                    identifier: "user-mcp",
+                    sourcePath: "/tmp/.claude.json",
+                    servers: [
+                        makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("user-filesystem")])
+                    ]
+                )
+            ]
+        )
+
+        XCTAssertEqual(
+            tryUnwrapMcpEntry(snapshot: mcpSnapshot, serverID: "filesystem").resolvedConfig.winningSource?.identifier,
+            "user-mcp"
+        )
+    }
+
+    func testManagedScopeStatusModelReportsActiveTier() {
+        let resolution = ManagedSettingsResolution(
+            activeTier: ManagedSettingsActiveTier(
+                kind: .mdmPolicy,
+                sources: [
+                    ResolutionSource(
+                        scope: .managed,
+                        kind: .managed,
+                        identifier: "mdm-managed",
+                        sourcePath: "com.anthropic.claudecode"
+                    )
+                ]
+            ),
+            settingsCandidates: [],
+            managedMcpDocuments: []
+        )
+
+        let model = ManagedScopeStatusModel(resolution: resolution)
+
+        XCTAssertEqual(model.title, "Active managed tier")
+        XCTAssertEqual(model.detail, "MDM / OS policy")
+        XCTAssertEqual(model.activeTierLabel, "mdmPolicy")
+        XCTAssertEqual(model.sourceSummaries, ["com.anthropic.claudecode"])
+    }
+
     func testSettingsResolverBuildSnapshotUsesReplaceMergeMethodForScalarKeys() {
         let resolver = SettingsResolver()
         let candidate = makeCandidate(
@@ -339,8 +605,52 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertEqual(
             entry.value.effectiveValue,
             .object([
-                "preToolUse": .array([
+                "PreToolUse": .array([
                     .object(["type": .string("command"), "command": .string("echo shared")]),
+                    .object(["type": .string("command"), "command": .string("echo local")]),
+                    .object(["type": .string("command"), "command": .string("echo user")])
+                ])
+            ])
+        )
+    }
+
+    func testSettingsResolverNormalizesKnownHookEventAliasesToCanonicalCatalogNames() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "preToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo user")])
+                    ])
+                ])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo local")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+        let entry = tryUnwrapEntry(snapshot: snapshot, keyPath: "hooks")
+
+        XCTAssertEqual(
+            entry.value.effectiveValue,
+            .object([
+                "PreToolUse": .array([
                     .object(["type": .string("command"), "command": .string("echo local")]),
                     .object(["type": .string("command"), "command": .string("echo user")])
                 ])
@@ -430,6 +740,331 @@ final class ResolverModelsTests: XCTestCase {
 
         XCTAssertEqual(cleanupEntry.value.winningSource?.identifier, "project-local-settings")
         XCTAssertEqual(cleanupEntry.value.effectiveValue, .number(30))
+    }
+
+    func testInstructionResolverFixtureCycleAndMissingImportDeterministicOrdering() throws {
+        let loader = FixtureLoader.shared
+        let parser = ClaudeMdParser()
+        let resolver = InstructionResolver(maxImportDepth: 8)
+        let caseID: FixtureCaseID = "cycle_and_missing_import"
+
+        let userPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "user.CLAUDE.md"
+        )
+        let importAPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "imports/a.md"
+        )
+        let importBPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "imports/b.md"
+        )
+
+        let userMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "user.CLAUDE.md"
+        )
+        let importAMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "imports/a.md"
+        )
+        let importBMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "imports/b.md"
+        )
+
+        let user = makeInstructionCandidate(
+            scope: .user,
+            identifier: "user-instructions",
+            path: userPath,
+            parser: parser,
+            markdown: userMarkdown
+        )
+        let importedA = makeInstructionCandidate(
+            scope: .imported,
+            identifier: "import-a",
+            path: importAPath,
+            parser: parser,
+            markdown: importAMarkdown
+        )
+        let importedB = makeInstructionCandidate(
+            scope: .imported,
+            identifier: "import-b",
+            path: importBPath,
+            parser: parser,
+            markdown: importBMarkdown
+        )
+
+        let snapshot = resolver.resolve(
+            InstructionResolverInput(
+                user: user,
+                importedDocuments: [importedA, importedB]
+            )
+        )
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedInstructionFixtureSummary.self
+        )
+
+        XCTAssertEqual(snapshot.orderedBlocks.count, expected.orderedBlockCount)
+        XCTAssertEqual(snapshot.rootLoadOrder.map(\.identifier), expected.rootLoadOrder)
+        XCTAssertEqual(snapshot.issues.map { $0.code.rawValue }, expected.issueCodes)
+        XCTAssertEqual(snapshot.composedInstructions.mergeMethod, .append)
+        XCTAssertEqual(snapshot.composedInstructions.winningSource?.identifier, "user-instructions")
+
+        let blockIDs = snapshot.orderedBlocks.map(\.blockID)
+        for suffix in expected.orderedBlockSuffixes {
+            XCTAssertTrue(blockIDs.contains(where: { $0.hasSuffix(suffix) }), "Missing expected block suffix: \(suffix)")
+        }
+
+        let composed = snapshot.composedInstructions.effectiveValue ?? ""
+        for needle in expected.composedContains {
+            XCTAssertTrue(composed.contains(needle), "Missing expected instruction segment: \(needle)")
+        }
+    }
+
+    func testMcpResolverFixtureFallbackAndEnvironmentNotesDeterministic() throws {
+        let loader = FixtureLoader.shared
+        let caseID: FixtureCaseID = "fallback_and_env_notes"
+        let resolver = MCPResolver()
+
+        let localDocument = try makeMcpFixtureDocument(
+            loader: loader,
+            caseID: caseID,
+            fileName: "project-local.mcp.json",
+            tier: .local,
+            scope: .projectLocal,
+            identifier: "local-mcp"
+        )
+        let projectDocument = try makeMcpFixtureDocument(
+            loader: loader,
+            caseID: caseID,
+            fileName: "project.mcp.json",
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp"
+        )
+
+        let snapshot = resolver.resolve(documents: [localDocument, projectDocument])
+        let entry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "filesystem")
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/mcp",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedMcpFixtureSummary.self
+        )
+
+        XCTAssertEqual(entry.serverID, expected.serverID)
+        XCTAssertEqual(entry.resolvedConfig.winningSource?.identifier, expected.winningSource)
+        XCTAssertEqual(entry.resolvedConfig.trace.participants.map { $0.identifier }, expected.participantSources)
+        XCTAssertEqual(
+            Set(entry.resolvedConfig.issues.map { $0.code.rawValue }),
+            Set(expected.issueCodes)
+        )
+        XCTAssertEqual(entry.resolvedConfig.mergeMethod, MergeMethod.selectHighestPrecedence)
+        XCTAssertEqual(
+            Set(entry.environmentNotes.map { $0.classification.rawValue }),
+            Set(expected.environmentClassifications)
+        )
+    }
+
+    func testAgentAndSkillResolverFixtureOverrideAndInvalidCases() throws {
+        let loader = FixtureLoader.shared
+        let caseID: FixtureCaseID = "override_and_invalid_entries"
+
+        let agentParser = AgentParser()
+        let skillParser = SkillParser()
+
+        let userAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "user.agent.md"
+        )
+        let projectAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "project.agent.md"
+        )
+        let invalidAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "invalid.agent.md"
+        )
+
+        let agentSnapshot = AgentResolver().resolve(candidates: [
+            makeAgentCandidate(
+                tier: .user,
+                identifier: "user-agent",
+                scope: .user,
+                sourcePath: "/tmp/.claude/agents/reviewer.md",
+                parser: agentParser,
+                markdown: userAgentMarkdown
+            ),
+            makeAgentCandidate(
+                tier: .project,
+                identifier: "project-agent",
+                scope: .project,
+                sourcePath: "/tmp/project/.claude/agents/reviewer.md",
+                parser: agentParser,
+                markdown: projectAgentMarkdown
+            ),
+            makeAgentCandidate(
+                tier: .project,
+                identifier: "invalid-agent",
+                scope: .project,
+                sourcePath: "/tmp/project/.claude/agents/invalid.md",
+                parser: agentParser,
+                markdown: invalidAgentMarkdown
+            )
+        ])
+
+        let userSkillMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "skills/user/research/SKILL.md"
+        )
+        let projectSkillMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "skills/project/research/SKILL.md"
+        )
+
+        let userSkill = makeSkillCandidate(
+            tier: .user,
+            identifier: "user-skill",
+            scope: .user,
+            directoryPath: "/tmp/.claude/skills/research",
+            parser: skillParser,
+            markdown: userSkillMarkdown
+        )
+        let projectSkill = makeSkillCandidate(
+            tier: .project,
+            identifier: "project-skill",
+            scope: .project,
+            directoryPath: "/tmp/project/.claude/skills/research",
+            parser: skillParser,
+            markdown: projectSkillMarkdown
+        )
+
+        let missingSkillSource = ResolutionSource(
+            scope: .user,
+            kind: .file,
+            identifier: "missing-skill",
+            sourcePath: "/tmp/.claude/skills/missing",
+            availability: .present
+        )
+        let missingSkillParse = skillParser.parse(
+            skillDirectoryURL: URL(fileURLWithPath: "/tmp/.claude/skills/missing"),
+            skillMarkdownData: nil
+        )
+        let missingSkill = SkillDocumentCandidate(
+            tier: .user,
+            source: missingSkillSource,
+            document: missingSkillParse.value,
+            issues: missingSkillParse.issues.map { ResolutionIssue(syntaxIssue: $0, source: missingSkillSource) }
+        )
+
+        let skillSnapshot = SkillResolver().resolve(candidates: [userSkill, projectSkill, missingSkill])
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedAgentSkillFixtureSummary.self
+        )
+
+        let agentStatesBySource = Dictionary(uniqueKeysWithValues: agentSnapshot.agents.map {
+            ($0.source.identifier, $0.visibility.effectiveValue?.rawValue ?? "unavailable")
+        })
+        let skillStatesBySource = Dictionary(uniqueKeysWithValues: skillSnapshot.skills.map {
+            ($0.source.identifier, $0.visibility.effectiveValue?.rawValue ?? "unavailable")
+        })
+
+        XCTAssertEqual(agentStatesBySource, expected.agentStatesBySource)
+        XCTAssertEqual(skillStatesBySource, expected.skillStatesBySource)
+        XCTAssertEqual(
+            Set(agentSnapshot.issues.map { $0.code.rawValue }),
+            Set(expected.requiredAgentIssueCodes)
+        )
+        XCTAssertEqual(
+            Set(skillSnapshot.issues.map { $0.code.rawValue }),
+            Set(expected.requiredSkillIssueCodes)
+        )
+    }
+
+    func testSessionProjectionFixturePartialSettingsOnlyCase() throws {
+        let loader = FixtureLoader.shared
+        let parser = SettingsParser()
+        let caseID: FixtureCaseID = "partial_settings_only"
+
+        let settingsJSON = try loader.loadString(
+            familyPath: "resolvers/projection",
+            caseID: caseID,
+            section: "input",
+            fileName: "settings.json"
+        )
+        let settingsDocument = try XCTUnwrap(
+            parser.parse(
+                jsonString: settingsJSON,
+                sourceURL: URL(fileURLWithPath: "/tmp/.claude/settings.json", isDirectory: false)
+            ).value
+        )
+
+        let settingsSnapshot = SettingsResolver().buildSnapshot(
+            from: SettingsResolver().resolvePrecedence(candidates: [
+                makeCandidate(
+                    tier: .user,
+                    identifier: "user-settings",
+                    scope: .user,
+                    sourcePath: "/tmp/.claude/settings.json",
+                    rawTopLevel: settingsDocument.rawTopLevelObject
+                )
+            ])
+        )
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: settingsSnapshot)
+        )
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/projection",
+            caseID: caseID,
+            fileName: "projection_summary.json",
+            as: ExpectedProjectionFixtureSummary.self
+        )
+
+        XCTAssertEqual(projection.completeness.isComplete, expected.isComplete)
+        XCTAssertEqual(projection.completeness.missingFamilies.map(\.rawValue), expected.missingFamilies)
+        XCTAssertEqual(
+            projection.familyStates.filter { $0.availability == .available }.map { $0.family.rawValue },
+            expected.availableFamilies
+        )
     }
 
     func testResolutionTraceDeduplicatesParticipantsPreservingFirstSeenOrder() {
@@ -605,6 +1240,7 @@ final class ResolverModelsTests: XCTestCase {
 
         let hooks: ResolvedHookSnapshot = try XCTUnwrap(projection.hooks)
         XCTAssertEqual(hooks.events.map { $0.eventID }, ["postToolUse", "preToolUse"])
+        XCTAssertEqual(hooks.events.map(\.eventType), [.postToolUse, .preToolUse])
         XCTAssertEqual(hooks.events.first?.hooks.effectiveValue, [JSONValue.string("notify")])
     }
 
@@ -778,16 +1414,13 @@ final class ResolverModelsTests: XCTestCase {
                 cleanupPeriodDays: nil,
                 companyAnnouncements: nil,
                 env: nil,
-                attribution: ParsedAttribution(
-                    includeCoAuthoredBy: false,
-                    rawObject: ["includeCoAuthoredBy": .bool(false)]
-                ),
+                attribution: ParsedAttribution(commit: "Generated with AI", pr: "", unknownFields: nil),
                 includeCoAuthoredBy: true,
                 includeGitInstructions: nil,
                 permissions: ParsedPermissions(
                     allow: ["Read", "Write"],
                     deny: ["Write"],
-                    mode: "acceptEdits",
+                    defaultMode: "acceptEdits",
                     rawObject: [:]
                 ),
                 autoMode: true,
@@ -797,13 +1430,25 @@ final class ResolverModelsTests: XCTestCase {
                 hooks: ParsedHooks(
                     events: [
                         "PreToolUse": ParsedHookEvent(
+                            eventName: "PreToolUse",
+                            eventType: .preToolUse,
                             matcher: nil,
                             actions: [
                                 ParsedHookAction(
                                     type: "command",
+                                    handlerType: .command,
                                     command: nil,
                                     url: nil,
-                                    timeoutMs: -1,
+                                    prompt: nil,
+                                    timeout: -1,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: nil,
+                                    isAsync: nil,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: nil,
                                     rawObject: [:]
                                 )
                             ],
@@ -812,6 +1457,7 @@ final class ResolverModelsTests: XCTestCase {
                     ],
                     rawObject: [:]
                 ),
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -823,10 +1469,8 @@ final class ResolverModelsTests: XCTestCase {
 
         let result = validator.validate(settings: document)
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.autoModeConflict" }))
-        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.attributionConflict" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.permissionsModeWithAllowDeny" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.permissionsAllowDenyOverlap" }))
-        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.hookActionTransportShape" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.hookActionTypeMismatch" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.hookActionNegativeTimeout" }))
     }
@@ -846,11 +1490,20 @@ final class ResolverModelsTests: XCTestCase {
                 mcpState: ParsedClaudeJsonMcpState(
                     userServers: [
                         "alpha": ParsedClaudeJsonMcpServerRef(
-                            command: nil,
-                            args: ["--stdio"],
-                            env: nil,
-                            url: nil,
-                            headers: ["Authorization": "token"],
+                            config: McpServerConfig(
+                                name: "alpha",
+                                transportType: .unknown,
+                                command: nil,
+                                args: ["--stdio"],
+                                env: nil,
+                                cwd: nil,
+                                url: nil,
+                                headers: ["Authorization": "token"],
+                                pluginId: nil,
+                                pluginName: nil,
+                                source: .claudeJson,
+                                unknownFields: nil
+                            ),
                             enabled: true,
                             source: nil,
                             rawObject: [:]
@@ -858,11 +1511,20 @@ final class ResolverModelsTests: XCTestCase {
                     ],
                     localServers: [
                         "alpha": ParsedClaudeJsonMcpServerRef(
-                            command: "run",
-                            args: nil,
-                            env: nil,
-                            url: "http://localhost:8123",
-                            headers: nil,
+                            config: McpServerConfig(
+                                name: "alpha",
+                                transportType: .stdio,
+                                command: "run",
+                                args: nil,
+                                env: nil,
+                                cwd: nil,
+                                url: "http://localhost:8123",
+                                headers: nil,
+                                pluginId: nil,
+                                pluginName: nil,
+                                source: .claudeJson,
+                                unknownFields: nil
+                            ),
                             enabled: true,
                             source: nil,
                             rawObject: [:]
@@ -887,7 +1549,6 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.claudeJson.mcpDuplicateAcrossScopes" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.argsWithoutCommand" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.headersWithoutUrl" }))
-        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.serverTransportShape" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.claudeJson.trustPathOverlap" }))
     }
 
@@ -1260,6 +1921,278 @@ final class ResolverModelsTests: XCTestCase {
         )
     }
 
+    func testSemanticValidatorFlagsHooksNeutralizedByManagedHookPolicies() throws {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "disableAllHooks": .bool(true),
+                "allowManagedHooksOnly": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo pre")])
+                    ])
+                ])
+            ]
+        )
+
+        let settingsSelection = resolver.resolvePrecedence(candidates: [user, managed])
+        let settingsSnapshot = resolver.buildSnapshot(from: settingsSelection)
+        let hooksSnapshot = try XCTUnwrap(
+            SessionProjectionBuilder().build(
+                from: SessionProjectionBuilder.Input(settings: settingsSnapshot)
+            ).hooks
+        )
+
+        let semantic = SemanticValidator().validate(
+            context: SemanticValidationContext(settings: settingsSnapshot, hooks: hooksSnapshot)
+        )
+
+        XCTAssertTrue(semantic.issues.contains(where: { $0.code.rawValue == "semantic.hooks.neutralizedByDisableAllHooks" }))
+        XCTAssertFalse(semantic.issues.contains(where: { $0.code.rawValue == "semantic.hooks.lowerScopeSuppressedByManagedPolicy" }))
+
+        let managedOnly = makeCandidate(
+            tier: .managed,
+            identifier: "managed-hook-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowManagedHooksOnly": .bool(true)
+            ]
+        )
+        let managedOnlySelection = resolver.resolvePrecedence(candidates: [user, managedOnly])
+        let managedOnlySettings = resolver.buildSnapshot(from: managedOnlySelection)
+        let managedOnlyHooks = try XCTUnwrap(
+            SessionProjectionBuilder().build(
+                from: SessionProjectionBuilder.Input(settings: managedOnlySettings)
+            ).hooks
+        )
+
+        let managedOnlySemantic = SemanticValidator().validate(
+            context: SemanticValidationContext(settings: managedOnlySettings, hooks: managedOnlyHooks)
+        )
+
+        XCTAssertTrue(managedOnlySemantic.issues.contains(where: { $0.code.rawValue == "semantic.hooks.lowerScopeSuppressedByManagedPolicy" }))
+    }
+
+    func testSemanticValidatorFlagsManagedOnlySettingsMaskedByManagedPrecedence() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowedMcpServers": .array([
+                    .object(["serverName": .string("managed-filesystem")])
+                ]),
+                "strictKnownMarketplaces": .array([
+                    .object([
+                        "id": .string("managed-market"),
+                        "source": .object([
+                            "type": .string("github"),
+                            "repo": .string("anthropic/managed-market")
+                        ])
+                    ])
+                ])
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "allowedMcpServers": .array([
+                    .object(["serverName": .string("user-filesystem")])
+                ]),
+                "strictKnownMarketplaces": .array([
+                    .object([
+                        "id": .string("user-market"),
+                        "source": .object([
+                            "type": .string("github"),
+                            "repo": .string("anthropic/user-market")
+                        ])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let settingsSnapshot = resolver.buildSnapshot(from: selection)
+
+        let semantic = SemanticValidator().validate(
+            context: SemanticValidationContext(settings: settingsSnapshot)
+        )
+
+        XCTAssertTrue(semantic.issues.contains(where: {
+            $0.code.rawValue == "semantic.mcp.managedPolicyMasksLowerScopeSetting" &&
+                $0.keyPath == "allowedMcpServers"
+        }))
+        XCTAssertTrue(semantic.issues.contains(where: {
+            $0.code.rawValue == "semantic.plugins.managedPolicyMasksLowerScope" &&
+                $0.keyPath == "strictKnownMarketplaces"
+        }))
+    }
+
+    func testSemanticValidatorFlagsResolvedPermissionAndSandboxConflicts() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "permissions": .object([
+                    "allow": .array([.string("Bash(git status)")])
+                ]),
+                "sandbox": .object([
+                    "filesystem": .object([
+                        "allowWrite": .array([.string("/tmp")]),
+                        "allowRead": .array([.string("/repo")])
+                    ]),
+                    "network": .object([
+                        "allowedDomains": .array([.string("example.com")])
+                    ])
+                ])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "permissions": .object([
+                    "deny": .array([.string("Bash(git status)")])
+                ]),
+                "sandbox": .object([
+                    "enabled": .bool(false),
+                    "filesystem": .object([
+                        "denyWrite": .array([.string("/tmp")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let settingsSnapshot = resolver.buildSnapshot(from: selection)
+
+        let semantic = SemanticValidator().validate(
+            context: SemanticValidationContext(settings: settingsSnapshot)
+        )
+
+        let semanticCodes = semantic.issues.map(\.code.rawValue)
+        XCTAssertTrue(semantic.issues.contains(where: { $0.code.rawValue == "semantic.settings.permissionsAllowDenyConflict" }), "\(semanticCodes)")
+        XCTAssertTrue(semantic.issues.contains(where: { $0.code.rawValue == "semantic.sandbox.disabledMakesSubsettingsIneffective" }), "\(semanticCodes)")
+    }
+
+    func testSemanticValidatorFlagsMcpBlockedByManagedOnlyPolicy() {
+        let settingsResolver = SettingsResolver()
+        let policySettings = settingsResolver.buildSnapshot(
+            from: settingsResolver.resolvePrecedence(candidates: [
+                makeCandidate(
+                    tier: .managed,
+                    identifier: "managed-policy",
+                    scope: .managed,
+                    kind: .managed,
+                    rawTopLevel: [
+                        "allowManagedMcpServersOnly": .bool(true)
+                    ]
+                )
+            ])
+        )
+
+        let baseMcp = MCPResolver().resolve(documents: [
+            makeMcpDocument(
+                tier: .project,
+                scope: .project,
+                identifier: "project-mcp",
+                sourcePath: "/tmp/project/.mcp.json",
+                servers: [
+                    makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("npx")])
+                ]
+            )
+        ])
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: policySettings, mcp: baseMcp)
+        )
+        let semantic = SemanticValidator().validate(
+            context: SemanticValidationContext(
+                settings: policySettings,
+                mcp: projection.mcp
+            )
+        )
+
+        XCTAssertTrue(semantic.issues.contains(where: { $0.code.rawValue == "semantic.mcp.blockedByManagedOnlyPolicy" }))
+    }
+
+    func testSemanticValidatorFlagsMcpBlockedByDenyRuleAndManagedOverride() {
+        let settingsResolver = SettingsResolver()
+        let policySettings = settingsResolver.buildSnapshot(
+            from: settingsResolver.resolvePrecedence(candidates: [
+                makeCandidate(
+                    tier: .managed,
+                    identifier: "managed-policy",
+                    scope: .managed,
+                    kind: .managed,
+                    rawTopLevel: [
+                        "deniedMcpServers": .array([
+                            .object(["serverName": .string("denied-server")])
+                        ])
+                    ]
+                )
+            ])
+        )
+
+        let baseMcp = MCPResolver().resolve(documents: [
+            makeMcpDocument(
+                tier: .managed,
+                scope: .managed,
+                identifier: "managed-mcp",
+                sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+                servers: [
+                    makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed")])
+                ]
+            ),
+            makeMcpDocument(
+                tier: .user,
+                scope: .user,
+                identifier: "user-mcp",
+                sourcePath: "/tmp/.claude.json",
+                servers: [
+                    makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("user")]),
+                    makeMcpServer(serverID: "denied-server", parseOrder: 1, config: ["command": .string("denied")])
+                ]
+            )
+        ])
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: policySettings, mcp: baseMcp)
+        )
+        let semantic = SemanticValidator().validate(
+            context: SemanticValidationContext(
+                settings: policySettings,
+                mcp: projection.mcp
+            )
+        )
+
+        let semanticCodes = semantic.issues.map(\.code.rawValue)
+        XCTAssertTrue(semantic.issues.contains(where: { $0.code.rawValue == "semantic.mcp.blockedByDenyRule" }), "\(semanticCodes)")
+    }
+
     func testSemanticAndSchemaIssuesAggregateDeterministicallyForSessionVisibility() {
         let schemaDocument = ParsedSettingsDocument(
             source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
@@ -1279,6 +2212,7 @@ final class ResolverModelsTests: XCTestCase {
                 useAutoModeDuringPlan: nil,
                 disableDeepLinkRegistration: nil,
                 hooks: nil,
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -1658,6 +2592,456 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(entry.resolvedConfig.issues.contains(where: { $0.code == .unresolvedValue }))
         XCTAssertTrue(entry.resolvedConfig.issues.contains(where: { $0.code == .typeMismatch }))
     }
+
+    // MARK: - R3 MCP Policy Enforcement Tests
+
+    func testMCPResolverPolicyAllowManagedMcpServersOnlyBlocksNonManaged() {
+        let resolver = MCPResolver()
+        let serverID = "filesystem"
+
+        let user = makeMcpDocument(
+            tier: .user,
+            scope: .user,
+            identifier: "user-mcp",
+            sourcePath: "/tmp/.claude.json",
+            servers: [
+                makeMcpServer(serverID: serverID, parseOrder: 0, config: ["command": .string("npx"), "args": .array([.string("@modelcontextprotocol/server-filesystem")])])
+            ]
+        )
+        let managed = makeMcpDocument(
+            tier: .managed,
+            scope: .managed,
+            identifier: "managed-mcp",
+            sourcePath: "/tmp/managed/mcp.json",
+            servers: [
+                makeMcpServer(serverID: "managed-server", parseOrder: 0, config: ["command": .string("managed-cmd")])
+            ]
+        )
+
+        let policySource = makeSource(identifier: "managed-settings", scope: .managed, sourcePath: "/tmp/managed/settings.json")
+        let policy = MCPResolver.PolicyInput(
+            allowManagedMcpServersOnly: true,
+            policySource: policySource
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [user, managed], policy: policy)
+
+        // Non-managed server should be blocked
+        let userEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: serverID)
+        XCTAssertEqual(userEntry.effectiveState, .blocked)
+        XCTAssertTrue(userEntry.stateExplanation.contains("only managed"))
+        XCTAssertTrue(userEntry.policyEffects.contains(where: { $0.reason == .allowManagedMcpServersOnly }))
+
+        // Managed server should be active with managed state
+        let managedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "managed-server")
+        XCTAssertEqual(managedEntry.effectiveState, .managed)
+        XCTAssertTrue(managedEntry.stateExplanation.contains("managed configuration"))
+
+        // Snapshot should have global policy effect
+        XCTAssertTrue(snapshot.policyEffects.contains(where: { $0.reason == .allowManagedMcpServersOnly }))
+    }
+
+    func testMCPResolverPolicyDeniedMcpServersBlocksByName() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "github", parseOrder: 0, config: ["command": .string("npx"), "args": .array([.string("@github/mcp")])]),
+                makeMcpServer(serverID: "safe-server", parseOrder: 1, config: ["command": .string("safe-cmd")])
+            ]
+        )
+
+        let policySource = makeSource(identifier: "user-settings", sourcePath: "/tmp/.claude/settings.json")
+        let policy = MCPResolver.PolicyInput(
+            deniedMcpServers: [McpRestrictionRule(serverName: "github", serverCommand: nil, serverUrl: nil, unknownFields: nil)],
+            policySource: policySource
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let blockedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "github")
+        XCTAssertEqual(blockedEntry.effectiveState, .blocked)
+        XCTAssertTrue(blockedEntry.policyEffects.contains(where: { $0.reason == .deniedMcpServers }))
+        XCTAssertTrue(snapshot.issues.contains(where: { $0.code == .mcpDenyRuleMatch }))
+
+        let safeEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "safe-server")
+        XCTAssertEqual(safeEntry.effectiveState, .active)
+    }
+
+    func testMCPResolverPolicyDeniedMcpServersByCommand() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "blocked-by-cmd", parseOrder: 0, config: [
+                    "command": .string("npx"),
+                    "args": .array([.string("@evil/mcp-server")])
+                ]),
+                makeMcpServer(serverID: "allowed-server", parseOrder: 1, config: [
+                    "command": .string("safe-tool")
+                ])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            deniedMcpServers: [McpRestrictionRule(serverName: nil, serverCommand: ["npx", "@evil/mcp-server"], serverUrl: nil, unknownFields: nil)],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let blockedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "blocked-by-cmd")
+        XCTAssertEqual(blockedEntry.effectiveState, .blocked)
+
+        let allowedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "allowed-server")
+        XCTAssertEqual(allowedEntry.effectiveState, .active)
+    }
+
+    func testMCPResolverPolicyDeniedMcpServersByUrl() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "http-server", parseOrder: 0, config: [
+                    "url": .string("https://evil.example.com/mcp")
+                ])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            deniedMcpServers: [McpRestrictionRule(serverName: nil, serverCommand: nil, serverUrl: "https://evil.example.com", unknownFields: nil)],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let blockedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "http-server")
+        XCTAssertEqual(blockedEntry.effectiveState, .blocked)
+        XCTAssertTrue(blockedEntry.stateExplanation.contains("deniedMcpServers"))
+    }
+
+    func testMCPResolverPolicyDisabledMcpjsonServersDisablesNamedServer() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "disabled-one", parseOrder: 0, config: ["command": .string("cmd1")]),
+                makeMcpServer(serverID: "active-one", parseOrder: 1, config: ["command": .string("cmd2")])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            disabledMcpjsonServers: ["disabled-one"],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let disabledEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "disabled-one")
+        XCTAssertEqual(disabledEntry.effectiveState, .disabled)
+        XCTAssertTrue(disabledEntry.policyEffects.contains(where: { $0.reason == .disabledMcpjsonServers }))
+
+        let activeEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "active-one")
+        XCTAssertEqual(activeEntry.effectiveState, .active)
+    }
+
+    func testMCPResolverPolicyAllowedMcpServersBlocksUnlistedServers() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "allowed-one", parseOrder: 0, config: ["command": .string("approved")]),
+                makeMcpServer(serverID: "not-allowed", parseOrder: 1, config: ["command": .string("unapproved")])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            allowedMcpServers: [McpRestrictionRule(serverName: "allowed-one", serverCommand: nil, serverUrl: nil, unknownFields: nil)],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let allowedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "allowed-one")
+        XCTAssertEqual(allowedEntry.effectiveState, .active)
+        XCTAssertTrue(allowedEntry.policyEffects.contains(where: { $0.reason == .allowedMcpServers }))
+
+        let blockedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "not-allowed")
+        XCTAssertEqual(blockedEntry.effectiveState, .blocked)
+        XCTAssertTrue(blockedEntry.stateExplanation.contains("allowedMcpServers"))
+    }
+
+    func testMCPResolverPolicyDenyWinsOverAllow() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "contested", parseOrder: 0, config: ["command": .string("npx"), "args": .array([.string("mcp-tool")])])
+            ]
+        )
+
+        // Both allow AND deny match the same server — deny should win
+        let policy = MCPResolver.PolicyInput(
+            allowedMcpServers: [McpRestrictionRule(serverName: "contested", serverCommand: nil, serverUrl: nil, unknownFields: nil)],
+            deniedMcpServers: [McpRestrictionRule(serverName: "contested", serverCommand: nil, serverUrl: nil, unknownFields: nil)],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+        let entry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "contested")
+
+        // Deny should take precedence
+        XCTAssertEqual(entry.effectiveState, .blocked)
+        XCTAssertTrue(entry.policyEffects.contains(where: { $0.reason == .deniedMcpServers }))
+    }
+
+    func testMCPResolverPolicyEnableAllProjectMcpServersAnnotatesProjectServers() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "project-server", parseOrder: 0, config: ["command": .string("cmd")])
+            ]
+        )
+        let user = makeMcpDocument(
+            tier: .user,
+            scope: .user,
+            identifier: "user-mcp",
+            sourcePath: "/tmp/.claude.json",
+            servers: [
+                makeMcpServer(serverID: "user-server", parseOrder: 0, config: ["command": .string("user-cmd")])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            enableAllProjectMcpServers: true,
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project, user], policy: policy)
+
+        // Project server should have enableAllProjectMcpServers effect
+        let projectEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "project-server")
+        XCTAssertEqual(projectEntry.effectiveState, .active)
+        XCTAssertTrue(projectEntry.policyEffects.contains(where: { $0.reason == .enableAllProjectMcpServers }))
+
+        // User server should NOT have enableAllProjectMcpServers effect
+        let userEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "user-server")
+        XCTAssertEqual(userEntry.effectiveState, .active)
+        XCTAssertFalse(userEntry.policyEffects.contains(where: { $0.reason == .enableAllProjectMcpServers }))
+
+        // Snapshot should have global policy note
+        XCTAssertTrue(snapshot.notes.contains(where: { $0.contains("enableAllProjectMcpServers") }))
+    }
+
+    func testMCPResolverPolicyEnabledMcpjsonServersAnnotatesNamedServers() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "named-server", parseOrder: 0, config: ["command": .string("cmd")]),
+                makeMcpServer(serverID: "other-server", parseOrder: 1, config: ["command": .string("other")])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            enabledMcpjsonServers: ["named-server"],
+            policySource: nil
+        )
+
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+
+        let namedEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "named-server")
+        XCTAssertEqual(namedEntry.effectiveState, .active)
+        XCTAssertTrue(namedEntry.policyEffects.contains(where: { $0.reason == .enabledMcpjsonServers }))
+
+        let otherEntry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "other-server")
+        XCTAssertEqual(otherEntry.effectiveState, .active)
+        XCTAssertFalse(otherEntry.policyEffects.contains(where: { $0.reason == .enabledMcpjsonServers }))
+    }
+
+    func testMCPResolverExtractPolicyInputFromResolvedSettings() {
+        let source = makeSource(identifier: "managed-settings", scope: .managed, sourcePath: "/tmp/managed/settings.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "allowManagedMcpServersOnly",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "disabledMcpjsonServers",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("bad-server")]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .appendUnique
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "deniedMcpServers",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.object(["serverName": .string("evil")])]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .appendUnique
+                    )
+                )
+            ]
+        )
+
+        let policy = MCPResolver.extractPolicyInput(from: settings)
+
+        XCTAssertTrue(policy.allowManagedMcpServersOnly)
+        XCTAssertFalse(policy.enableAllProjectMcpServers)
+        XCTAssertEqual(policy.disabledMcpjsonServers, ["bad-server"])
+        XCTAssertEqual(policy.deniedMcpServers.count, 1)
+        XCTAssertEqual(policy.deniedMcpServers.first?.serverName, "evil")
+        XCTAssertEqual(policy.policySource?.identifier, "managed-settings")
+    }
+
+    func testMCPResolverApplyPolicyPostResolutionMatchesResolveWithPolicy() {
+        let resolver = MCPResolver()
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: "srv", parseOrder: 0, config: ["command": .string("cmd")])
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput(
+            disabledMcpjsonServers: ["srv"],
+            policySource: nil
+        )
+
+        let withPolicy = resolver.resolveWithPolicy(documents: [project], policy: policy)
+        let base = resolver.resolve(documents: [project])
+        let applied = resolver.applyPolicy(to: base, policy: policy)
+
+        // Both paths should produce the same effective state
+        XCTAssertEqual(
+            withPolicy.servers.first?.effectiveState,
+            applied.servers.first?.effectiveState
+        )
+    }
+
+    func testMCPResolverUnresolvedServerGetsUnresolvedState() {
+        let resolver = MCPResolver()
+        let serverID = "broken"
+
+        let project = makeMcpDocument(
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp",
+            sourcePath: "/tmp/project/.mcp.json",
+            servers: [
+                makeMcpServer(serverID: serverID, parseOrder: 0, config: .string("not-an-object"))
+            ]
+        )
+
+        let policy = MCPResolver.PolicyInput()
+        let snapshot = resolver.resolveWithPolicy(documents: [project], policy: policy)
+        let entry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: serverID)
+
+        XCTAssertEqual(entry.effectiveState, .unresolved)
+        XCTAssertTrue(entry.stateExplanation.contains("No usable"))
+    }
+
+    func testSessionProjectionBuilderAppliesMcpPolicyFromSettings() {
+        let managedSource = makeSource(identifier: "managed-settings", scope: .managed, sourcePath: "/tmp/managed/settings.json")
+        let userSource = makeSource(identifier: "user-mcp", sourcePath: "/tmp/.claude.json")
+
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "disabledMcpjsonServers",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("disabled-srv")]),
+                        winningSource: managedSource,
+                        trace: ResolutionTrace(participants: [managedSource]),
+                        mergeMethod: .appendUnique
+                    )
+                )
+            ]
+        )
+
+        let mcp = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "disabled-srv",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("cmd")]),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(participants: [userSource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedMcpServerEntry(
+                    serverID: "active-srv",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("cmd2")]),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(participants: [userSource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+
+        let builder = SessionProjectionBuilder()
+        let projection = builder.build(from: SessionProjectionBuilder.Input(settings: settings, mcp: mcp))
+
+        // The projection should have policy-aware MCP
+        let disabledSrv = projection.mcp?.servers.first(where: { $0.serverID == "disabled-srv" })
+        XCTAssertNotNil(disabledSrv)
+        XCTAssertEqual(disabledSrv?.effectiveState, .disabled)
+
+        let activeSrv = projection.mcp?.servers.first(where: { $0.serverID == "active-srv" })
+        XCTAssertNotNil(activeSrv)
+        XCTAssertEqual(activeSrv?.effectiveState, .active)
+    }
+
+    // MARK: - End R3 MCP Policy Tests
 
     func testAgentResolverResolvesUserOnlyAgentAsEffective() throws {
         let parser = AgentParser()
@@ -2054,31 +3438,33 @@ final class ResolverModelsTests: XCTestCase {
         let source = makeSource(identifier: "user-settings", sourcePath: "/tmp/.claude/settings.json")
         let settings = ResolvedSettingsSnapshot(
             entries: [
+                // Worktree family (sortOrder 9)
                 ResolvedSettingsEntry(
-                    keyPath: "zeta.flag",
+                    keyPath: "worktree.sparsePaths",
                     value: ResolvedValue(
-                        effectiveValue: .bool(true),
+                        effectiveValue: .array([.string("src/")]),
                         winningSource: source,
                         trace: ResolutionTrace(participants: [source]),
-                        mergeMethod: .replace
+                        mergeMethod: .appendUnique
+                    )
+                ),
+                // Model family (sortOrder 0) — two keys to test intra-section ordering
+                ResolvedSettingsEntry(
+                    keyPath: "model",
+                    value: ResolvedValue(
+                        effectiveValue: .string("claude-sonnet-4-6"),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence
                     )
                 ),
                 ResolvedSettingsEntry(
-                    keyPath: "alpha.b",
+                    keyPath: "effortLevel",
                     value: ResolvedValue(
-                        effectiveValue: .number(2),
+                        effectiveValue: .string("high"),
                         winningSource: source,
                         trace: ResolutionTrace(participants: [source]),
-                        mergeMethod: .replace
-                    )
-                ),
-                ResolvedSettingsEntry(
-                    keyPath: "alpha.a",
-                    value: ResolvedValue(
-                        effectiveValue: .number(1),
-                        winningSource: source,
-                        trace: ResolutionTrace(participants: [source]),
-                        mergeMethod: .replace
+                        mergeMethod: .selectHighestPrecedence
                     )
                 )
             ]
@@ -2089,8 +3475,10 @@ final class ResolverModelsTests: XCTestCase {
 
         let viewModel = SessionSettingsViewModel(projection: projection)
 
-        XCTAssertEqual(viewModel.sections.map(\.key), ["alpha", "zeta"])
-        XCTAssertEqual(viewModel.sections.first?.rows.map(\.keyPath), ["alpha.a", "alpha.b"])
+        // Model family appears before Worktree family per SettingsFamily.sortOrder
+        XCTAssertEqual(viewModel.sections.map(\.key), ["model", "worktree"])
+        // Within Model family, rows are sorted alphabetically by keyPath
+        XCTAssertEqual(viewModel.sections.first?.rows.map(\.keyPath), ["effortLevel", "model"])
     }
 
     func testSessionInstructionsViewModelSupportsNoImportSimpleState() {
@@ -2348,7 +3736,7 @@ final class ResolverModelsTests: XCTestCase {
                             "preToolUse": .object([
                                 "matcher": .string("Bash"),
                                 "hooks": .array([
-                                    .object(["type": .string("command"), "command": .string("echo ok"), "timeoutMs": .number(1200)])
+                                    .object(["type": .string("command"), "command": .string("echo ok"), "timeout": .number(12)])
                                 ])
                             ])
                         ]),
@@ -2366,16 +3754,59 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .populated)
         XCTAssertEqual(viewModel.groupCount, 2)
         XCTAssertEqual(viewModel.rowCount, 2)
+        XCTAssertEqual(viewModel.catalogSections.map(\.title), ["Tool And Turn Flow"])
         XCTAssertEqual(viewModel.groups.map(\.eventID), ["postToolUse", "preToolUse"])
+        XCTAssertEqual(viewModel.groups.map(\.eventTitle), ["PostToolUse", "PreToolUse"])
         XCTAssertEqual(viewModel.groups[0].matcherLabel, "(none)")
+        XCTAssertEqual(viewModel.groups[0].matcherDetail, "Matcher: none")
         XCTAssertEqual(viewModel.groups[1].matcherLabel, "Bash")
-        XCTAssertEqual(viewModel.groups[1].rows.first?.actionSummary, "command | command: echo ok | timeout=1200ms")
+        XCTAssertEqual(viewModel.groups[1].matcherDetail, "Matcher: Bash")
+        XCTAssertEqual(viewModel.groups[1].rows.first?.handlerTitle, "Command handler")
+        XCTAssertEqual(viewModel.groups[1].rows.first?.primaryDetail, "Command: echo ok")
+        XCTAssertEqual(viewModel.groups[1].rows.first?.detailLines, ["Timeout: 12s"])
+    }
+
+    func testSessionHooksViewModelShowsHookEventCapabilityBadges() {
+        let source = makeSource(identifier: "project-local", scope: .projectLocal, sourcePath: "/tmp/project/.claude/settings.local.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "hooks",
+                    value: ResolvedValue(
+                        effectiveValue: .object([
+                            "UserPromptSubmit": .array([
+                                .object(["type": .string("command"), "command": .string("echo gate")])
+                            ])
+                        ]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .keyedByIdentifier
+                    )
+                )
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: settings))
+
+        let viewModel = SessionHooksViewModel(projection: projection)
+        let group = tryUnwrapHookGroup(viewModel: viewModel, eventID: "UserPromptSubmit")
+
+        XCTAssertEqual(group.capabilityBadges.map(\.title), ["Blocking", "Context injection"])
+        XCTAssertEqual(group.capabilityNote, "Prompt erasure: a successful block result can remove the user's prompt from model context.")
     }
 
     func testSessionHooksViewModelRendersRestrictionBadgesFromEffectiveSettings() {
         let source = makeSource(identifier: "project-local", scope: .projectLocal, sourcePath: "/tmp/project/.claude/settings.local.json")
         let settings = ResolvedSettingsSnapshot(
             entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "disableAllHooks",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .replace
+                    )
+                ),
                 ResolvedSettingsEntry(
                     keyPath: "allowManagedHooksOnly",
                     value: ResolvedValue(
@@ -2409,9 +3840,63 @@ final class ResolverModelsTests: XCTestCase {
 
         let viewModel = SessionHooksViewModel(projection: projection)
 
-        XCTAssertEqual(viewModel.restrictionBadges.count, 2)
-        XCTAssertEqual(viewModel.restrictionBadges.map(\.title), ["Managed Hooks Only", "HTTP URL Allowlist"])
+        XCTAssertEqual(viewModel.policyBanners.map(\.title), ["All hooks disabled", "Managed hooks only"])
+        XCTAssertEqual(viewModel.restrictionBadges.count, 1)
+        XCTAssertEqual(viewModel.restrictionBadges.map(\.title), ["HTTP URL Allowlist"])
         XCTAssertTrue(viewModel.restrictionBadges.contains(where: { $0.detail.contains("2 allowed URL patterns") }))
+    }
+
+    func testSessionHooksViewModelSurfacesHandlerSpecificDetailsAndIndicators() throws {
+        let source = makeSource(identifier: "user-settings", scope: .user, sourcePath: "/tmp/.claude/settings.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "hooks",
+                    value: ResolvedValue(
+                        effectiveValue: .object([
+                            "PreToolUse": .array([
+                                .object([
+                                    "type": .string("command"),
+                                    "command": .string("lint.sh"),
+                                    "if": .string("tool == 'Bash'"),
+                                    "async": .bool(true),
+                                    "shell": .string("bash"),
+                                    "statusMessage": .string("Linting"),
+                                    "timeout": .number(30)
+                                ]),
+                                .object([
+                                    "type": .string("http"),
+                                    "url": .string("https://hooks.example.com/check"),
+                                    "headers": .object(["Authorization": .string("Bearer $TOKEN")]),
+                                    "allowedEnvVars": .array([.string("TOKEN")])
+                                ])
+                            ])
+                        ]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .keyedByIdentifier
+                    )
+                )
+            ]
+        )
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: settings))
+        let viewModel = SessionHooksViewModel(projection: projection)
+        let group = tryUnwrapHookGroup(viewModel: viewModel, eventID: "PreToolUse")
+        let commandRow = try XCTUnwrap(group.rows.first)
+        let httpRow = try XCTUnwrap(group.rows.last)
+
+        XCTAssertEqual(commandRow.handlerTitle, "Command handler")
+        XCTAssertEqual(commandRow.primaryDetail, "Command: lint.sh")
+        XCTAssertTrue(commandRow.detailLines.contains("Condition: tool == 'Bash'"))
+        XCTAssertTrue(commandRow.detailLines.contains("Shell: bash"))
+        XCTAssertTrue(commandRow.detailLines.contains("Status message: Linting"))
+        XCTAssertEqual(commandRow.indicatorBadges.map(\.title), ["Conditional", "Async"])
+
+        XCTAssertEqual(httpRow.handlerTitle, "HTTP handler")
+        XCTAssertEqual(httpRow.primaryDetail, "URL: https://hooks.example.com/check")
+        XCTAssertTrue(httpRow.detailLines.contains("Headers: Authorization"))
+        XCTAssertTrue(httpRow.detailLines.contains("Allowed env vars: TOKEN"))
     }
 
     func testSessionHooksViewModelMapsInvalidHookDiagnosticsAndPartialState() {
@@ -2663,6 +4148,119 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(viewModel.summaryNotes.contains(where: { $0.contains("partial provenance") }))
     }
 
+    func testSessionMCPViewModelSurfacesPolicyBannersAndEffectiveStateBreakdown() {
+        let managedSource = makeSource(identifier: "managed-mcp", scope: .managed, sourcePath: "/tmp/managed-mcp.json")
+        let userSource = makeSource(identifier: "user-mcp", scope: .user, sourcePath: "/tmp/.mcp.json")
+        let policySource = makeSource(identifier: "managed-settings", scope: .managed, sourcePath: "/tmp/managed-settings.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "allowManagedMcpServersOnly",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: policySource,
+                        trace: ResolutionTrace(participants: [policySource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "deniedMcpServers",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.object(["serverName": .string("denied-srv")])]),
+                        winningSource: policySource,
+                        trace: ResolutionTrace(participants: [policySource]),
+                        mergeMethod: .appendUnique
+                    )
+                )
+            ]
+        )
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "managed-srv",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("managed-cmd")]),
+                        winningSource: managedSource,
+                        trace: ResolutionTrace(participants: [managedSource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedMcpServerEntry(
+                    serverID: "blocked-srv",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object(["command": .string("user-cmd")]),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(participants: [userSource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: settings, mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+
+        XCTAssertEqual(viewModel.managedCount, 1)
+        XCTAssertEqual(viewModel.blockedCount, 1)
+        XCTAssertEqual(viewModel.activeCount, 0)
+        XCTAssertEqual(viewModel.stateBreakdownSummary, "1 managed, 1 blocked")
+        XCTAssertEqual(viewModel.policyBanners.map(\.title), ["Managed MCP only", "MCP deny rules active"])
+    }
+
+    func testSessionMCPViewModelBuildsTransportAndPolicyDetailsFromNormalizedServerConfig() throws {
+        let source = makeSource(identifier: "project-mcp", scope: .project, sourcePath: "/tmp/project/.mcp.json")
+        let settingsSource = makeSource(identifier: "project-settings", scope: .project, sourcePath: "/tmp/project/.claude/settings.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "enableAllProjectMcpServers",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: settingsSource,
+                        trace: ResolutionTrace(participants: [settingsSource]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+        let snapshot = ResolvedMcpSnapshot(
+            servers: [
+                ResolvedMcpServerEntry(
+                    serverID: "filesystem",
+                    resolvedConfig: ResolvedValue(
+                        effectiveValue: .object([
+                            "command": .string("npx"),
+                            "args": .array([.string("-y"), .string("@modelcontextprotocol/server-filesystem")]),
+                            "cwd": .string("/tmp/project"),
+                            "env": .object(["HOME": .string("/Users/test")])
+                        ]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                )
+            ]
+        )
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: settings, mcp: snapshot)
+        )
+
+        let viewModel = SessionMCPViewModel(projection: projection)
+        let row = try XCTUnwrap(viewModel.serverRows.first)
+
+        XCTAssertEqual(row.effectiveStateLabel, "Active")
+        XCTAssertEqual(row.transportLabel, "stdio")
+        XCTAssertEqual(row.transportPrimaryDetail, "npx -y @modelcontextprotocol/server-filesystem")
+        XCTAssertTrue(row.transportDetailLines.contains("Working directory: /tmp/project"))
+        XCTAssertTrue(row.transportDetailLines.contains("Environment: 1 variable"))
+        XCTAssertEqual(row.policyEffectBadges.map(\.title), ["Project Auto-Enable"])
+        XCTAssertTrue(row.policyEffectDetails.contains("Server 'filesystem' is auto-enabled by enableAllProjectMcpServers."))
+    }
+
     func testSessionAgentsSkillsViewModelSupportsMissingState() {
         let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input())
 
@@ -2891,6 +4489,819 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(partialViewModel.summaryNotes.contains(where: { $0.contains("Only one of agents/skills families") }))
     }
 
+    // MARK: - R1 Expanded Settings Families Tests
+
+    func testSettingsResolverUsesRegistryMergeHintForScalarKeys() {
+        let resolver = SettingsResolver()
+        let keys: [String: JSONValue] = [
+            "model": .string("claude-sonnet-4-6"),
+            "effortLevel": .string("high"),
+            "defaultShell": .string("/bin/zsh"),
+            "language": .string("en"),
+            "alwaysThinkingEnabled": .bool(true),
+            "fastMode": .bool(false),
+            "fastModePerSessionOptIn": .bool(true),
+            "outputStyle": .string("concise"),
+            "voiceEnabled": .bool(true),
+            "prefersReducedMotion": .bool(false),
+            "spinnerTipsEnabled": .bool(true),
+            "respectGitignore": .bool(true),
+            "autoMemoryEnabled": .bool(true),
+            "disableAllHooks": .bool(false),
+            "disableUpdateChecks": .bool(true),
+            "plansDirectory": .string("/tmp/plans"),
+            "autoUpdatesChannel": .string("stable"),
+            "showClearContextOnPlanAccept": .bool(false),
+            "feedbackSurveyRate": .number(0.1),
+            "agent": .string("reviewer")
+        ]
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: keys
+        )
+
+        var overrideTopLevel: [String: JSONValue] = [:]
+        for (key, _) in keys {
+            overrideTopLevel[key] = .string("override-\(key)")
+        }
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: overrideTopLevel
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        for key in keys.keys {
+            let entry = snapshot.entries.first(where: { $0.keyPath == key })
+            XCTAssertNotNil(entry, "Missing entry for key '\(key)'")
+            XCTAssertEqual(entry?.value.mergeMethod, .replace, "Key '\(key)' should use replace merge method")
+            XCTAssertEqual(entry?.value.winningSource?.identifier, "project-local-settings", "Key '\(key)' should be won by local")
+        }
+    }
+
+    func testSettingsResolverUsesRegistryMergeHintForDeepMergeObjectKeys() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "sandbox": .object([
+                    "enabled": .bool(true),
+                    "failIfUnavailable": .bool(false)
+                ]),
+                "worktree": .object([
+                    "sparsePaths": .array([.string("/src")])
+                ]),
+                "statusLine": .object([
+                    "command": .string("echo status"),
+                    "padding": .number(2)
+                ]),
+                "fileSuggestion": .object([
+                    "type": .string("default")
+                ]),
+                "spinnerVerbs": .object([
+                    "mode": .string("custom"),
+                    "verbs": .array([.string("thinking")])
+                ]),
+                "spinnerTipsOverride": .object([
+                    "excludeDefault": .bool(true),
+                    "tips": .array([.string("user tip")])
+                ])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "sandbox": .object([
+                    "enabled": .bool(false),
+                    "autoAllowBashIfSandboxed": .bool(true)
+                ]),
+                "worktree": .object([
+                    "symlinkDirectories": .array([.string("/lib")])
+                ]),
+                "statusLine": .object([
+                    "command": .string("echo local-status")
+                ]),
+                "fileSuggestion": .object([
+                    "command": .string("fzf")
+                ]),
+                "spinnerVerbs": .object([
+                    "verbs": .array([.string("processing")])
+                ]),
+                "spinnerTipsOverride": .object([
+                    "tips": .array([.string("local tip")])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let sandboxEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "sandbox")
+        XCTAssertEqual(sandboxEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(sandboxMerged) = sandboxEntry.value.effectiveValue else {
+            XCTFail("sandbox should be object")
+            return
+        }
+        XCTAssertEqual(sandboxMerged["enabled"], .bool(false))
+        XCTAssertEqual(sandboxMerged["failIfUnavailable"], .bool(false))
+        XCTAssertEqual(sandboxMerged["autoAllowBashIfSandboxed"], .bool(true))
+
+        let worktreeEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "worktree")
+        XCTAssertEqual(worktreeEntry.value.mergeMethod, .deepMergeObject)
+
+        let statusLineEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "statusLine")
+        XCTAssertEqual(statusLineEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(statusMerged) = statusLineEntry.value.effectiveValue else {
+            XCTFail("statusLine should be object")
+            return
+        }
+        XCTAssertEqual(statusMerged["command"], .string("echo local-status"))
+        XCTAssertEqual(statusMerged["padding"], .number(2))
+    }
+
+    func testSettingsResolverUsesRegistryMergeHintForAppendUniqueArrayKeys() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "companyAnnouncements": .array([.string("user-announcement")]),
+                "claudeMdExcludes": .array([.string("*.tmp")]),
+                "sandbox.excludedCommands": .array([.string("rm")]),
+                "sandbox.filesystem.allowWrite": .array([.string("/tmp")]),
+                "sandbox.network.allowedDomains": .array([.string("example.com")]),
+                "worktree.sparsePaths": .array([.string("/src")]),
+                "worktree.symlinkDirectories": .array([.string("/lib")])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "companyAnnouncements": .array([.string("local-announcement"), .string("user-announcement")]),
+                "claudeMdExcludes": .array([.string("*.log"), .string("*.tmp")]),
+                "sandbox.excludedCommands": .array([.string("rm"), .string("chmod")]),
+                "sandbox.filesystem.allowWrite": .array([.string("/var")]),
+                "sandbox.network.allowedDomains": .array([.string("example.com"), .string("anthropic.com")]),
+                "worktree.sparsePaths": .array([.string("/src"), .string("/docs")]),
+                "worktree.symlinkDirectories": .array([.string("/lib"), .string("/bin")])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let announcements = tryUnwrapEntry(snapshot: snapshot, keyPath: "companyAnnouncements")
+        XCTAssertEqual(announcements.value.mergeMethod, .appendUnique)
+
+        let excludes = tryUnwrapEntry(snapshot: snapshot, keyPath: "claudeMdExcludes")
+        XCTAssertEqual(excludes.value.mergeMethod, .appendUnique)
+        XCTAssertEqual(
+            excludes.value.effectiveValue,
+            .array([.string("*.log"), .string("*.tmp")])
+        )
+    }
+
+    func testSettingsResolverManagedPolicyMakesLowerScopeValuesIneffective() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "model": .string("claude-opus-4-6"),
+                "disableAllHooks": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "model": .string("claude-sonnet-4-6"),
+                "disableAllHooks": .bool(false)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let modelEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "model")
+        XCTAssertEqual(modelEntry.value.effectiveValue, .string("claude-opus-4-6"))
+        XCTAssertEqual(modelEntry.value.winningSource?.identifier, "managed-policy")
+        XCTAssertTrue(
+            modelEntry.value.trace.notes.contains(where: { $0.contains("Managed policy is active") && $0.contains("ineffective") }),
+            "Expected provenance note about managed policy suppressing lower scope"
+        )
+        XCTAssertTrue(
+            modelEntry.value.trace.overridden.contains(where: { $0.identifier == "user-settings" })
+        )
+
+        XCTAssertTrue(
+            snapshot.notes.contains(where: { $0.contains("Managed policy is active") })
+        )
+    }
+
+    func testSettingsResolverManagedOnlyKeyInNonManagedScopeEmitsWarning() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "allowManagedPermissionRulesOnly": .bool(true),
+                "channelsEnabled": .bool(true)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        XCTAssertTrue(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only") && $0.keyPath == "allowManagedPermissionRulesOnly"
+            }),
+            "Expected warning for managed-only key in non-managed scope"
+        )
+        XCTAssertTrue(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only") && $0.keyPath == "channelsEnabled"
+            }),
+            "Expected warning for channelsEnabled in non-managed scope"
+        )
+    }
+
+    func testSettingsResolverManagedOnlyKeyFromManagedScopeDoesNotWarn() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowManagedPermissionRulesOnly": .bool(true),
+                "channelsEnabled": .bool(true)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        XCTAssertFalse(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only")
+            }),
+            "Should not warn when managed-only keys come from managed scope"
+        )
+    }
+
+    func testSettingsResolverPluginAndMarketplaceKeysUseMergeHintsFromRegistry() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "enabledPlugins": .object(["plugin-a": .bool(true)]),
+                "extraKnownMarketplaces": .object(["mp-a": .object(["id": .string("a")])])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "enabledPlugins": .object(["plugin-b": .bool(false)]),
+                "extraKnownMarketplaces": .object(["mp-b": .object(["id": .string("b")])])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let pluginsEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "enabledPlugins")
+        XCTAssertEqual(pluginsEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(merged) = pluginsEntry.value.effectiveValue else {
+            XCTFail("enabledPlugins should merge as object")
+            return
+        }
+        XCTAssertEqual(merged["plugin-a"], .bool(true))
+        XCTAssertEqual(merged["plugin-b"], .bool(false))
+
+        let marketplaces = tryUnwrapEntry(snapshot: snapshot, keyPath: "extraKnownMarketplaces")
+        XCTAssertEqual(marketplaces.value.mergeMethod, .deepMergeObject)
+    }
+
+    func testSettingsResolverMcpControlKeysResolveCorrectly() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "enabledMcpjsonServers": .array([.string("server-a")]),
+                "disabledMcpjsonServers": .array([.string("server-b")]),
+                "enableAllProjectMcpServers": .bool(false),
+                "deniedMcpServers": .array([.object(["serverName": .string("bad-server")])])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "enabledMcpjsonServers": .array([.string("server-a"), .string("server-c")]),
+                "disabledMcpjsonServers": .array([.string("server-d")]),
+                "enableAllProjectMcpServers": .bool(true),
+                "deniedMcpServers": .array([.object(["serverName": .string("worse-server")])])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let enabled = tryUnwrapEntry(snapshot: snapshot, keyPath: "enabledMcpjsonServers")
+        XCTAssertEqual(enabled.value.mergeMethod, .appendUnique)
+        XCTAssertEqual(
+            enabled.value.effectiveValue,
+            .array([.string("server-a"), .string("server-c")])
+        )
+
+        let enableAll = tryUnwrapEntry(snapshot: snapshot, keyPath: "enableAllProjectMcpServers")
+        XCTAssertEqual(enableAll.value.mergeMethod, .replace)
+        XCTAssertEqual(enableAll.value.winningSource?.identifier, "project-local-settings")
+
+        let denied = tryUnwrapEntry(snapshot: snapshot, keyPath: "deniedMcpServers")
+        XCTAssertEqual(denied.value.mergeMethod, .appendUnique)
+    }
+
+    func testSettingsResolverUnknownKeyFallsToPassthrough() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["someUnknownFutureKey": .string("value")]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let entry = tryUnwrapEntry(snapshot: snapshot, keyPath: "someUnknownFutureKey")
+        XCTAssertEqual(entry.value.mergeMethod, .passthrough)
+    }
+
+    func testSettingsResolverAllRegistryKeysHaveExplicitMergeMethod() {
+        let resolver = SettingsResolver()
+        let registry = SettingsKeyRegistry.shared
+        var rawTopLevel: [String: JSONValue] = [:]
+        for definition in registry.allDefinitions {
+            if definition.keyPath.contains(".") { continue }
+            switch definition.type {
+            case .string:
+                rawTopLevel[definition.keyPath] = .string("test")
+            case .bool:
+                rawTopLevel[definition.keyPath] = .bool(true)
+            case .integer, .number:
+                rawTopLevel[definition.keyPath] = .number(1)
+            case .stringArray:
+                rawTopLevel[definition.keyPath] = .array([.string("test")])
+            case .object, .dictionary:
+                rawTopLevel[definition.keyPath] = .object(["key": .string("value")])
+            case .anyArray:
+                rawTopLevel[definition.keyPath] = .array([.string("test")])
+            case .array:
+                rawTopLevel[definition.keyPath] = .array([.object(["id": .string("test")])])
+            case .oneOf, .anyValue:
+                rawTopLevel[definition.keyPath] = .string("test")
+            }
+        }
+
+        let candidate = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: rawTopLevel
+        )
+        let selection = resolver.resolvePrecedence(candidates: [candidate])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        for entry in snapshot.entries {
+            XCTAssertNotEqual(
+                entry.value.mergeMethod, .passthrough,
+                "Registry key '\(entry.keyPath)' should have an explicit merge method, not passthrough. " +
+                "This means the registry defines a mergeHint but the resolver did not map it."
+            )
+        }
+    }
+
+    // MARK: - R2: HookResolver Tests
+
+    func testHookResolverProducesTypedHandlersForAllFourHandlerTypes() {
+        let resolver = SettingsResolver()
+        let source = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo pre")]),
+                        .object(["type": .string("http"), "url": .string("https://hooks.example.com/pre")]),
+                        .object(["type": .string("prompt"), "prompt": .string("check this tool call")]),
+                        .object(["type": .string("agent"), "prompt": .string("review code changes"), "model": .string("claude-sonnet-4-6")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [source])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks = projection.hooks!
+
+        let event = hooks.events.first(where: { $0.eventID == "PreToolUse" })!
+        XCTAssertEqual(event.resolvedHandlers.count, 4)
+        XCTAssertEqual(event.resolvedHandlers[0].handlerType, .command)
+        XCTAssertEqual(event.resolvedHandlers[0].command, "echo pre")
+        XCTAssertEqual(event.resolvedHandlers[1].handlerType, .http)
+        XCTAssertEqual(event.resolvedHandlers[1].url, "https://hooks.example.com/pre")
+        XCTAssertEqual(event.resolvedHandlers[2].handlerType, .prompt)
+        XCTAssertEqual(event.resolvedHandlers[2].prompt, "check this tool call")
+        XCTAssertEqual(event.resolvedHandlers[3].handlerType, .agent)
+        XCTAssertEqual(event.resolvedHandlers[3].prompt, "review code changes")
+        XCTAssertEqual(event.resolvedHandlers[3].model, "claude-sonnet-4-6")
+    }
+
+    func testHookResolverAppliesDisableAllHooksPolicy() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "disableAllHooks": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo pre")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        // All hooks should be suppressed
+        XCTAssertTrue(hooks.policyEffects.contains(where: { $0.reason == .disableAllHooks }))
+        XCTAssertTrue(hooks.notes.contains(where: { $0.contains("disableAllHooks") }))
+
+        // Events are still present but marked as suppressed
+        let event = hooks.events.first(where: { $0.eventID == "PreToolUse" })!
+        XCTAssertNotNil(event.suppression)
+        XCTAssertEqual(event.suppression?.reason, .disableAllHooks)
+
+        // Policy source should be attributed
+        XCTAssertEqual(hooks.policyEffects.first?.policySource?.identifier, "managed-policy")
+    }
+
+    func testHookResolverAppliesAllowManagedHooksOnlyPolicy() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowManagedHooksOnly": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PostToolUse": .array([
+                        .object(["type": .string("http"), "url": .string("https://hooks.example.com/post")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        XCTAssertTrue(hooks.policyEffects.contains(where: { $0.reason == .allowManagedHooksOnly }))
+
+        let event = hooks.events.first(where: { $0.eventID == "PostToolUse" })!
+        XCTAssertNotNil(event.suppression)
+        XCTAssertEqual(event.suppression?.reason, .allowManagedHooksOnly)
+        XCTAssertTrue(
+            hooks.issues.contains(where: {
+                $0.code == .hookPolicySuppressed && $0.keyPath == "hooks.PostToolUse"
+            })
+        )
+    }
+
+    func testHookResolverDoesNotSuppressManagedHooksWhenAllowManagedHooksOnly() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowManagedHooksOnly": .bool(true),
+                "hooks": .object([
+                    "SessionStart": .array([
+                        .object(["type": .string("command"), "command": .string("echo start")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        let event = hooks.events.first(where: { $0.eventID == "SessionStart" })!
+        // Managed hooks should NOT be suppressed
+        XCTAssertNil(event.suppression)
+        XCTAssertEqual(event.resolvedHandlers.count, 1)
+        XCTAssertEqual(event.resolvedHandlers.first?.handlerType, .command)
+    }
+
+    func testHookResolverDisableAllHooksSuppressesEvenManagedHooks() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "disableAllHooks": .bool(true),
+                "hooks": .object([
+                    "SessionStart": .array([
+                        .object(["type": .string("command"), "command": .string("echo start")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        let event = hooks.events.first(where: { $0.eventID == "SessionStart" })!
+        // disableAllHooks suppresses even managed hooks
+        XCTAssertNotNil(event.suppression)
+        XCTAssertEqual(event.suppression?.reason, .disableAllHooks)
+    }
+
+    func testHookResolverCurrentEventCatalogResolution() {
+        let resolver = SettingsResolver()
+        let knownEvents = [
+            "SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+            "PostToolUseFailure", "PermissionRequest", "Notification", "Stop", "StopFailure",
+            "SubagentStart", "SubagentStop", "PreCompact", "PostCompact", "InstructionsLoaded",
+            "ConfigChange", "WorktreeCreate", "WorktreeRemove", "Elicitation", "ElicitationResult",
+            "CwdChanged", "FileChanged", "TaskCreated", "TaskCompleted", "TeammateIdle", "Setup"
+        ]
+
+        var hooksObject: [String: JSONValue] = [:]
+        for event in knownEvents {
+            hooksObject[event] = .array([
+                .object(["type": .string("command"), "command": .string("echo \(event)")])
+            ])
+        }
+
+        let candidate = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["hooks": .object(hooksObject)]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [candidate])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        XCTAssertEqual(hooks.events.count, knownEvents.count)
+        for eventID in knownEvents {
+            let event = hooks.events.first(where: { $0.eventID == eventID })
+            XCTAssertNotNil(event, "Missing resolved event for \(eventID)")
+            XCTAssertTrue(event?.eventType.isKnown ?? false, "\(eventID) should be a known event type")
+            XCTAssertEqual(event?.resolvedHandlers.count, 1, "Each event should have one resolved handler")
+            XCTAssertNil(event?.suppression, "\(eventID) should not be suppressed")
+        }
+    }
+
+    func testHookResolverHandlerPropertiesAreParsed() {
+        let resolver = SettingsResolver()
+        let candidate = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object([
+                            "type": .string("command"),
+                            "command": .string("lint.sh"),
+                            "timeout": .number(30),
+                            "statusMessage": .string("Running lint..."),
+                            "if": .string("tool == 'Bash'"),
+                            "once": .bool(true),
+                            "shell": .string("bash"),
+                            "async": .bool(false)
+                        ]),
+                        .object([
+                            "type": .string("http"),
+                            "url": .string("https://hooks.example.com/log"),
+                            "headers": .object(["Authorization": .string("Bearer $TOKEN")]),
+                            "allowedEnvVars": .array([.string("TOKEN")])
+                        ])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [candidate])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+        let event = hooks.events.first(where: { $0.eventID == "PreToolUse" })!
+
+        let commandHandler = event.resolvedHandlers[0]
+        XCTAssertEqual(commandHandler.handlerType, .command)
+        XCTAssertEqual(commandHandler.command, "lint.sh")
+        XCTAssertEqual(commandHandler.timeout, 30)
+        XCTAssertEqual(commandHandler.statusMessage, "Running lint...")
+        XCTAssertEqual(commandHandler.condition, "tool == 'Bash'")
+        XCTAssertEqual(commandHandler.once, true)
+        XCTAssertEqual(commandHandler.shell, "bash")
+        XCTAssertEqual(commandHandler.isAsync, false)
+
+        let httpHandler = event.resolvedHandlers[1]
+        XCTAssertEqual(httpHandler.handlerType, .http)
+        XCTAssertEqual(httpHandler.url, "https://hooks.example.com/log")
+        XCTAssertEqual(httpHandler.headers, ["Authorization": "Bearer $TOKEN"])
+        XCTAssertEqual(httpHandler.allowedEnvVars, ["TOKEN"])
+    }
+
+    func testHookResolverPolicyEffectsHaveProvenanceAttribution() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "enterprise-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "disableAllHooks": .bool(true),
+                "allowManagedHooksOnly": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "Stop": .array([.object(["type": .string("command"), "command": .string("echo stop")])])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        // Both policies should be present
+        XCTAssertEqual(hooks.policyEffects.count, 2)
+
+        let disableEffect = hooks.policyEffects.first(where: { $0.reason == .disableAllHooks })!
+        XCTAssertEqual(disableEffect.policySource?.identifier, "enterprise-policy")
+        XCTAssertEqual(disableEffect.policySource?.scope, .managed)
+        XCTAssertTrue(disableEffect.message.contains("disableAllHooks"))
+
+        let managedOnlyEffect = hooks.policyEffects.first(where: { $0.reason == .allowManagedHooksOnly })!
+        XCTAssertEqual(managedOnlyEffect.policySource?.identifier, "enterprise-policy")
+        XCTAssertTrue(managedOnlyEffect.message.contains("allowManagedHooksOnly"))
+    }
+
+    func testHookResolverReturnsSnapshotForPolicyOnlyWithoutHooksKey() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "disableAllHooks": .bool(true)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+
+        // Should still produce a hook snapshot with policy effects but no events
+        let hooks = projection.hooks!
+        XCTAssertTrue(hooks.events.isEmpty)
+        XCTAssertTrue(hooks.policyEffects.contains(where: { $0.reason == .disableAllHooks }))
+        XCTAssertTrue(hooks.notes.contains(where: { $0.contains("disableAllHooks") }))
+    }
+
+    func testHookResolverObjectWithNestedHooksArrayFormat() {
+        let resolver = SettingsResolver()
+        let candidate = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .object([
+                        "matcher": .string("Bash"),
+                        "hooks": .array([
+                            .object(["type": .string("command"), "command": .string("sandbox-check")])
+                        ])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [candidate])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: snapshot))
+        let hooks: ResolvedHookSnapshot = projection.hooks!
+
+        let event = hooks.events.first(where: { $0.eventID == "PreToolUse" })!
+        XCTAssertEqual(event.resolvedHandlers.count, 1)
+        XCTAssertEqual(event.resolvedHandlers.first?.handlerType, .command)
+        XCTAssertEqual(event.resolvedHandlers.first?.command, "sandbox-check")
+    }
+
     private func makeSource(
         identifier: String,
         scope: ResolutionScope = .user,
@@ -3058,6 +5469,7 @@ final class ResolverModelsTests: XCTestCase {
                 useAutoModeDuringPlan: nil,
                 disableDeepLinkRegistration: nil,
                 hooks: nil,
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -3082,6 +5494,14 @@ final class ResolverModelsTests: XCTestCase {
             fatalError("Missing row")
         }
         return row
+    }
+
+    private func tryUnwrapHookGroup(viewModel: SessionHooksViewModel, eventID: String) -> HookGroupModel {
+        guard let group = viewModel.groups.first(where: { $0.eventID == eventID }) else {
+            XCTFail("Missing session hooks group for eventID '\(eventID)'")
+            fatalError("Missing hook group")
+        }
+        return group
     }
 
     private func makeInstructionCandidate(
@@ -3138,6 +5558,18 @@ final class ResolverModelsTests: XCTestCase {
         McpDocumentServerEntry(
             serverID: serverID,
             rawConfig: .object(config),
+            parseOrder: parseOrder
+        )
+    }
+
+    private func makeMcpServer(
+        serverID: String,
+        parseOrder: Int,
+        config rawConfig: JSONValue
+    ) -> McpDocumentServerEntry {
+        McpDocumentServerEntry(
+            serverID: serverID,
+            rawConfig: rawConfig,
             parseOrder: parseOrder
         )
     }
@@ -3204,4 +5636,627 @@ final class ResolverModelsTests: XCTestCase {
             issues: issues
         )
     }
+
+    private func fixtureInputPath(
+        loader: FixtureLoader,
+        familyPath: String,
+        caseID: FixtureCaseID,
+        fileName: String
+    ) throws -> String {
+        try loader.descriptor(familyPath: familyPath, caseID: caseID)
+            .inputFileURL(named: fileName)
+            .path
+    }
+
+    private func loadExpectedJSON<T: Decodable>(
+        loader: FixtureLoader,
+        familyPath: String,
+        caseID: FixtureCaseID,
+        fileName: String,
+        as type: T.Type
+    ) throws -> T {
+        let raw = try loader.loadString(
+            familyPath: familyPath,
+            caseID: caseID,
+            section: "expected",
+            fileName: fileName
+        )
+        return try JSONDecoder().decode(type, from: Data(raw.utf8))
+    }
+
+    private func makeMcpFixtureDocument(
+        loader: FixtureLoader,
+        caseID: FixtureCaseID,
+        fileName: String,
+        tier: McpSourceTier,
+        scope: ResolutionScope,
+        identifier: String
+    ) throws -> McpDocumentCandidate {
+        let content = try loader.loadString(
+            familyPath: "resolvers/mcp",
+            caseID: caseID,
+            section: "input",
+            fileName: fileName
+        )
+        let data = Data(content.utf8)
+        let any = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let object = any as? [String: Any] else {
+            XCTFail("Expected top-level object in MCP fixture \(fileName)")
+            return makeMcpDocument(
+                tier: tier,
+                scope: scope,
+                identifier: identifier,
+                sourcePath: "/tmp/\(fileName)",
+                servers: []
+            )
+        }
+
+        let servers = object.keys.sorted().enumerated().map { index, key in
+            McpDocumentServerEntry(
+                serverID: key,
+                rawConfig: JSONValue.from(any: object[key] as Any),
+                parseOrder: index
+            )
+        }
+
+        return makeMcpDocument(
+            tier: tier,
+            scope: scope,
+            identifier: identifier,
+            sourcePath: "/tmp/\(fileName)",
+            servers: servers
+        )
+    }
+
+    // MARK: - E4 Schema Validation: Expanded Coverage Tests
+
+    func testSchemaValidatorSettingsDetectsEnumValues() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                effortLevel: "extreme",
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: ParsedPermissions(
+                    allow: nil,
+                    deny: nil,
+                    defaultMode: "superAuto",
+                    rawObject: [:]
+                ),
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        let enumCodes = result.issues.filter { $0.code.rawValue == "schema.settings.unknownEnumValue" }
+        XCTAssertEqual(enumCodes.count, 2, "Should produce info issues for unknown effortLevel and permissions.defaultMode")
+        XCTAssertTrue(enumCodes.allSatisfy { $0.severity == .info }, "Unknown enum values should be info severity for forward compatibility")
+        XCTAssertTrue(enumCodes.contains(where: { $0.keyPath == "effortLevel" }))
+        XCTAssertTrue(enumCodes.contains(where: { $0.keyPath == "permissions.defaultMode" }))
+    }
+
+    func testSchemaValidatorSettingsValidEnumValuesProduceNoIssues() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                effortLevel: "high",
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: ParsedPermissions(
+                    allow: nil,
+                    deny: nil,
+                    defaultMode: "auto",
+                    rawObject: [:]
+                ),
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        XCTAssertTrue(result.issues.isEmpty, "Valid enum values should produce no issues, got: \(result.issues.map { $0.code.rawValue })")
+    }
+
+    func testSchemaValidatorSettingsDetectsNumberRanges() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: -5,
+                companyAnnouncements: nil,
+                feedbackSurveyRate: 2.5,
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: nil,
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                sandbox: ParsedSandboxConfig(
+                    enabled: true,
+                    failIfUnavailable: nil,
+                    autoAllowBashIfSandboxed: nil,
+                    excludedCommands: nil,
+                    allowUnsandboxedCommands: nil,
+                    enableWeakerNestedSandbox: nil,
+                    enableWeakerNetworkIsolation: nil,
+                    filesystem: nil,
+                    network: ParsedSandboxNetwork(
+                        allowUnixSockets: nil,
+                        allowAllUnixSockets: nil,
+                        allowLocalBinding: nil,
+                        allowedDomains: nil,
+                        allowManagedDomainsOnly: nil,
+                        httpProxyPort: 99999,
+                        socksProxyPort: 0,
+                        unknownFields: nil
+                    ),
+                    unknownFields: nil
+                ),
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        let rangeCodes = result.issues.filter { $0.code.rawValue == "schema.settings.numberOutOfRange" }
+        XCTAssertEqual(rangeCodes.count, 4, "Should detect out-of-range for feedbackSurveyRate, cleanupPeriodDays, httpProxyPort, socksProxyPort")
+        XCTAssertTrue(rangeCodes.contains(where: { $0.keyPath == "feedbackSurveyRate" }))
+        XCTAssertTrue(rangeCodes.contains(where: { $0.keyPath == "cleanupPeriodDays" }))
+        XCTAssertTrue(rangeCodes.contains(where: { $0.keyPath == "sandbox.network.httpProxyPort" }))
+        XCTAssertTrue(rangeCodes.contains(where: { $0.keyPath == "sandbox.network.socksProxyPort" }))
+    }
+
+    func testSchemaValidatorSettingsDetectsSandboxFilesystemOverlaps() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: nil,
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                sandbox: ParsedSandboxConfig(
+                    enabled: true,
+                    failIfUnavailable: nil,
+                    autoAllowBashIfSandboxed: nil,
+                    excludedCommands: nil,
+                    allowUnsandboxedCommands: nil,
+                    enableWeakerNestedSandbox: nil,
+                    enableWeakerNetworkIsolation: nil,
+                    filesystem: ParsedSandboxFilesystem(
+                        allowWrite: ["/tmp", "/var"],
+                        denyWrite: ["/var"],
+                        denyRead: ["/etc"],
+                        allowRead: ["/etc"],
+                        allowManagedReadPathsOnly: nil,
+                        unknownFields: nil
+                    ),
+                    network: nil,
+                    unknownFields: nil
+                ),
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        let overlapCodes = result.issues.filter { $0.code.rawValue == "schema.settings.sandboxFilesystemOverlap" }
+        XCTAssertEqual(overlapCodes.count, 2, "Should detect write and read overlaps")
+    }
+
+    func testSchemaValidatorSettingsDetectsMcpRestrictionRuleShapes() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: nil,
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                allowedMcpServers: [
+                    McpRestrictionRule(serverName: nil, serverCommand: nil, serverUrl: nil, unknownFields: nil),
+                    McpRestrictionRule(serverName: "github", serverCommand: ["npx"], serverUrl: nil, unknownFields: nil),
+                    McpRestrictionRule(serverName: nil, serverCommand: [], serverUrl: nil, unknownFields: nil)
+                ],
+                deniedMcpServers: [
+                    McpRestrictionRule(serverName: "valid", serverCommand: nil, serverUrl: nil, unknownFields: nil)
+                ],
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.mcpRestrictionRuleMissingDiscriminator" }))
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.mcpRestrictionRuleAmbiguous" }))
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.mcpRestrictionRuleEmptyCommand" }))
+        // Valid rule in deniedMcpServers should produce no issues for that entry
+        let deniedIssues = result.issues.filter { $0.keyPath?.hasPrefix("deniedMcpServers") == true }
+        XCTAssertTrue(deniedIssues.isEmpty, "Valid restriction rule should produce no issues")
+    }
+
+    func testSchemaValidatorSettingsDetectsMarketplaceSourceShapes() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: nil,
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: nil,
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                strictKnownMarketplaces: [
+                    ParsedPluginMarketplace(id: "mp1", source: nil, unknownFields: nil),
+                    ParsedPluginMarketplace(
+                        id: "mp2",
+                        source: .github(ParsedGitHubMarketplaceSource(repo: nil, ref: nil, subpath: nil, unknownFields: nil)),
+                        unknownFields: nil
+                    )
+                ],
+                blockedMarketplaces: [
+                    ParsedPluginMarketplace(
+                        id: "mp3",
+                        source: .npm(ParsedNpmMarketplaceSource(package: nil, version: nil, registry: nil, unknownFields: nil)),
+                        unknownFields: nil
+                    )
+                ],
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.marketplaceMissingSource" }))
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.marketplaceSourceMissingField" && $0.keyPath?.contains("repo") == true }))
+        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.marketplaceSourceMissingField" && $0.keyPath?.contains("package") == true }))
+    }
+
+    func testSchemaValidatorSettingsDetectsHookPropertyCompatibility() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: nil,
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: nil,
+                companyAnnouncements: nil,
+                env: nil,
+                attribution: nil,
+                includeCoAuthoredBy: nil,
+                includeGitInstructions: nil,
+                permissions: nil,
+                autoMode: nil,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: ParsedHooks(
+                    events: [
+                        "Stop": ParsedHookEvent(
+                            eventName: "Stop",
+                            eventType: .stop,
+                            matcher: nil,
+                            actions: [
+                                // prompt type missing prompt value
+                                ParsedHookAction(
+                                    type: "prompt",
+                                    handlerType: .prompt,
+                                    command: nil,
+                                    url: nil,
+                                    prompt: nil,
+                                    timeout: nil,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: nil,
+                                    isAsync: nil,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: nil,
+                                    rawObject: [:]
+                                ),
+                                // http type with shell property (incompatible)
+                                ParsedHookAction(
+                                    type: "http",
+                                    handlerType: .http,
+                                    command: nil,
+                                    url: "https://example.com/hook",
+                                    prompt: nil,
+                                    timeout: nil,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: "bash",
+                                    isAsync: true,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: "claude-3",
+                                    rawObject: [:]
+                                ),
+                                // command type with unknown shell enum
+                                ParsedHookAction(
+                                    type: "command",
+                                    handlerType: .command,
+                                    command: "echo hello",
+                                    url: nil,
+                                    prompt: nil,
+                                    timeout: 5000,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: "zsh",
+                                    isAsync: nil,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: nil,
+                                    rawObject: [:]
+                                )
+                            ],
+                            rawValue: .array([])
+                        )
+                    ],
+                    rawObject: [:]
+                ),
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        // prompt type missing prompt
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.hookActionTypeMismatch" && $0.message.contains("prompt")
+        }))
+        // shell on http handler
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.hookPropertyIncompatible" && $0.keyPath?.contains("shell") == true
+        }))
+        // async on http handler
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.hookPropertyIncompatible" && $0.keyPath?.contains("async") == true
+        }))
+        // model on http handler
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.hookPropertyIncompatible" && $0.keyPath?.contains("model") == true
+        }))
+        // unknown shell enum
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.unknownEnumValue" && $0.keyPath?.contains("shell") == true
+        }))
+        // timeout warning for exceeding max
+        XCTAssertTrue(result.issues.contains(where: {
+            $0.code.rawValue == "schema.settings.numberOutOfRange" && $0.keyPath?.contains("timeout") == true
+        }))
+    }
+
+    func testSchemaValidatorSettingsValidDocumentProducesNoFalsePositives() {
+        let validator = SchemaValidator()
+        let document = ParsedSettingsDocument(
+            source: SourceFileReference(url: URL(fileURLWithPath: "/tmp/.claude/settings.json")),
+            value: SettingsDocumentValue(
+                schema: nil,
+                apiKeyHelper: "/usr/local/bin/api-helper",
+                autoMemoryDirectory: nil,
+                cleanupPeriodDays: 30,
+                companyAnnouncements: nil,
+                effortLevel: "medium",
+                feedbackSurveyRate: 0.5,
+                env: nil,
+                attribution: ParsedAttribution(commit: "Co-authored", pr: nil, unknownFields: nil),
+                includeCoAuthoredBy: true,
+                includeGitInstructions: nil,
+                permissions: ParsedPermissions(
+                    allow: ["Read"],
+                    deny: ["Bash"],
+                    defaultMode: nil,
+                    rawObject: [:]
+                ),
+                autoMode: true,
+                disableAutoMode: nil,
+                useAutoModeDuringPlan: nil,
+                disableDeepLinkRegistration: nil,
+                hooks: ParsedHooks(
+                    events: [
+                        "PreToolUse": ParsedHookEvent(
+                            eventName: "PreToolUse",
+                            eventType: .preToolUse,
+                            matcher: nil,
+                            actions: [
+                                ParsedHookAction(
+                                    type: "command",
+                                    handlerType: .command,
+                                    command: "echo lint",
+                                    url: nil,
+                                    prompt: nil,
+                                    timeout: 30,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: "bash",
+                                    isAsync: nil,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: nil,
+                                    rawObject: [:]
+                                )
+                            ],
+                            rawValue: .array([])
+                        )
+                    ],
+                    rawObject: [:]
+                ),
+                disableAllHooks: nil,
+                allowManagedHooksOnly: nil,
+                allowedHTTPHookURLs: nil,
+                httpHookAllowedEnvVars: nil,
+                allowedMcpServers: [
+                    McpRestrictionRule(serverName: "github", serverCommand: nil, serverUrl: nil, unknownFields: nil)
+                ],
+                sandbox: ParsedSandboxConfig(
+                    enabled: true,
+                    failIfUnavailable: nil,
+                    autoAllowBashIfSandboxed: nil,
+                    excludedCommands: nil,
+                    allowUnsandboxedCommands: nil,
+                    enableWeakerNestedSandbox: nil,
+                    enableWeakerNetworkIsolation: nil,
+                    filesystem: ParsedSandboxFilesystem(
+                        allowWrite: ["/tmp"],
+                        denyWrite: ["/var"],
+                        denyRead: nil,
+                        allowRead: nil,
+                        allowManagedReadPathsOnly: nil,
+                        unknownFields: nil
+                    ),
+                    network: ParsedSandboxNetwork(
+                        allowUnixSockets: nil,
+                        allowAllUnixSockets: nil,
+                        allowLocalBinding: nil,
+                        allowedDomains: ["example.com"],
+                        allowManagedDomainsOnly: nil,
+                        httpProxyPort: 8080,
+                        socksProxyPort: 1080,
+                        unknownFields: nil
+                    ),
+                    unknownFields: nil
+                ),
+                pluginSettings: [:]
+            ),
+            rawTopLevelObject: [:],
+            unsupportedTopLevelKeys: [:]
+        )
+
+        let result = validator.validate(settings: document)
+        XCTAssertTrue(result.issues.isEmpty, "Valid settings document should produce no issues, got: \(result.issues.map { "\($0.code.rawValue) at \($0.keyPath ?? "root")" })")
+    }
+}
+
+private struct ExpectedInstructionFixtureSummary: Decodable {
+    let orderedBlockCount: Int
+    let orderedBlockSuffixes: [String]
+    let rootLoadOrder: [String]
+    let issueCodes: [String]
+    let composedContains: [String]
+}
+
+private struct ExpectedMcpFixtureSummary: Decodable {
+    let serverID: String
+    let winningSource: String
+    let participantSources: [String]
+    let issueCodes: [String]
+    let environmentClassifications: [String]
+}
+
+private struct ExpectedAgentSkillFixtureSummary: Decodable {
+    let agentStatesBySource: [String: String]
+    let skillStatesBySource: [String: String]
+    let requiredAgentIssueCodes: [String]
+    let requiredSkillIssueCodes: [String]
+}
+
+private struct ExpectedProjectionFixtureSummary: Decodable {
+    let isComplete: Bool
+    let missingFamilies: [String]
+    let availableFamilies: [String]
 }

@@ -1,0 +1,15 @@
+{
+  "enabledPlugins": [
+    "formatter@official"
+  ],
+  "extraKnownMarketplaces": [],
+  "strictKnownMarketplaces": false,
+  "blockedMarketplaces": [
+    true
+  ],
+  "pluginTrustMessage": 7,
+  "channelsEnabled": "yes",
+  "allowedChannelPlugins": [
+    "formatter"
+  ]
+}

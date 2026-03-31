@@ -74,14 +74,36 @@ The app is split into:
 
 ### Main file classes
 
-- `~/.claude/settings.json`
-- `<project>/.claude/settings.json`
-- `<project>/.claude/settings.local.json`
-- `~/.claude.json`
-- `<project>/.mcp.json`
-- `~/.claude/CLAUDE.md`
-- `<project>/CLAUDE.md`
-- `<project>/.claude/CLAUDE.md`
+**Settings files:**
+- `~/.claude/settings.json` — user-scope settings
+- `<project>/.claude/settings.json` — project-scope settings (team-shared)
+- `<project>/.claude/settings.local.json` — local-scope settings (personal, gitignored)
+
+**Managed settings and policy:**
+- `managed-settings.json` — file-based managed settings (system-level paths)
+- `managed-settings.d/*.json` — drop-in managed settings fragments
+- `managed-mcp.json` — managed MCP server configuration
+- `/Library/Application Support/ClaudeCode/CLAUDE.md` — managed instruction source
+- MDM/OS policy and server-managed settings (non-file sources)
+
+**Global config:**
+- `~/.claude.json` — global config (different from settings.json; has its own key set)
+
+**MCP config:**
+- `<project>/.mcp.json` — project MCP server configuration
+
+**Instruction files:**
+- `~/.claude/CLAUDE.md` — user-scope instructions
+- `<project>/CLAUDE.md` — project-root instructions
+- `<project>/.claude/CLAUDE.md` — project .claude/ instructions
+
+**Runtime artifacts:**
+- `~/.claude/projects/<project_key>/<session_id>.jsonl` — primary session transcripts
+- `~/.claude/projects/<project_key>/<session_id>/subagents/*.jsonl` — child/subagent transcripts
+- Status-line JSON payload (delivered via stdin to user-configured command, not persisted to disk)
+- `~/.claude/telemetry/*.json` — local telemetry artifacts may exist, but are not documented as a stable interface; treat as experimental/non-canonical if ever inspected
+
+**Other:**
 - auto-memory files under `~/.claude/projects/<project>/memory/`
 - agent files under `.claude/agents/`
 - skill directories under `.claude/skills/`
@@ -170,51 +192,19 @@ Goal: derived usage summaries, provenance UI, test hardening, and beta preparati
 
 ## Documentation map
 
-### Section docs
+### Active documentation (current workflow)
 
-- `Docs/Sections/SECTION_A_APP_SHELL.md`
-- `Docs/Sections/SECTION_B_DISCOVERY.md`
-- `Docs/Sections/SECTION_C_PARSERS.md`
-- `Docs/Sections/SECTION_D_RESOLVER.md`
-- `Docs/Sections/SECTION_E_VALIDATION.md`
-- `Docs/Sections/SECTION_F_SESSION_UI.md`
-- `Docs/Sections/SECTION_I_FIXTURES_AND_TESTS.md`
+- `Documents/AGENT_FRAMEWORK.md` — shared coding sub-agent handoff guide
+- `Documents/IMPLEMENTATION_PLAN_V2.md` — the active implementation plan with all 31 packets across 12 phases
+- `Documents/Specs/` — per-packet detailed specification files (e.g., `01-G1-settings-key-registry.md`, `29-T1-runtime-session-snapshot.md`)
+- `Documents/<PACKET_ID>-handoff.md` — handoff documents from completed packets
 
-### Packet docs created now
+### Legacy documentation (from initial planning, may be outdated)
 
-- `Docs/Packets/A1_XCODE_SETUP.md`
-- `Docs/Packets/A2_APP_SANDBOX_AND_BOOKMARKS.md`
-- `Docs/Packets/A3_GLOBAL_AND_PROJECT_ROOT_PICKERS.md`
-- `Docs/Packets/B1_ROOT_LOCATOR.md`
-- `Docs/Packets/B2_PROJECT_SCANNER.md`
-- `Docs/Packets/B3_DISCOVERY_MODELS.md`
-- `Docs/Packets/C1_SETTINGS_JSON_PARSER.md`
-- `Docs/Packets/C2_CLAUDE_JSON_PARSER.md`
-- `Docs/Packets/C3_MCP_JSON_PARSER.md`
-- `Docs/Packets/C4_CLAUDE_MD_PARSER.md`
-- `Docs/Packets/C5_AGENT_PARSER.md`
-- `Docs/Packets/C6_SKILL_PARSER.md`
-- `Docs/Packets/D1_RESOLVER_MODELS.md`
-- `Docs/Packets/D2_SETTINGS_PRECEDENCE.md`
-- `Docs/Packets/D3_SETTINGS_MERGE_RULES.md`
-- `Docs/Packets/D4_INSTRUCTION_RESOLUTION.md`
-- `Docs/Packets/D5_MCP_RESOLUTION.md`
-- `Docs/Packets/D6_AGENT_SKILL_RESOLUTION.md`
-- `Docs/Packets/D7_SESSION_PROJECTION.md`
-- `Docs/Packets/E1_VALIDATION_MODELS.md`
-- `Docs/Packets/E2_SCHEMA_VALIDATION.md`
-- `Docs/Packets/E3_SEMANTIC_VALIDATION.md`
-- `Docs/Packets/F1_SESSION_SETTINGS_VIEW.md`
-- `Docs/Packets/F2_SESSION_INSTRUCTIONS_VIEW.md`
-- `Docs/Packets/F3_SESSION_HOOKS_VIEW.md`
-- `Docs/Packets/F4_SESSION_MCP_VIEW.md`
-- `Docs/Packets/F5_SESSION_AGENTS_SKILLS_VIEW.md`
-- `Docs/Packets/I1_FIXTURE_LAYOUT.md`
-- `Docs/Packets/I2_RESOLVER_TESTS.md`
-- `Docs/Packets/I3_PARSER_TESTS.md`
+The following docs under `Docs/` were created during initial planning. The active workflow now uses `Documents/Specs/` for packet specs. These legacy docs may be useful for historical context but should not be treated as authoritative:
 
-### Handoff doc
-
+- `Docs/Sections/SECTION_A_APP_SHELL.md` through `SECTION_I_FIXTURES_AND_TESTS.md`
+- `Docs/Packets/A1_XCODE_SETUP.md` through `I3_PARSER_TESTS.md`
 - `Docs/AI_DRAFT_OTHERS_HANDOFF.md`
 
 ## Working conventions for future AI sessions

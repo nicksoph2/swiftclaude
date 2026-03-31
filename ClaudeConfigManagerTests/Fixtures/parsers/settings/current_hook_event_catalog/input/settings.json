@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "echo pre"
+      }
+    ],
+    "UserPromptSubmit": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo prompt"
+        }
+      ]
+    },
+    "TeammateIdle": [
+      {
+        "type": "http",
+        "url": "https://hooks.example.com/idle"
+      }
+    ],
+    "Setup": [
+      {
+        "type": "command",
+        "command": "echo setup"
+      }
+    ],
+    "FutureHook": [
+      {
+        "type": "command",
+        "command": "echo future"
+      }
+    ]
+  }
+}

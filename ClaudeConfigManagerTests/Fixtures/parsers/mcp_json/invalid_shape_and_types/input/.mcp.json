@@ -1,0 +1,10 @@
+{
+  "broken": "not-an-object",
+  "tool": {
+    "command": 7,
+    "args": ["ok", 9],
+    "env": {
+      "HOME": true
+    }
+  }
+}

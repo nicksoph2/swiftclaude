@@ -1,0 +1,6 @@
+{
+  "worktree": "not-an-object",
+  "cleanupPeriodDays": -5,
+  "autoUpdatesChannel": "nightly",
+  "disableDeepLinkRegistration": true
+}

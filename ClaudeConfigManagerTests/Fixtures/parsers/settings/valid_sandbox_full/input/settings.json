@@ -1,0 +1,22 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "excludedCommands": ["docker", "git"],
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "allowWrite": ["/tmp/build", "~/.kube"],
+      "denyWrite": ["/etc"],
+      "denyRead": ["~/.aws/credentials"],
+      "allowRead": ["."]
+    },
+    "network": {
+      "allowUnixSockets": ["/var/run/docker.sock"],
+      "allowLocalBinding": true,
+      "allowedDomains": ["github.com", "*.npmjs.org"],
+      "httpProxyPort": 8080,
+      "socksProxyPort": 8081
+    }
+  }
+}

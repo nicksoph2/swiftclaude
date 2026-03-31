@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "echo pre-tool",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "http",
+        "url": "https://hooks.example.com/post",
+        "headers": {
+          "Authorization": "Bearer $TOKEN"
+        },
+        "allowedEnvVars": ["TOKEN"]
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "prompt",
+        "prompt": "Initialize session context"
+      }
+    ],
+    "Stop": [
+      {
+        "type": "agent",
+        "prompt": "Review session output",
+        "model": "claude-sonnet-4-6"
+      }
+    ]
+  }
+}
