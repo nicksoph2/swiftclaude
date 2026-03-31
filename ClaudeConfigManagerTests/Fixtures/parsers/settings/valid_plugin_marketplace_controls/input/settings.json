@@ -1,0 +1,101 @@
+{
+  "enabledPlugins": {
+    "formatter@official": true,
+    "reviewer@partner": false
+  },
+  "extraKnownMarketplaces": {
+    "official": {
+      "source": {
+        "type": "github",
+        "repo": "anthropic/plugins",
+        "ref": "main",
+        "subpath": "catalog"
+      }
+    },
+    "partner": {
+      "type": "url",
+      "url": "https://plugins.example.com/index.json",
+      "checksum": "sha256:abc123"
+    }
+  },
+  "strictKnownMarketplaces": [
+    {
+      "id": "npm-registry",
+      "source": {
+        "type": "npm",
+        "package": "@acme/claude-marketplace",
+        "version": "1.2.3",
+        "registry": "https://registry.npmjs.org"
+      }
+    },
+    {
+      "id": "trusted-hosts",
+      "source": {
+        "type": "hostPattern",
+        "pattern": "*.trusted.example.com"
+      }
+    },
+    {
+      "id": "git-source",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/acme/marketplace.git",
+        "ref": "v1.0.0",
+        "subpath": "catalog"
+      }
+    },
+    {
+      "id": "file-bundle",
+      "source": {
+        "type": "file",
+        "path": "/Library/Application Support/ClaudeCode/marketplaces/bundle.json"
+      }
+    },
+    {
+      "id": "directory-bundle",
+      "source": {
+        "type": "directory",
+        "path": "/Library/Application Support/ClaudeCode/marketplaces/directory"
+      }
+    }
+  ],
+  "blockedMarketplaces": [
+    {
+      "id": "legacy",
+      "source": {
+        "type": "url",
+        "url": "https://legacy.example.com/index.json"
+      }
+    }
+  ],
+  "pluginTrustMessage": "Install only approved plugins.",
+  "channelsEnabled": true,
+  "allowedChannelPlugins": [
+    {
+      "plugin": "formatter",
+      "marketplace": "official",
+      "channels": [
+        "stable",
+        "beta"
+      ],
+      "note": "preferred"
+    },
+    {
+      "id": "reviewer@partner",
+      "channels": [
+        "stable"
+      ]
+    }
+  ],
+  "pluginConfigs": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "skippedPlugins": [
+    "legacy-plugin"
+  ],
+  "skippedMarketplaces": [
+    "legacy"
+  ]
+}

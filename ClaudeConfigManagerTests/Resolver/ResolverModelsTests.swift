@@ -151,6 +151,272 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(selection.entries.isEmpty)
     }
 
+    func testManagedSettingsResolverPrefersServerManagedTierOverMdmAndFileBased() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+
+        let serverManaged = makeCandidate(
+            tier: .managed,
+            identifier: "server-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/server-managed.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(90)]
+        )
+        let mdmManaged = makeCandidate(
+            tier: .managed,
+            identifier: "mdm-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/mdm-policy.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(60)]
+        )
+        let baseManaged = makeCandidate(
+            tier: .managed,
+            identifier: "managed-settings",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(30)]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                serverManagedSettings: serverManaged,
+                mdmManagedSettings: mdmManaged,
+                fileBasedSettings: [baseManaged],
+                fileBasedManagedMcp: makeMcpDocument(
+                    tier: .managed,
+                    scope: .managed,
+                    identifier: "managed-mcp",
+                    sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+                    servers: [makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed")])]
+                )
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .serverManaged)
+        XCTAssertEqual(resolution.settingsCandidates.map(\.source.identifier), ["server-managed"])
+        XCTAssertTrue(resolution.managedMcpDocuments.isEmpty)
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(10)]
+        )
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let entry = selection.entries.first(where: { $0.keyPath == "cleanupPeriodDays" })
+
+        XCTAssertEqual(entry?.winningSource?.identifier, "server-managed")
+        XCTAssertEqual(entry?.participants.map(\.identifier), ["server-managed", "user-settings"])
+    }
+
+    func testManagedSettingsResolverPrefersMdmTierWhenServerManagedIsAbsent() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+
+        let mdmManaged = makeCandidate(
+            tier: .managed,
+            identifier: "mdm-managed",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/virtual/mdm-policy.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(60)]
+        )
+        let dropIn = makeCandidate(
+            tier: .managed,
+            identifier: "drop-in",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/10-override.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(30)]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                mdmManagedSettings: mdmManaged,
+                fileBasedSettings: [dropIn],
+                fileBasedManagedMcp: makeMcpDocument(
+                    tier: .managed,
+                    scope: .managed,
+                    identifier: "managed-mcp",
+                    sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+                    servers: [makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed")])]
+                )
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .mdmPolicy)
+        XCTAssertEqual(resolution.settingsCandidates.map(\.source.identifier), ["mdm-managed"])
+        XCTAssertTrue(resolution.managedMcpDocuments.isEmpty)
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["cleanupPeriodDays": .number(10)]
+        )
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let entry = selection.entries.first(where: { $0.keyPath == "cleanupPeriodDays" })
+
+        XCTAssertEqual(entry?.winningSource?.identifier, "mdm-managed")
+    }
+
+    func testManagedSettingsResolverMergesFileBasedTierDeterministicallyAndIncludesManagedMcp() {
+        let managedResolver = ManagedSettingsResolver()
+        let settingsResolver = SettingsResolver()
+        let mcpResolver = MCPResolver()
+
+        let base = makeCandidate(
+            tier: .managed,
+            identifier: "managed-settings",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(15),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/base")]),
+                "env": .object(["BASE": .string("1"), "SHARED": .string("base")])
+            ]
+        )
+        let firstDropIn = makeCandidate(
+            tier: .managed,
+            identifier: "01-base",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/01-base.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(20),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/one")]),
+                "env": .object(["SHARED": .string("one")])
+            ]
+        )
+        let secondDropIn = makeCandidate(
+            tier: .managed,
+            identifier: "02-override",
+            scope: .managed,
+            kind: .managed,
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-settings.d/02-override.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(30),
+                "allowedHttpHookUrls": .array([
+                    .string("https://hooks.example.com/one"),
+                    .string("https://hooks.example.com/two")
+                ]),
+                "env": .object(["FINAL": .string("2"), "SHARED": .string("two")])
+            ]
+        )
+
+        let managedMcp = makeMcpDocument(
+            tier: .managed,
+            scope: .managed,
+            identifier: "managed-mcp",
+            sourcePath: "/Library/Application Support/ClaudeCode/managed-mcp.json",
+            servers: [
+                makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("managed-filesystem")])
+            ]
+        )
+
+        let resolution = managedResolver.resolve(
+            input: ManagedSettingsResolver.Input(
+                fileBasedSettings: [secondDropIn, base, firstDropIn],
+                fileBasedManagedMcp: managedMcp
+            )
+        )
+
+        XCTAssertEqual(resolution.activeTier?.kind, .fileBased)
+        XCTAssertEqual(
+            resolution.settingsCandidates.map(\.source.identifier),
+            ["02-override", "01-base", "managed-settings"]
+        )
+        XCTAssertEqual(resolution.managedMcpDocuments.map(\.source.identifier), ["managed-mcp"])
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "cleanupPeriodDays": .number(5),
+                "allowedHttpHookUrls": .array([.string("https://hooks.example.com/user")]),
+                "env": .object(["USER": .string("1"), "SHARED": .string("user")])
+            ]
+        )
+
+        let selection = settingsResolver.resolvePrecedence(candidates: resolution.settingsCandidates + [user])
+        let snapshot = settingsResolver.buildSnapshot(from: selection)
+
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "cleanupPeriodDays").value.effectiveValue,
+            .number(30)
+        )
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "allowedHttpHookUrls").value.effectiveValue,
+            .array([
+                .string("https://hooks.example.com/one"),
+                .string("https://hooks.example.com/two"),
+                .string("https://hooks.example.com/base"),
+                .string("https://hooks.example.com/user")
+            ])
+        )
+        XCTAssertEqual(
+            tryUnwrapEntry(snapshot: snapshot, keyPath: "env").value.effectiveValue,
+            .object([
+                "BASE": .string("1"),
+                "FINAL": .string("2"),
+                "SHARED": .string("two"),
+                "USER": .string("1")
+            ])
+        )
+
+        let mcpSnapshot = mcpResolver.resolve(
+            documents: resolution.managedMcpDocuments + [
+                makeMcpDocument(
+                    tier: .user,
+                    scope: .user,
+                    identifier: "user-mcp",
+                    sourcePath: "/tmp/.claude.json",
+                    servers: [
+                        makeMcpServer(serverID: "filesystem", parseOrder: 0, config: ["command": .string("user-filesystem")])
+                    ]
+                )
+            ]
+        )
+
+        XCTAssertEqual(
+            tryUnwrapMcpEntry(snapshot: mcpSnapshot, serverID: "filesystem").resolvedConfig.winningSource?.identifier,
+            "user-mcp"
+        )
+    }
+
+    func testManagedScopeStatusModelReportsActiveTier() {
+        let resolution = ManagedSettingsResolution(
+            activeTier: ManagedSettingsActiveTier(
+                kind: .mdmPolicy,
+                sources: [
+                    ResolutionSource(
+                        scope: .managed,
+                        kind: .managed,
+                        identifier: "mdm-managed",
+                        sourcePath: "com.anthropic.claudecode"
+                    )
+                ]
+            ),
+            settingsCandidates: [],
+            managedMcpDocuments: []
+        )
+
+        let model = ManagedScopeStatusModel(resolution: resolution)
+
+        XCTAssertEqual(model.title, "Active managed tier")
+        XCTAssertEqual(model.detail, "MDM / OS policy")
+        XCTAssertEqual(model.activeTierLabel, "mdmPolicy")
+        XCTAssertEqual(model.sourceSummaries, ["com.anthropic.claudecode"])
+    }
+
     func testSettingsResolverBuildSnapshotUsesReplaceMergeMethodForScalarKeys() {
         let resolver = SettingsResolver()
         let candidate = makeCandidate(
@@ -339,8 +605,52 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertEqual(
             entry.value.effectiveValue,
             .object([
-                "preToolUse": .array([
+                "PreToolUse": .array([
                     .object(["type": .string("command"), "command": .string("echo shared")]),
+                    .object(["type": .string("command"), "command": .string("echo local")]),
+                    .object(["type": .string("command"), "command": .string("echo user")])
+                ])
+            ])
+        )
+    }
+
+    func testSettingsResolverNormalizesKnownHookEventAliasesToCanonicalCatalogNames() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "preToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo user")])
+                    ])
+                ])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "hooks": .object([
+                    "PreToolUse": .array([
+                        .object(["type": .string("command"), "command": .string("echo local")])
+                    ])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+        let entry = tryUnwrapEntry(snapshot: snapshot, keyPath: "hooks")
+
+        XCTAssertEqual(
+            entry.value.effectiveValue,
+            .object([
+                "PreToolUse": .array([
                     .object(["type": .string("command"), "command": .string("echo local")]),
                     .object(["type": .string("command"), "command": .string("echo user")])
                 ])
@@ -430,6 +740,331 @@ final class ResolverModelsTests: XCTestCase {
 
         XCTAssertEqual(cleanupEntry.value.winningSource?.identifier, "project-local-settings")
         XCTAssertEqual(cleanupEntry.value.effectiveValue, .number(30))
+    }
+
+    func testInstructionResolverFixtureCycleAndMissingImportDeterministicOrdering() throws {
+        let loader = FixtureLoader.shared
+        let parser = ClaudeMdParser()
+        let resolver = InstructionResolver(maxImportDepth: 8)
+        let caseID: FixtureCaseID = "cycle_and_missing_import"
+
+        let userPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "user.CLAUDE.md"
+        )
+        let importAPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "imports/a.md"
+        )
+        let importBPath = try fixtureInputPath(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "imports/b.md"
+        )
+
+        let userMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "user.CLAUDE.md"
+        )
+        let importAMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "imports/a.md"
+        )
+        let importBMarkdown = try loader.loadString(
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            section: "input",
+            fileName: "imports/b.md"
+        )
+
+        let user = makeInstructionCandidate(
+            scope: .user,
+            identifier: "user-instructions",
+            path: userPath,
+            parser: parser,
+            markdown: userMarkdown
+        )
+        let importedA = makeInstructionCandidate(
+            scope: .imported,
+            identifier: "import-a",
+            path: importAPath,
+            parser: parser,
+            markdown: importAMarkdown
+        )
+        let importedB = makeInstructionCandidate(
+            scope: .imported,
+            identifier: "import-b",
+            path: importBPath,
+            parser: parser,
+            markdown: importBMarkdown
+        )
+
+        let snapshot = resolver.resolve(
+            InstructionResolverInput(
+                user: user,
+                importedDocuments: [importedA, importedB]
+            )
+        )
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/instructions",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedInstructionFixtureSummary.self
+        )
+
+        XCTAssertEqual(snapshot.orderedBlocks.count, expected.orderedBlockCount)
+        XCTAssertEqual(snapshot.rootLoadOrder.map(\.identifier), expected.rootLoadOrder)
+        XCTAssertEqual(snapshot.issues.map { $0.code.rawValue }, expected.issueCodes)
+        XCTAssertEqual(snapshot.composedInstructions.mergeMethod, .append)
+        XCTAssertEqual(snapshot.composedInstructions.winningSource?.identifier, "user-instructions")
+
+        let blockIDs = snapshot.orderedBlocks.map(\.blockID)
+        for suffix in expected.orderedBlockSuffixes {
+            XCTAssertTrue(blockIDs.contains(where: { $0.hasSuffix(suffix) }), "Missing expected block suffix: \(suffix)")
+        }
+
+        let composed = snapshot.composedInstructions.effectiveValue ?? ""
+        for needle in expected.composedContains {
+            XCTAssertTrue(composed.contains(needle), "Missing expected instruction segment: \(needle)")
+        }
+    }
+
+    func testMcpResolverFixtureFallbackAndEnvironmentNotesDeterministic() throws {
+        let loader = FixtureLoader.shared
+        let caseID: FixtureCaseID = "fallback_and_env_notes"
+        let resolver = MCPResolver()
+
+        let localDocument = try makeMcpFixtureDocument(
+            loader: loader,
+            caseID: caseID,
+            fileName: "project-local.mcp.json",
+            tier: .local,
+            scope: .projectLocal,
+            identifier: "local-mcp"
+        )
+        let projectDocument = try makeMcpFixtureDocument(
+            loader: loader,
+            caseID: caseID,
+            fileName: "project.mcp.json",
+            tier: .project,
+            scope: .project,
+            identifier: "project-mcp"
+        )
+
+        let snapshot = resolver.resolve(documents: [localDocument, projectDocument])
+        let entry = tryUnwrapMcpEntry(snapshot: snapshot, serverID: "filesystem")
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/mcp",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedMcpFixtureSummary.self
+        )
+
+        XCTAssertEqual(entry.serverID, expected.serverID)
+        XCTAssertEqual(entry.resolvedConfig.winningSource?.identifier, expected.winningSource)
+        XCTAssertEqual(entry.resolvedConfig.trace.participants.map { $0.identifier }, expected.participantSources)
+        XCTAssertEqual(
+            Set(entry.resolvedConfig.issues.map { $0.code.rawValue }),
+            Set(expected.issueCodes)
+        )
+        XCTAssertEqual(entry.resolvedConfig.mergeMethod, MergeMethod.selectHighestPrecedence)
+        XCTAssertEqual(
+            Set(entry.environmentNotes.map { $0.classification.rawValue }),
+            Set(expected.environmentClassifications)
+        )
+    }
+
+    func testAgentAndSkillResolverFixtureOverrideAndInvalidCases() throws {
+        let loader = FixtureLoader.shared
+        let caseID: FixtureCaseID = "override_and_invalid_entries"
+
+        let agentParser = AgentParser()
+        let skillParser = SkillParser()
+
+        let userAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "user.agent.md"
+        )
+        let projectAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "project.agent.md"
+        )
+        let invalidAgentMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "invalid.agent.md"
+        )
+
+        let agentSnapshot = AgentResolver().resolve(candidates: [
+            makeAgentCandidate(
+                tier: .user,
+                identifier: "user-agent",
+                scope: .user,
+                sourcePath: "/tmp/.claude/agents/reviewer.md",
+                parser: agentParser,
+                markdown: userAgentMarkdown
+            ),
+            makeAgentCandidate(
+                tier: .project,
+                identifier: "project-agent",
+                scope: .project,
+                sourcePath: "/tmp/project/.claude/agents/reviewer.md",
+                parser: agentParser,
+                markdown: projectAgentMarkdown
+            ),
+            makeAgentCandidate(
+                tier: .project,
+                identifier: "invalid-agent",
+                scope: .project,
+                sourcePath: "/tmp/project/.claude/agents/invalid.md",
+                parser: agentParser,
+                markdown: invalidAgentMarkdown
+            )
+        ])
+
+        let userSkillMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "skills/user/research/SKILL.md"
+        )
+        let projectSkillMarkdown = try loader.loadString(
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            section: "input",
+            fileName: "skills/project/research/SKILL.md"
+        )
+
+        let userSkill = makeSkillCandidate(
+            tier: .user,
+            identifier: "user-skill",
+            scope: .user,
+            directoryPath: "/tmp/.claude/skills/research",
+            parser: skillParser,
+            markdown: userSkillMarkdown
+        )
+        let projectSkill = makeSkillCandidate(
+            tier: .project,
+            identifier: "project-skill",
+            scope: .project,
+            directoryPath: "/tmp/project/.claude/skills/research",
+            parser: skillParser,
+            markdown: projectSkillMarkdown
+        )
+
+        let missingSkillSource = ResolutionSource(
+            scope: .user,
+            kind: .file,
+            identifier: "missing-skill",
+            sourcePath: "/tmp/.claude/skills/missing",
+            availability: .present
+        )
+        let missingSkillParse = skillParser.parse(
+            skillDirectoryURL: URL(fileURLWithPath: "/tmp/.claude/skills/missing"),
+            skillMarkdownData: nil
+        )
+        let missingSkill = SkillDocumentCandidate(
+            tier: .user,
+            source: missingSkillSource,
+            document: missingSkillParse.value,
+            issues: missingSkillParse.issues.map { ResolutionIssue(syntaxIssue: $0, source: missingSkillSource) }
+        )
+
+        let skillSnapshot = SkillResolver().resolve(candidates: [userSkill, projectSkill, missingSkill])
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/agents_skills",
+            caseID: caseID,
+            fileName: "resolution_summary.json",
+            as: ExpectedAgentSkillFixtureSummary.self
+        )
+
+        let agentStatesBySource = Dictionary(uniqueKeysWithValues: agentSnapshot.agents.map {
+            ($0.source.identifier, $0.visibility.effectiveValue?.rawValue ?? "unavailable")
+        })
+        let skillStatesBySource = Dictionary(uniqueKeysWithValues: skillSnapshot.skills.map {
+            ($0.source.identifier, $0.visibility.effectiveValue?.rawValue ?? "unavailable")
+        })
+
+        XCTAssertEqual(agentStatesBySource, expected.agentStatesBySource)
+        XCTAssertEqual(skillStatesBySource, expected.skillStatesBySource)
+        XCTAssertEqual(
+            Set(agentSnapshot.issues.map { $0.code.rawValue }),
+            Set(expected.requiredAgentIssueCodes)
+        )
+        XCTAssertEqual(
+            Set(skillSnapshot.issues.map { $0.code.rawValue }),
+            Set(expected.requiredSkillIssueCodes)
+        )
+    }
+
+    func testSessionProjectionFixturePartialSettingsOnlyCase() throws {
+        let loader = FixtureLoader.shared
+        let parser = SettingsParser()
+        let caseID: FixtureCaseID = "partial_settings_only"
+
+        let settingsJSON = try loader.loadString(
+            familyPath: "resolvers/projection",
+            caseID: caseID,
+            section: "input",
+            fileName: "settings.json"
+        )
+        let settingsDocument = try XCTUnwrap(
+            parser.parse(
+                jsonString: settingsJSON,
+                sourceURL: URL(fileURLWithPath: "/tmp/.claude/settings.json", isDirectory: false)
+            ).value
+        )
+
+        let settingsSnapshot = SettingsResolver().buildSnapshot(
+            from: SettingsResolver().resolvePrecedence(candidates: [
+                makeCandidate(
+                    tier: .user,
+                    identifier: "user-settings",
+                    scope: .user,
+                    sourcePath: "/tmp/.claude/settings.json",
+                    rawTopLevel: settingsDocument.rawTopLevelObject
+                )
+            ])
+        )
+
+        let projection = SessionProjectionBuilder().build(
+            from: SessionProjectionBuilder.Input(settings: settingsSnapshot)
+        )
+
+        let expected = try loadExpectedJSON(
+            loader: loader,
+            familyPath: "resolvers/projection",
+            caseID: caseID,
+            fileName: "projection_summary.json",
+            as: ExpectedProjectionFixtureSummary.self
+        )
+
+        XCTAssertEqual(projection.completeness.isComplete, expected.isComplete)
+        XCTAssertEqual(projection.completeness.missingFamilies.map(\.rawValue), expected.missingFamilies)
+        XCTAssertEqual(
+            projection.familyStates.filter { $0.availability == .available }.map { $0.family.rawValue },
+            expected.availableFamilies
+        )
     }
 
     func testResolutionTraceDeduplicatesParticipantsPreservingFirstSeenOrder() {
@@ -605,6 +1240,7 @@ final class ResolverModelsTests: XCTestCase {
 
         let hooks: ResolvedHookSnapshot = try XCTUnwrap(projection.hooks)
         XCTAssertEqual(hooks.events.map { $0.eventID }, ["postToolUse", "preToolUse"])
+        XCTAssertEqual(hooks.events.map(\.eventType), [.postToolUse, .preToolUse])
         XCTAssertEqual(hooks.events.first?.hooks.effectiveValue, [JSONValue.string("notify")])
     }
 
@@ -778,16 +1414,13 @@ final class ResolverModelsTests: XCTestCase {
                 cleanupPeriodDays: nil,
                 companyAnnouncements: nil,
                 env: nil,
-                attribution: ParsedAttribution(
-                    includeCoAuthoredBy: false,
-                    rawObject: ["includeCoAuthoredBy": .bool(false)]
-                ),
+                attribution: ParsedAttribution(commit: "Generated with AI", pr: "", unknownFields: nil),
                 includeCoAuthoredBy: true,
                 includeGitInstructions: nil,
                 permissions: ParsedPermissions(
                     allow: ["Read", "Write"],
                     deny: ["Write"],
-                    mode: "acceptEdits",
+                    defaultMode: "acceptEdits",
                     rawObject: [:]
                 ),
                 autoMode: true,
@@ -797,13 +1430,25 @@ final class ResolverModelsTests: XCTestCase {
                 hooks: ParsedHooks(
                     events: [
                         "PreToolUse": ParsedHookEvent(
+                            eventName: "PreToolUse",
+                            eventType: .preToolUse,
                             matcher: nil,
                             actions: [
                                 ParsedHookAction(
                                     type: "command",
+                                    handlerType: .command,
                                     command: nil,
                                     url: nil,
-                                    timeoutMs: -1,
+                                    prompt: nil,
+                                    timeout: -1,
+                                    statusMessage: nil,
+                                    condition: nil,
+                                    once: nil,
+                                    shell: nil,
+                                    isAsync: nil,
+                                    headers: nil,
+                                    allowedEnvVars: nil,
+                                    model: nil,
                                     rawObject: [:]
                                 )
                             ],
@@ -812,6 +1457,7 @@ final class ResolverModelsTests: XCTestCase {
                     ],
                     rawObject: [:]
                 ),
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -823,7 +1469,6 @@ final class ResolverModelsTests: XCTestCase {
 
         let result = validator.validate(settings: document)
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.autoModeConflict" }))
-        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.attributionConflict" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.permissionsModeWithAllowDeny" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.permissionsAllowDenyOverlap" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.settings.hookActionTransportShape" }))
@@ -846,11 +1491,20 @@ final class ResolverModelsTests: XCTestCase {
                 mcpState: ParsedClaudeJsonMcpState(
                     userServers: [
                         "alpha": ParsedClaudeJsonMcpServerRef(
-                            command: nil,
-                            args: ["--stdio"],
-                            env: nil,
-                            url: nil,
-                            headers: ["Authorization": "token"],
+                            config: McpServerConfig(
+                                name: "alpha",
+                                transportType: .unknown,
+                                command: nil,
+                                args: ["--stdio"],
+                                env: nil,
+                                cwd: nil,
+                                url: nil,
+                                headers: ["Authorization": "token"],
+                                pluginId: nil,
+                                pluginName: nil,
+                                source: .claudeJson,
+                                unknownFields: nil
+                            ),
                             enabled: true,
                             source: nil,
                             rawObject: [:]
@@ -858,11 +1512,20 @@ final class ResolverModelsTests: XCTestCase {
                     ],
                     localServers: [
                         "alpha": ParsedClaudeJsonMcpServerRef(
-                            command: "run",
-                            args: nil,
-                            env: nil,
-                            url: "http://localhost:8123",
-                            headers: nil,
+                            config: McpServerConfig(
+                                name: "alpha",
+                                transportType: .stdio,
+                                command: "run",
+                                args: nil,
+                                env: nil,
+                                cwd: nil,
+                                url: "http://localhost:8123",
+                                headers: nil,
+                                pluginId: nil,
+                                pluginName: nil,
+                                source: .claudeJson,
+                                unknownFields: nil
+                            ),
                             enabled: true,
                             source: nil,
                             rawObject: [:]
@@ -887,7 +1550,6 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.claudeJson.mcpDuplicateAcrossScopes" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.argsWithoutCommand" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.headersWithoutUrl" }))
-        XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.mcp.serverTransportShape" }))
         XCTAssertTrue(result.issues.contains(where: { $0.code.rawValue == "schema.claudeJson.trustPathOverlap" }))
     }
 
@@ -1279,6 +1941,7 @@ final class ResolverModelsTests: XCTestCase {
                 useAutoModeDuringPlan: nil,
                 disableDeepLinkRegistration: nil,
                 hooks: nil,
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -2348,7 +3011,7 @@ final class ResolverModelsTests: XCTestCase {
                             "preToolUse": .object([
                                 "matcher": .string("Bash"),
                                 "hooks": .array([
-                                    .object(["type": .string("command"), "command": .string("echo ok"), "timeoutMs": .number(1200)])
+                                    .object(["type": .string("command"), "command": .string("echo ok"), "timeout": .number(12)])
                                 ])
                             ])
                         ]),
@@ -2367,9 +3030,38 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertEqual(viewModel.groupCount, 2)
         XCTAssertEqual(viewModel.rowCount, 2)
         XCTAssertEqual(viewModel.groups.map(\.eventID), ["postToolUse", "preToolUse"])
+        XCTAssertEqual(viewModel.groups.map(\.eventTitle), ["PostToolUse", "PreToolUse"])
         XCTAssertEqual(viewModel.groups[0].matcherLabel, "(none)")
         XCTAssertEqual(viewModel.groups[1].matcherLabel, "Bash")
-        XCTAssertEqual(viewModel.groups[1].rows.first?.actionSummary, "command | command: echo ok | timeout=1200ms")
+        XCTAssertEqual(viewModel.groups[1].rows.first?.actionSummary, "command | command: echo ok | timeout=12s")
+    }
+
+    func testSessionHooksViewModelShowsHookEventCapabilityBadges() {
+        let source = makeSource(identifier: "project-local", scope: .projectLocal, sourcePath: "/tmp/project/.claude/settings.local.json")
+        let settings = ResolvedSettingsSnapshot(
+            entries: [
+                ResolvedSettingsEntry(
+                    keyPath: "hooks",
+                    value: ResolvedValue(
+                        effectiveValue: .object([
+                            "UserPromptSubmit": .array([
+                                .object(["type": .string("command"), "command": .string("echo gate")])
+                            ])
+                        ]),
+                        winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .keyedByIdentifier
+                    )
+                )
+            ]
+        )
+        let projection = SessionProjectionBuilder().build(from: SessionProjectionBuilder.Input(settings: settings))
+
+        let viewModel = SessionHooksViewModel(projection: projection)
+        let group = tryUnwrapHookGroup(viewModel: viewModel, eventID: "UserPromptSubmit")
+
+        XCTAssertEqual(group.capabilityBadges.map(\.title), ["Blocking", "Context injection"])
+        XCTAssertEqual(group.capabilityNote, "Prompt erasure: a successful block result can remove the user's prompt from model context.")
     }
 
     func testSessionHooksViewModelRendersRestrictionBadgesFromEffectiveSettings() {
@@ -2891,6 +3583,439 @@ final class ResolverModelsTests: XCTestCase {
         XCTAssertTrue(partialViewModel.summaryNotes.contains(where: { $0.contains("Only one of agents/skills families") }))
     }
 
+    // MARK: - R1 Expanded Settings Families Tests
+
+    func testSettingsResolverUsesRegistryMergeHintForScalarKeys() {
+        let resolver = SettingsResolver()
+        let keys: [String: JSONValue] = [
+            "model": .string("claude-sonnet-4-6"),
+            "effortLevel": .string("high"),
+            "defaultShell": .string("/bin/zsh"),
+            "language": .string("en"),
+            "alwaysThinkingEnabled": .bool(true),
+            "fastMode": .bool(false),
+            "fastModePerSessionOptIn": .bool(true),
+            "outputStyle": .string("concise"),
+            "voiceEnabled": .bool(true),
+            "prefersReducedMotion": .bool(false),
+            "spinnerTipsEnabled": .bool(true),
+            "respectGitignore": .bool(true),
+            "autoMemoryEnabled": .bool(true),
+            "disableAllHooks": .bool(false),
+            "disableUpdateChecks": .bool(true),
+            "plansDirectory": .string("/tmp/plans"),
+            "autoUpdatesChannel": .string("stable"),
+            "showClearContextOnPlanAccept": .bool(false),
+            "feedbackSurveyRate": .number(0.1),
+            "agent": .string("reviewer")
+        ]
+
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: keys
+        )
+
+        var overrideTopLevel: [String: JSONValue] = [:]
+        for (key, _) in keys {
+            overrideTopLevel[key] = .string("override-\(key)")
+        }
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: overrideTopLevel
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        for key in keys.keys {
+            let entry = snapshot.entries.first(where: { $0.keyPath == key })
+            XCTAssertNotNil(entry, "Missing entry for key '\(key)'")
+            XCTAssertEqual(entry?.value.mergeMethod, .replace, "Key '\(key)' should use replace merge method")
+            XCTAssertEqual(entry?.value.winningSource?.identifier, "project-local-settings", "Key '\(key)' should be won by local")
+        }
+    }
+
+    func testSettingsResolverUsesRegistryMergeHintForDeepMergeObjectKeys() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "sandbox": .object([
+                    "enabled": .bool(true),
+                    "failIfUnavailable": .bool(false)
+                ]),
+                "worktree": .object([
+                    "sparsePaths": .array([.string("/src")])
+                ]),
+                "statusLine": .object([
+                    "command": .string("echo status"),
+                    "padding": .number(2)
+                ]),
+                "fileSuggestion": .object([
+                    "type": .string("default")
+                ]),
+                "spinnerVerbs": .object([
+                    "mode": .string("custom"),
+                    "verbs": .array([.string("thinking")])
+                ]),
+                "spinnerTipsOverride": .object([
+                    "excludeDefault": .bool(true),
+                    "tips": .array([.string("user tip")])
+                ])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "sandbox": .object([
+                    "enabled": .bool(false),
+                    "autoAllowBashIfSandboxed": .bool(true)
+                ]),
+                "worktree": .object([
+                    "symlinkDirectories": .array([.string("/lib")])
+                ]),
+                "statusLine": .object([
+                    "command": .string("echo local-status")
+                ]),
+                "fileSuggestion": .object([
+                    "command": .string("fzf")
+                ]),
+                "spinnerVerbs": .object([
+                    "verbs": .array([.string("processing")])
+                ]),
+                "spinnerTipsOverride": .object([
+                    "tips": .array([.string("local tip")])
+                ])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let sandboxEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "sandbox")
+        XCTAssertEqual(sandboxEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(sandboxMerged) = sandboxEntry.value.effectiveValue else {
+            XCTFail("sandbox should be object")
+            return
+        }
+        XCTAssertEqual(sandboxMerged["enabled"], .bool(false))
+        XCTAssertEqual(sandboxMerged["failIfUnavailable"], .bool(false))
+        XCTAssertEqual(sandboxMerged["autoAllowBashIfSandboxed"], .bool(true))
+
+        let worktreeEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "worktree")
+        XCTAssertEqual(worktreeEntry.value.mergeMethod, .deepMergeObject)
+
+        let statusLineEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "statusLine")
+        XCTAssertEqual(statusLineEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(statusMerged) = statusLineEntry.value.effectiveValue else {
+            XCTFail("statusLine should be object")
+            return
+        }
+        XCTAssertEqual(statusMerged["command"], .string("echo local-status"))
+        XCTAssertEqual(statusMerged["padding"], .number(2))
+    }
+
+    func testSettingsResolverUsesRegistryMergeHintForAppendUniqueArrayKeys() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "companyAnnouncements": .array([.string("user-announcement")]),
+                "claudeMdExcludes": .array([.string("*.tmp")]),
+                "sandbox.excludedCommands": .array([.string("rm")]),
+                "sandbox.filesystem.allowWrite": .array([.string("/tmp")]),
+                "sandbox.network.allowedDomains": .array([.string("example.com")]),
+                "worktree.sparsePaths": .array([.string("/src")]),
+                "worktree.symlinkDirectories": .array([.string("/lib")])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "companyAnnouncements": .array([.string("local-announcement"), .string("user-announcement")]),
+                "claudeMdExcludes": .array([.string("*.log"), .string("*.tmp")]),
+                "sandbox.excludedCommands": .array([.string("rm"), .string("chmod")]),
+                "sandbox.filesystem.allowWrite": .array([.string("/var")]),
+                "sandbox.network.allowedDomains": .array([.string("example.com"), .string("anthropic.com")]),
+                "worktree.sparsePaths": .array([.string("/src"), .string("/docs")]),
+                "worktree.symlinkDirectories": .array([.string("/lib"), .string("/bin")])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let announcements = tryUnwrapEntry(snapshot: snapshot, keyPath: "companyAnnouncements")
+        XCTAssertEqual(announcements.value.mergeMethod, .appendUnique)
+
+        let excludes = tryUnwrapEntry(snapshot: snapshot, keyPath: "claudeMdExcludes")
+        XCTAssertEqual(excludes.value.mergeMethod, .appendUnique)
+        XCTAssertEqual(
+            excludes.value.effectiveValue,
+            .array([.string("*.log"), .string("*.tmp")])
+        )
+    }
+
+    func testSettingsResolverManagedPolicyMakesLowerScopeValuesIneffective() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "model": .string("claude-opus-4-6"),
+                "disableAllHooks": .bool(true)
+            ]
+        )
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "model": .string("claude-sonnet-4-6"),
+                "disableAllHooks": .bool(false)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let modelEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "model")
+        XCTAssertEqual(modelEntry.value.effectiveValue, .string("claude-opus-4-6"))
+        XCTAssertEqual(modelEntry.value.winningSource?.identifier, "managed-policy")
+        XCTAssertTrue(
+            modelEntry.value.trace.notes.contains(where: { $0.contains("Managed policy is active") && $0.contains("ineffective") }),
+            "Expected provenance note about managed policy suppressing lower scope"
+        )
+        XCTAssertTrue(
+            modelEntry.value.trace.overridden.contains(where: { $0.identifier == "user-settings" })
+        )
+
+        XCTAssertTrue(
+            snapshot.notes.contains(where: { $0.contains("Managed policy is active") })
+        )
+    }
+
+    func testSettingsResolverManagedOnlyKeyInNonManagedScopeEmitsWarning() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "allowManagedPermissionRulesOnly": .bool(true),
+                "channelsEnabled": .bool(true)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        XCTAssertTrue(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only") && $0.keyPath == "allowManagedPermissionRulesOnly"
+            }),
+            "Expected warning for managed-only key in non-managed scope"
+        )
+        XCTAssertTrue(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only") && $0.keyPath == "channelsEnabled"
+            }),
+            "Expected warning for channelsEnabled in non-managed scope"
+        )
+    }
+
+    func testSettingsResolverManagedOnlyKeyFromManagedScopeDoesNotWarn() {
+        let resolver = SettingsResolver()
+        let managed = makeCandidate(
+            tier: .managed,
+            identifier: "managed-policy",
+            scope: .managed,
+            kind: .managed,
+            rawTopLevel: [
+                "allowManagedPermissionRulesOnly": .bool(true),
+                "channelsEnabled": .bool(true)
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [managed])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        XCTAssertFalse(
+            snapshot.issues.contains(where: {
+                $0.code == .conflict && $0.message.contains("managed-only")
+            }),
+            "Should not warn when managed-only keys come from managed scope"
+        )
+    }
+
+    func testSettingsResolverPluginAndMarketplaceKeysUseMergeHintsFromRegistry() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "enabledPlugins": .object(["plugin-a": .bool(true)]),
+                "extraKnownMarketplaces": .object(["mp-a": .object(["id": .string("a")])])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "enabledPlugins": .object(["plugin-b": .bool(false)]),
+                "extraKnownMarketplaces": .object(["mp-b": .object(["id": .string("b")])])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let pluginsEntry = tryUnwrapEntry(snapshot: snapshot, keyPath: "enabledPlugins")
+        XCTAssertEqual(pluginsEntry.value.mergeMethod, .deepMergeObject)
+        guard case let .object(merged) = pluginsEntry.value.effectiveValue else {
+            XCTFail("enabledPlugins should merge as object")
+            return
+        }
+        XCTAssertEqual(merged["plugin-a"], .bool(true))
+        XCTAssertEqual(merged["plugin-b"], .bool(false))
+
+        let marketplaces = tryUnwrapEntry(snapshot: snapshot, keyPath: "extraKnownMarketplaces")
+        XCTAssertEqual(marketplaces.value.mergeMethod, .deepMergeObject)
+    }
+
+    func testSettingsResolverMcpControlKeysResolveCorrectly() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: [
+                "enabledMcpjsonServers": .array([.string("server-a")]),
+                "disabledMcpjsonServers": .array([.string("server-b")]),
+                "enableAllProjectMcpServers": .bool(false),
+                "deniedMcpServers": .array([.object(["serverName": .string("bad-server")])])
+            ]
+        )
+        let local = makeCandidate(
+            tier: .projectLocal,
+            identifier: "project-local-settings",
+            scope: .projectLocal,
+            sourcePath: "/tmp/project/.claude/settings.local.json",
+            rawTopLevel: [
+                "enabledMcpjsonServers": .array([.string("server-a"), .string("server-c")]),
+                "disabledMcpjsonServers": .array([.string("server-d")]),
+                "enableAllProjectMcpServers": .bool(true),
+                "deniedMcpServers": .array([.object(["serverName": .string("worse-server")])])
+            ]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user, local])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let enabled = tryUnwrapEntry(snapshot: snapshot, keyPath: "enabledMcpjsonServers")
+        XCTAssertEqual(enabled.value.mergeMethod, .appendUnique)
+        XCTAssertEqual(
+            enabled.value.effectiveValue,
+            .array([.string("server-a"), .string("server-c")])
+        )
+
+        let enableAll = tryUnwrapEntry(snapshot: snapshot, keyPath: "enableAllProjectMcpServers")
+        XCTAssertEqual(enableAll.value.mergeMethod, .replace)
+        XCTAssertEqual(enableAll.value.winningSource?.identifier, "project-local-settings")
+
+        let denied = tryUnwrapEntry(snapshot: snapshot, keyPath: "deniedMcpServers")
+        XCTAssertEqual(denied.value.mergeMethod, .appendUnique)
+    }
+
+    func testSettingsResolverUnknownKeyFallsToPassthrough() {
+        let resolver = SettingsResolver()
+        let user = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: ["someUnknownFutureKey": .string("value")]
+        )
+
+        let selection = resolver.resolvePrecedence(candidates: [user])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        let entry = tryUnwrapEntry(snapshot: snapshot, keyPath: "someUnknownFutureKey")
+        XCTAssertEqual(entry.value.mergeMethod, .passthrough)
+    }
+
+    func testSettingsResolverAllRegistryKeysHaveExplicitMergeMethod() {
+        let resolver = SettingsResolver()
+        let registry = SettingsKeyRegistry.shared
+        var rawTopLevel: [String: JSONValue] = [:]
+        for definition in registry.allDefinitions {
+            if definition.keyPath.contains(".") { continue }
+            switch definition.type {
+            case .string:
+                rawTopLevel[definition.keyPath] = .string("test")
+            case .bool:
+                rawTopLevel[definition.keyPath] = .bool(true)
+            case .integer, .number:
+                rawTopLevel[definition.keyPath] = .number(1)
+            case .stringArray:
+                rawTopLevel[definition.keyPath] = .array([.string("test")])
+            case .object, .dictionary:
+                rawTopLevel[definition.keyPath] = .object(["key": .string("value")])
+            case .anyArray:
+                rawTopLevel[definition.keyPath] = .array([.string("test")])
+            case .array:
+                rawTopLevel[definition.keyPath] = .array([.object(["id": .string("test")])])
+            case .oneOf, .anyValue:
+                rawTopLevel[definition.keyPath] = .string("test")
+            }
+        }
+
+        let candidate = makeCandidate(
+            tier: .user,
+            identifier: "user-settings",
+            scope: .user,
+            sourcePath: "/tmp/.claude/settings.json",
+            rawTopLevel: rawTopLevel
+        )
+        let selection = resolver.resolvePrecedence(candidates: [candidate])
+        let snapshot = resolver.buildSnapshot(from: selection)
+
+        for entry in snapshot.entries {
+            XCTAssertNotEqual(
+                entry.value.mergeMethod, .passthrough,
+                "Registry key '\(entry.keyPath)' should have an explicit merge method, not passthrough. " +
+                "This means the registry defines a mergeHint but the resolver did not map it."
+            )
+        }
+    }
+
     private func makeSource(
         identifier: String,
         scope: ResolutionScope = .user,
@@ -3058,6 +4183,7 @@ final class ResolverModelsTests: XCTestCase {
                 useAutoModeDuringPlan: nil,
                 disableDeepLinkRegistration: nil,
                 hooks: nil,
+                disableAllHooks: nil,
                 allowManagedHooksOnly: nil,
                 allowedHTTPHookURLs: nil,
                 httpHookAllowedEnvVars: nil,
@@ -3082,6 +4208,14 @@ final class ResolverModelsTests: XCTestCase {
             fatalError("Missing row")
         }
         return row
+    }
+
+    private func tryUnwrapHookGroup(viewModel: SessionHooksViewModel, eventID: String) -> HookGroupModel {
+        guard let group = viewModel.groups.first(where: { $0.eventID == eventID }) else {
+            XCTFail("Missing session hooks group for eventID '\(eventID)'")
+            fatalError("Missing hook group")
+        }
+        return group
     }
 
     private func makeInstructionCandidate(
@@ -3204,4 +4338,104 @@ final class ResolverModelsTests: XCTestCase {
             issues: issues
         )
     }
+
+    private func fixtureInputPath(
+        loader: FixtureLoader,
+        familyPath: String,
+        caseID: FixtureCaseID,
+        fileName: String
+    ) throws -> String {
+        try loader.descriptor(familyPath: familyPath, caseID: caseID)
+            .inputFileURL(named: fileName)
+            .path
+    }
+
+    private func loadExpectedJSON<T: Decodable>(
+        loader: FixtureLoader,
+        familyPath: String,
+        caseID: FixtureCaseID,
+        fileName: String,
+        as type: T.Type
+    ) throws -> T {
+        let raw = try loader.loadString(
+            familyPath: familyPath,
+            caseID: caseID,
+            section: "expected",
+            fileName: fileName
+        )
+        return try JSONDecoder().decode(type, from: Data(raw.utf8))
+    }
+
+    private func makeMcpFixtureDocument(
+        loader: FixtureLoader,
+        caseID: FixtureCaseID,
+        fileName: String,
+        tier: McpSourceTier,
+        scope: ResolutionScope,
+        identifier: String
+    ) throws -> McpDocumentCandidate {
+        let content = try loader.loadString(
+            familyPath: "resolvers/mcp",
+            caseID: caseID,
+            section: "input",
+            fileName: fileName
+        )
+        let data = Data(content.utf8)
+        let any = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let object = any as? [String: Any] else {
+            XCTFail("Expected top-level object in MCP fixture \(fileName)")
+            return makeMcpDocument(
+                tier: tier,
+                scope: scope,
+                identifier: identifier,
+                sourcePath: "/tmp/\(fileName)",
+                servers: []
+            )
+        }
+
+        let servers = object.keys.sorted().enumerated().map { index, key in
+            McpDocumentServerEntry(
+                serverID: key,
+                rawConfig: JSONValue.from(any: object[key] as Any),
+                parseOrder: index
+            )
+        }
+
+        return makeMcpDocument(
+            tier: tier,
+            scope: scope,
+            identifier: identifier,
+            sourcePath: "/tmp/\(fileName)",
+            servers: servers
+        )
+    }
+}
+
+private struct ExpectedInstructionFixtureSummary: Decodable {
+    let orderedBlockCount: Int
+    let orderedBlockSuffixes: [String]
+    let rootLoadOrder: [String]
+    let issueCodes: [String]
+    let composedContains: [String]
+}
+
+private struct ExpectedMcpFixtureSummary: Decodable {
+    let serverID: String
+    let winningSource: String
+    let participantSources: [String]
+    let issueCodes: [String]
+    let environmentClassifications: [String]
+}
+
+private struct ExpectedAgentSkillFixtureSummary: Decodable {
+    let agentStatesBySource: [String: String]
+    let skillStatesBySource: [String: String]
+    let requiredAgentIssueCodes: [String]
+    let requiredSkillIssueCodes: [String]
+}
+
+private struct ExpectedProjectionFixtureSummary: Decodable {
+    let isComplete: Bool
+    let missingFamilies: [String]
+    let availableFamilies: [String]
 }

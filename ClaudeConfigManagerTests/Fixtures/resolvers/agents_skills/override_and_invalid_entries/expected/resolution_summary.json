@@ -1,0 +1,21 @@
+{
+  "agentStatesBySource": {
+    "project-agent": "effective",
+    "user-agent": "overridden",
+    "invalid-agent": "invalid"
+  },
+  "skillStatesBySource": {
+    "project-skill": "effective",
+    "user-skill": "overridden",
+    "missing-skill": "invalid"
+  },
+  "requiredAgentIssueCodes": [
+    "duplicateIdentifier",
+    "parserSyntaxIssue"
+  ],
+  "requiredSkillIssueCodes": [
+    "duplicateIdentifier",
+    "parserSyntaxIssue",
+    "unsupportedShape"
+  ]
+}

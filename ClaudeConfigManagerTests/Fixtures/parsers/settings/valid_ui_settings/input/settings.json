@@ -1,0 +1,35 @@
+{
+  "language": "japanese",
+  "respectGitignore": false,
+  "outputStyle": "Explanatory",
+  "defaultShell": "bash",
+  "voiceEnabled": true,
+  "prefersReducedMotion": true,
+  "spinnerTipsEnabled": false,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1
+  },
+  "fileSuggestion": {
+    "type": "command",
+    "command": "~/.claude/file-suggestion.sh"
+  },
+  "spinnerVerbs": {
+    "mode": "append",
+    "verbs": [
+      "Pondering",
+      "Crafting"
+    ]
+  },
+  "spinnerTipsOverride": {
+    "excludeDefault": true,
+    "tips": [
+      "Use our internal tool X"
+    ]
+  },
+  "attribution": {
+    "commit": "Generated with AI\n\nCo-Authored-By: AI <ai@example.com>",
+    "pr": ""
+  }
+}

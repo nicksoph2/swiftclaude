@@ -1,0 +1,13 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["memory", "github"],
+  "disabledMcpjsonServers": ["filesystem"],
+  "allowedMcpServers": [
+    { "serverName": "github" },
+    { "serverCommand": ["npx", "-y", "@modelcontextprotocol/server-github"] }
+  ],
+  "deniedMcpServers": [
+    { "serverName": "filesystem" },
+    { "serverUrl": "https://untrusted.example.com/*" }
+  ]
+}

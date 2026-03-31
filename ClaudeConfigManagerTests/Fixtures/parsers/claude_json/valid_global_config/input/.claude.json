@@ -1,0 +1,12 @@
+{
+  "$schema": "https://example.com/claude-json.schema.json",
+  "autoConnectIde": true,
+  "autoInstallIdeExtension": false,
+  "editorMode": "vim",
+  "showTurnDuration": false,
+  "terminalProgressBarEnabled": true,
+  "teammateMode": "tmux",
+  "globalPreferences": {
+    "defaultModel": "claude-sonnet-4-6"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "stringArray": ["a", "b", "c"],
+  "numberArray": [1, 2],
+  "mixedArray": ["text", 42, true, null]
+}

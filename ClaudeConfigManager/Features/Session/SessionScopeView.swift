@@ -165,7 +165,7 @@ struct SessionScopeView: View {
                                     .object([
                                         "type": .string("command"),
                                         "command": .string("echo validating command"),
-                                        "timeoutMs": .number(1500)
+                                        "timeout": .number(15)
                                     ])
                                 ])
                             ]),
@@ -173,7 +173,7 @@ struct SessionScopeView: View {
                                 .object([
                                     "type": .string("http"),
                                     "url": .string("https://hooks.example.internal/post-tool"),
-                                    "timeoutMs": .number(3000)
+                                    "timeout": .number(30)
                                 ])
                             ])
                         ]),
@@ -1445,6 +1445,16 @@ struct SessionHooksView: View {
                 issueBadgesView(group.issueBadges)
             }
 
+            if !group.capabilityBadges.isEmpty {
+                capabilityBadgesView(group.capabilityBadges)
+            }
+
+            if let capabilityNote = group.capabilityNote {
+                Text(capabilityNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             ForEach(group.rows) { row in
                 rowCard(row)
             }
@@ -1568,6 +1578,18 @@ struct SessionHooksView: View {
         HStack(spacing: 8) {
             ForEach(badges) { badge in
                 Text("\(badge.count) \(badge.label)")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(badge.color.opacity(0.18), in: Capsule())
+            }
+        }
+    }
+
+    private func capabilityBadgesView(_ badges: [HookCapabilityBadgeModel]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(badges) { badge in
+                Text(badge.title)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -3063,11 +3085,15 @@ struct SessionHooksViewModel: Equatable {
             .map { event in
                 HookGroupModel(
                     eventID: event.eventID,
+                    eventType: event.eventType,
                     matcher: eventMatchers[event.eventID],
                     value: event.hooks
                 )
             }
             .sorted { lhs, rhs in
+                if lhs.eventType.sortKey != rhs.eventType.sortKey {
+                    return lhs.eventType.sortKey < rhs.eventType.sortKey
+                }
                 if lhs.eventID != rhs.eventID {
                     return lhs.eventID < rhs.eventID
                 }
@@ -3084,7 +3110,8 @@ struct SessionHooksViewModel: Equatable {
                 hooks.events.flatMap(\.hooks.issues) +
                 projection.issues.filter { issue in
                     guard let keyPath = issue.keyPath else { return false }
-                    return keyPath == "allowManagedHooksOnly" ||
+                    return keyPath == "disableAllHooks" ||
+                        keyPath == "allowManagedHooksOnly" ||
                         keyPath == "allowedHttpHookUrls" ||
                         keyPath == "httpHookAllowedEnvVars" ||
                         keyPath.hasPrefix("hooks")
@@ -3166,6 +3193,19 @@ struct SessionHooksViewModel: Equatable {
 
         var rows: [HookRestrictionBadgeModel] = []
         if
+            let disabledEntry = settings.entries.first(where: { $0.keyPath == "disableAllHooks" }),
+            disabledEntry.value.effectiveValue?.boolValue == true
+        {
+            rows.append(
+                HookRestrictionBadgeModel(
+                    title: "Hooks Disabled",
+                    detail: "All hooks and any custom status line are disabled by the effective policy.",
+                    tone: .warning
+                )
+            )
+        }
+
+        if
             let managedOnly = settings.entries.first(where: { $0.keyPath == "allowManagedHooksOnly" }),
             managedOnly.value.effectiveValue?.boolValue == true
         {
@@ -3219,20 +3259,28 @@ struct SessionHooksViewModel: Equatable {
 
 struct HookGroupModel: Identifiable, Equatable {
     let eventID: String
+    let eventType: HookEventType
     let eventTitle: String
     let matcherLabel: String
+    let capabilityBadges: [HookCapabilityBadgeModel]
+    let capabilityNote: String?
     let rows: [HookRowModel]
     let issueBadges: [IssueBadgeModel]
     let notes: [String]
 
     var id: String { "\(eventID)-\(matcherLabel)" }
 
-    init(eventID: String, matcher: String?, value: ResolvedValue<[JSONValue]>) {
+    init(eventID: String, eventType: HookEventType, matcher: String?, value: ResolvedValue<[JSONValue]>) {
         self.eventID = eventID
-        eventTitle = eventID
+        self.eventType = eventType
+        eventTitle = eventType.canonicalName
         matcherLabel = matcher?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             ? matcher!
             : "(none)"
+        capabilityBadges = HookCapabilityBadgeModel.badges(for: eventType)
+        capabilityNote = eventType.supportsPromptErasure
+            ? "Prompt erasure: a successful block result can remove the user's prompt from model context."
+            : nil
 
         let actions = value.effectiveValue ?? []
         rows = actions.enumerated().map { pair in
@@ -3273,7 +3321,7 @@ struct HookRowModel: Identifiable, Equatable {
 
         let type = object["type"]?.stringValue ?? "unknown"
         let matcher = object["matcher"]?.stringValue
-        let timeout = object["timeoutMs"]?.numberValue.map { "timeout=\(Int($0))ms" }
+        let timeout = object["timeout"]?.numberValue.map { "timeout=\(Int($0))s" }
 
         if let command = object["command"]?.stringValue {
             return [type, "command: \(command)", matcher.map { "matcher: \($0)" }, timeout]
@@ -3323,6 +3371,42 @@ struct HookRowModel: Identifiable, Equatable {
             }
             return "{\(pairs.joined(separator: ", "))}"
         }
+    }
+}
+
+struct HookCapabilityBadgeModel: Identifiable, Equatable {
+    enum Tone: Equatable {
+        case warning
+        case info
+
+        var color: Color {
+            switch self {
+            case .warning:
+                return .orange
+            case .info:
+                return .blue
+            }
+        }
+    }
+
+    let title: String
+    let tone: Tone
+
+    var id: String { title }
+    var color: Color { tone.color }
+
+    static func badges(for eventType: HookEventType) -> [HookCapabilityBadgeModel] {
+        var rows: [HookCapabilityBadgeModel] = []
+
+        if eventType.isBlocking {
+            rows.append(HookCapabilityBadgeModel(title: "Blocking", tone: .warning))
+        }
+
+        if eventType.supportsContextInjection {
+            rows.append(HookCapabilityBadgeModel(title: "Context injection", tone: .info))
+        }
+
+        return rows
     }
 }
 

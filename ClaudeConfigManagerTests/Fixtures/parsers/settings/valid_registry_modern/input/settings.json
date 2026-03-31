@@ -1,0 +1,87 @@
+{
+  "defaultShell": "bash",
+  "alwaysThinkingEnabled": true,
+  "autoMemoryEnabled": true,
+  "claudeMdExcludes": [
+    "node_modules/**",
+    ".git/**"
+  ],
+  "enabledPlugins": {
+    "formatter@official": true,
+    "reviewer@partner": false
+  },
+  "extraKnownMarketplaces": {
+    "official": {
+      "source": {
+        "type": "github",
+        "repo": "anthropic/plugins",
+        "ref": "main"
+      }
+    },
+    "partner": {
+      "type": "url",
+      "url": "https://plugins.example.com/index.json"
+    }
+  },
+  "allowedChannelPlugins": [
+    {
+      "plugin": "formatter",
+      "marketplace": "official",
+      "channels": [
+        "stable"
+      ]
+    }
+  ],
+  "channelsEnabled": true,
+  "blockedMarketplaces": [
+    {
+      "id": "legacy",
+      "source": {
+        "type": "hostPattern",
+        "pattern": "*.legacy.example.com"
+      }
+    }
+  ],
+  "pluginTrustMessage": "Install only approved plugins.",
+  "allowManagedMcpServersOnly": true,
+  "allowedMcpServers": [
+    {
+      "serverName": "docs"
+    }
+  ],
+  "strictKnownMarketplaces": [
+    {
+      "id": "npm-registry",
+      "source": {
+        "type": "npm",
+        "package": "@acme/claude-marketplace",
+        "version": "1.2.3",
+        "registry": "https://registry.npmjs.org"
+      }
+    }
+  ],
+  "sandbox": {
+    "failIfUnavailable": true,
+    "network": {
+      "httpProxyPort": 8080
+    }
+  },
+  "worktree": {
+    "sparsePaths": [
+      "Sources/**",
+      "Tests/**"
+    ]
+  },
+  "pluginConfigs": {
+    "examplePlugin": {
+      "enabled": true
+    }
+  },
+  "skippedPlugins": [
+    "legacy-plugin"
+  ],
+  "skippedMarketplaces": [
+    "internal-preview"
+  ],
+  "futureSetting": "preserved"
+}
