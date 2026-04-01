@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "echo preparing",
+        "timeout": 6,
+        "statusMessage": "Running command hook"
+      },
+      {
+        "type": "http",
+        "url": "https://hooks.example.com/pre",
+        "timeout": 12
+      },
+      {
+        "type": "prompt",
+        "template": "Inspect the hook payload: $ARGUMENTS",
+        "statusMessage": "Prompting reviewer"
+      },
+      {
+        "type": "agent",
+        "agent_id": "delegator"
+      }
+    ]
+  }
+}

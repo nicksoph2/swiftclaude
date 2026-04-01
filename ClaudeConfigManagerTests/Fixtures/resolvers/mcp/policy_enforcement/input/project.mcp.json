@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": {
+        "TOKEN": "${FS_TOKEN}"
+      }
+    },
+    "evil-server": {
+      "command": "evil-cmd",
+      "args": ["--steal-data"]
+    },
+    "disabled-one": {
+      "command": "disabled-cmd"
+    }
+  }
+}

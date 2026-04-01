@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 protocol BookmarkMetadataPersisting {
     func loadRecords() throws -> [BookmarkRecord]
@@ -113,7 +114,7 @@ final class FileSystemGlobalStatePersistence: GlobalStatePersisting {
     }
 
     func loadState() throws -> GlobalAppState {
-        guard fileManager.fileExists(atPath: stateURL.path()) else {
+        guard fileManager.fileExists(atPath: stateURL.path) else {
             return .default
         }
 
@@ -148,6 +149,8 @@ final class InMemoryGlobalStatePersistence: GlobalStatePersisting {
 }
 
 final class GlobalStateStore {
+    private static let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "GlobalStateStore")
+
     private let persistence: GlobalStatePersisting
 
     init(persistence: GlobalStatePersisting) {
@@ -156,6 +159,7 @@ final class GlobalStateStore {
 
     static func makeLiveStore() throws -> GlobalStateStore {
         let stateURL = try AppOwnedGlobalStateStorageLocator().makeGlobalStateURL()
+        logger.info("GlobalStateStore live store created at \(stateURL.path, privacy: .public)")
         let persistence = FileSystemGlobalStatePersistence(stateURL: stateURL)
         return GlobalStateStore(persistence: persistence)
     }
@@ -197,7 +201,7 @@ final class FileSystemBookmarkPersistence: BookmarkMetadataPersisting {
     }
 
     func loadRecords() throws -> [BookmarkRecord] {
-        guard fileManager.fileExists(atPath: storage.metadataURL.path()) else {
+        guard fileManager.fileExists(atPath: storage.metadataURL.path) else {
             return []
         }
 
@@ -223,7 +227,7 @@ final class FileSystemBookmarkPersistence: BookmarkMetadataPersisting {
 
     func loadBookmarkData(for id: String) throws -> Data? {
         let url = bookmarkBlobURL(for: id)
-        guard fileManager.fileExists(atPath: url.path()) else {
+        guard fileManager.fileExists(atPath: url.path) else {
             return nil
         }
 
@@ -244,7 +248,7 @@ final class FileSystemBookmarkPersistence: BookmarkMetadataPersisting {
 
     func removeBookmarkData(for id: String) throws {
         let url = bookmarkBlobURL(for: id)
-        guard fileManager.fileExists(atPath: url.path()) else {
+        guard fileManager.fileExists(atPath: url.path) else {
             return
         }
 

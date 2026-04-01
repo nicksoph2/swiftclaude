@@ -1,0 +1,13 @@
+{
+  "isComplete": false,
+  "missingFamilies": [
+    "instructions",
+    "hooks",
+    "mcp",
+    "agents",
+    "skills"
+  ],
+  "availableFamilies": [
+    "settings"
+  ]
+}

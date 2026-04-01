@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "agent",
+        "agent_id": "request-screener",
+        "inputs": {
+          "policy": "strict",
+          "max_tokens": 2048
+        },
+        "model": "claude-haiku-4-5-20251001",
+        "timeout": 60,
+        "once": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "sandbox": {
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "enableWeakerNetworkIsolation": false,
+    "network": {
+      "allowedDomains": ["github.com", "registry.npmjs.org"],
+      "httpProxyPort": 8080,
+      "socksProxyPort": 1080
+    }
+  }
+}

@@ -2,6 +2,7 @@ import Foundation
 
 enum BookmarkKind: String, Codable, CaseIterable, Sendable {
     case globalClaudeRoot
+    case managedClaudeCodeRoot
     case projectRoot
 }
 
@@ -104,12 +105,16 @@ struct ProjectRegistration: Codable, Equatable, Identifiable, Sendable {
 struct GlobalAppState: Codable, Equatable, Sendable {
     var globalClaudeRootSource: GlobalClaudeRootSource
     var globalClaudeRootBookmarkID: String?
+    var hasCompletedInitialGlobalRootSetup: Bool
+    var managedRootBookmarkID: String? = nil
     var projectRegistrations: [ProjectRegistration]
     var selectedProjectRegistrationID: String?
 
     static let `default` = GlobalAppState(
         globalClaudeRootSource: .defaultHomeClaude,
         globalClaudeRootBookmarkID: nil,
+        hasCompletedInitialGlobalRootSetup: false,
+        managedRootBookmarkID: nil,
         projectRegistrations: [],
         selectedProjectRegistrationID: nil
     )
@@ -117,19 +122,23 @@ struct GlobalAppState: Codable, Equatable, Sendable {
 
 enum RootSelectionArea: Equatable, Sendable {
     case globalRoot
+    case managedRoot
     case projects
 }
 
 enum RootSelectionIssue: Equatable, Identifiable, Sendable {
-    case invalidGlobalRoot(path: String)
+    case unreadableGlobalRoot(path: String)
+    case recommendedGlobalRootUnavailable(path: String)
     case duplicateProject(path: String)
     case persistenceFailure(area: RootSelectionArea, details: String)
     case bookmarkFailure(area: RootSelectionArea, details: String)
 
     var id: String {
         switch self {
-        case .invalidGlobalRoot(let path):
-            return "invalid-global-\(path)"
+        case .unreadableGlobalRoot(let path):
+            return "unreadable-global-\(path)"
+        case .recommendedGlobalRootUnavailable(let path):
+            return "recommended-global-unavailable-\(path)"
         case .duplicateProject(let path):
             return "duplicate-project-\(path)"
         case .persistenceFailure(let area, let details):
@@ -141,7 +150,7 @@ enum RootSelectionIssue: Equatable, Identifiable, Sendable {
 
     var area: RootSelectionArea {
         switch self {
-        case .invalidGlobalRoot:
+        case .unreadableGlobalRoot, .recommendedGlobalRootUnavailable:
             return .globalRoot
         case .duplicateProject:
             return .projects
@@ -154,8 +163,10 @@ enum RootSelectionIssue: Equatable, Identifiable, Sendable {
 
     var message: String {
         switch self {
-        case .invalidGlobalRoot(let path):
-            return "Choose the Claude root folder named .claude. The selected folder was \(path)."
+        case .unreadableGlobalRoot(let path):
+            return "The selected folder is not readable: \(path). Choose a readable folder and grant access when prompted."
+        case .recommendedGlobalRootUnavailable(let path):
+            return "The recommended Claude folder is not currently readable or does not exist: \(path). Choose a different folder or try again later."
         case .duplicateProject(let path):
             return "This project is already registered: \(path)"
         case .persistenceFailure(_, let details):
@@ -171,6 +182,8 @@ private extension RootSelectionArea {
         switch self {
         case .globalRoot:
             return "global-root"
+        case .managedRoot:
+            return "managed-root"
         case .projects:
             return "projects"
         }

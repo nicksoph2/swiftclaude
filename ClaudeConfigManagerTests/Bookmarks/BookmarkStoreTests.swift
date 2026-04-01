@@ -178,7 +178,7 @@ final class BookmarkStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testRootSelectionViewModelRejectsInvalidGlobalRootFolder() {
+    func testRootSelectionViewModelRejectsUnreadableGlobalRootFolder() {
         let persistence = InMemoryBookmarkPersistence()
         let dataCoder = MockBookmarkDataCoder(dataByURL: [:], resolvedByData: [:])
         let access = MockSecurityScopeAccessManager()
@@ -192,16 +192,49 @@ final class BookmarkStoreTests: XCTestCase {
         let viewModel = RootSelectionViewModel(
             bookmarkStore: bookmarkStore,
             projectRegistry: registry,
-            folderSelector: selector
+            folderSelector: selector,
+            accessChecker: MockAccessChecker(statusesByPath: [:])
         )
 
-        viewModel.selectGlobalRootOverride()
+        viewModel.chooseGlobalRootFolder()
 
-        guard case .invalidGlobalRoot(let path) = viewModel.issue else {
-            return XCTFail("Expected invalid global root issue")
+        guard case .unreadableGlobalRoot(let path) = viewModel.issue else {
+            return XCTFail("Expected unreadable global root issue")
         }
         XCTAssertEqual(path, "/tmp/not-claude-root")
-        XCTAssertEqual(viewModel.globalRootSource, .defaultHomeClaude)
+        XCTAssertEqual(viewModel.globalRootSource, GlobalClaudeRootSource.defaultHomeClaude)
+        XCTAssertFalse(viewModel.hasAuthorizedGlobalRoot)
+    }
+
+    @MainActor
+    func testRootSelectionViewModelAuthorizesRecommendedGlobalRoot() throws {
+        let recommendedRoot = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude", isDirectory: true)
+        let persistence = InMemoryBookmarkPersistence()
+        let dataCoder = MockBookmarkDataCoder(
+            dataByURL: [recommendedRoot.path: Data("root".utf8)],
+            resolvedByData: [:]
+        )
+        let access = MockSecurityScopeAccessManager()
+        let bookmarkStore = BookmarkStore(persistence: persistence, dataCoder: dataCoder, accessManager: access)
+        let stateStore = GlobalStateStore(persistence: InMemoryGlobalStatePersistence())
+        let registry = ProjectRegistry(bookmarkStore: bookmarkStore, globalStateStore: stateStore)
+        let selector = MockFolderSelector(nextURL: recommendedRoot)
+
+        let viewModel = RootSelectionViewModel(
+            bookmarkStore: bookmarkStore,
+            projectRegistry: registry,
+            folderSelector: selector,
+            accessChecker: MockAccessChecker(
+                statusesByPath: [RootLocator.normalizedIdentityPath(recommendedRoot.path): RootAccessStatus.accessible]
+            )
+        )
+
+        viewModel.authorizeRecommendedGlobalRoot()
+
+        XCTAssertTrue(viewModel.hasAuthorizedGlobalRoot)
+        XCTAssertEqual(viewModel.globalRootSource, GlobalClaudeRootSource.defaultHomeClaude)
+        XCTAssertNil(viewModel.issue)
     }
 }
 
@@ -268,6 +301,15 @@ private final class MockSecurityScopeAccessManager: SecurityScopedAccessing {
     }
 }
 
+private struct MockAccessChecker: RootDirectoryAccessChecking {
+    let statusesByPath: [String: RootAccessStatus]
+
+    func accessStatus(forDirectoryAt url: URL) -> RootAccessStatus {
+        let normalizedPath = RootLocator.normalizedIdentityPath(url.path)
+        return statusesByPath[normalizedPath] ?? .inaccessible
+    }
+}
+
 @MainActor
 private final class MockFolderSelector: FolderSelecting {
     var nextURL: URL?
@@ -280,7 +322,8 @@ private final class MockFolderSelector: FolderSelecting {
         title: String,
         message: String,
         prompt: String,
-        initialDirectory: URL?
+        initialDirectory: URL?,
+        showsHiddenFiles: Bool
     ) -> URL? {
         nextURL
     }

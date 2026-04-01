@@ -1,0 +1,11 @@
+{
+  "sandbox": {
+    "enabled": "yes",
+    "excludedCommands": "docker",
+    "filesystem": "not-an-object",
+    "network": {
+      "httpProxyPort": "bad",
+      "allowedDomains": 42
+    }
+  }
+}

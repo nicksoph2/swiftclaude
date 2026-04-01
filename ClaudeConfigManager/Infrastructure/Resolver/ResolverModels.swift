@@ -127,6 +127,9 @@ enum ResolutionIssueCode: String, Equatable, Sendable {
     case importDepthExceeded
     case parserSyntaxIssue
     case note
+    case hookPolicySuppressed
+    case mcpPolicySuppressed
+    case mcpDenyRuleMatch
 }
 
 struct ResolutionIssue: Equatable, Identifiable, Sendable {
@@ -218,7 +221,13 @@ struct ResolutionIssue: Equatable, Identifiable, Sendable {
             return .typeMismatch
         case .invalidJSON,
              .topLevelNotObject,
+             .ambiguousMcpTransport,
+             .missingMcpTransport,
+             .deprecatedMcpTransport,
+             .invalidMcpRestrictionRule,
+             .managedOnlySettingInNonManagedScope,
              .invalidHookShape,
+             .preservedUnknownHookEvent,
              .invalidPermissionsShape,
              .invalidEnvShape,
              .invalidAttributionShape,
@@ -226,12 +235,21 @@ struct ResolutionIssue: Equatable, Identifiable, Sendable {
              .invalidClaudeJsonMcpShape,
              .invalidTrustStateShape,
              .settingsFamilyKeyInClaudeJson,
+             .claudeJsonOnlyKeyInSettings,
              .preservedUnsupportedKey,
              .invalidFrontmatterFence,
              .invalidYAMLFrontmatter,
              .frontmatterTopLevelNotObject,
              .missingSkillMarkdown,
-             .invalidMarkdownReferenceToken:
+             .invalidMarkdownReferenceToken,
+             .preservedUnknownValue,
+             .unknownKey,
+             .deprecatedKey,
+             .invalidValue,
+             .invalidFieldType,
+             .invalidEnumValue,
+             .scopeRestrictionViolated,
+             .mutuallyExclusiveKeys:
             return .parserSyntaxIssue
         }
     }
@@ -632,20 +650,26 @@ struct SchemaValidationContext: Equatable, Sendable {
 }
 
 struct SemanticValidationContext: Equatable, Sendable {
+    let settings: ResolvedSettingsSnapshot?
     let instructions: ResolvedInstructionSnapshot?
+    let hooks: ResolvedHookSnapshot?
     let mcp: ResolvedMcpSnapshot?
     let agents: ResolvedAgentSnapshot?
     let skills: ResolvedSkillSnapshot?
     let existingIssues: [ValidationIssue]
 
     init(
+        settings: ResolvedSettingsSnapshot? = nil,
         instructions: ResolvedInstructionSnapshot? = nil,
+        hooks: ResolvedHookSnapshot? = nil,
         mcp: ResolvedMcpSnapshot? = nil,
         agents: ResolvedAgentSnapshot? = nil,
         skills: ResolvedSkillSnapshot? = nil,
         existingIssues: [ValidationIssue] = []
     ) {
+        self.settings = settings
         self.instructions = instructions
+        self.hooks = hooks
         self.mcp = mcp
         self.agents = agents
         self.skills = skills
@@ -684,9 +708,13 @@ struct SemanticValidator {
 
     private static let defaultRules: [SemanticRule] = [
         SemanticRule(key: "agents.duplicateIdentity", evaluate: validateAgentIdentityConflicts),
+        SemanticRule(key: "hooks.policySuppression", evaluate: validateHookPolicySemantics),
         SemanticRule(key: "instructions.importResolution", evaluate: validateInstructionImportSemantics),
+        SemanticRule(key: "mcp.blockedByPolicy", evaluate: validateMcpPolicyConsequences),
         SemanticRule(key: "mcp.crossScope", evaluate: validateMcpCrossScopeAssumptions),
         SemanticRule(key: "mcp.environmentReferences", evaluate: validateMcpEnvironmentReferences),
+        SemanticRule(key: "settings.crossKeyInteractions", evaluate: validateSettingsCrossKeySemantics),
+        SemanticRule(key: "settings.managedOnlyPrecedence", evaluate: validateManagedOnlySettingSemantics),
         SemanticRule(key: "skills.duplicateIdentity", evaluate: validateSkillIdentityConflicts)
     ]
 
@@ -896,6 +924,294 @@ struct SemanticValidator {
         return issues
     }
 
+    private static func validateHookPolicySemantics(_ context: SemanticValidationContext) -> [ValidationIssue] {
+        guard let hooks = context.hooks else { return [] }
+
+        var issues: [ValidationIssue] = []
+        for event in hooks.events {
+            guard let suppression = event.suppression else { continue }
+
+            let source = event.hooks.winningSource.map(ValidationSourceReference.init(resolutionSource:))
+            let relatedSources = [suppression.policySource, event.hooks.winningSource]
+                .compactMap { $0 }
+                .filter { $0.id != event.hooks.winningSource?.id }
+                .map(ValidationSourceReference.init(resolutionSource:))
+
+            switch suppression.reason {
+            case .disableAllHooks:
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("hooks.neutralizedByDisableAllHooks"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "Hook event '\(event.eventID)' is configured but will not run because 'disableAllHooks' is active.",
+                        source: source,
+                        keyPath: "hooks.\(event.eventID)",
+                        relatedSources: relatedSources
+                    )
+                )
+            case .allowManagedHooksOnly:
+                let hookScope = event.hooks.winningSource.map { $0.scope.rawValue } ?? "unknown"
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("hooks.lowerScopeSuppressedByManagedPolicy"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "Hook event '\(event.eventID)' from scope '\(hookScope)' will not run because 'allowManagedHooksOnly' only permits managed hooks.",
+                        source: source,
+                        keyPath: "hooks.\(event.eventID)",
+                        relatedSources: relatedSources
+                    )
+                )
+            }
+        }
+
+        return issues
+    }
+
+    private static func validateMcpPolicyConsequences(_ context: SemanticValidationContext) -> [ValidationIssue] {
+        guard let mcp = context.mcp else { return [] }
+
+        var issues: [ValidationIssue] = []
+        for entry in mcp.servers {
+            let source = entry.resolvedConfig.winningSource.map(ValidationSourceReference.init(resolutionSource:))
+            let isBlockedByManagedOnly = entry.policyEffects.contains(where: { $0.reason == .allowManagedMcpServersOnly }) &&
+                (entry.effectiveState == .blocked || entry.stateExplanation.localizedCaseInsensitiveContains("managed MCP servers are allowed"))
+            let isBlockedByDenyRule = entry.policyEffects.contains(where: { $0.reason == .deniedMcpServers }) &&
+                (entry.effectiveState == .blocked || entry.stateExplanation.localizedCaseInsensitiveContains("deniedMcpServers"))
+
+            if entry.effectiveState == .managed,
+               entry.resolvedConfig.trace.participants.contains(where: { $0.scope != .managed }) {
+                let relatedSources = entry.resolvedConfig.trace.participants
+                    .filter { $0.id != entry.resolvedConfig.winningSource?.id }
+                    .map(ValidationSourceReference.init(resolutionSource:))
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("mcp.managedConfigurationOverridesLowerScope"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "MCP server '\(entry.serverID)' is controlled by managed configuration, so lower-scope definitions for the same server will not take effect.",
+                        source: source,
+                        keyPath: entry.serverID,
+                        relatedSources: relatedSources
+                    )
+                )
+            }
+
+            for effect in entry.policyEffects {
+                let relatedSources = [effect.policySource, entry.resolvedConfig.winningSource]
+                    .compactMap { $0 }
+                    .filter { $0.id != entry.resolvedConfig.winningSource?.id }
+                    .map(ValidationSourceReference.init(resolutionSource:))
+
+                switch effect.reason {
+                case .allowManagedMcpServersOnly where isBlockedByManagedOnly:
+                    issues.append(
+                        ValidationIssue(
+                            code: .semantic("mcp.blockedByManagedOnlyPolicy"),
+                            severity: .warning,
+                            category: .semantic,
+                            message: "MCP server '\(entry.serverID)' is configured but blocked because only managed MCP servers are allowed.",
+                            source: source,
+                            keyPath: entry.serverID,
+                            relatedSources: relatedSources
+                        )
+                    )
+                case .deniedMcpServers where isBlockedByDenyRule:
+                    issues.append(
+                        ValidationIssue(
+                            code: .semantic("mcp.blockedByDenyRule"),
+                            severity: .warning,
+                            category: .semantic,
+                            message: "MCP server '\(entry.serverID)' is configured but blocked by a deny rule.",
+                            source: source,
+                            keyPath: entry.serverID,
+                            relatedSources: relatedSources
+                        )
+                    )
+                default:
+                    continue
+                }
+            }
+        }
+
+        return issues
+    }
+
+    private static func validateSettingsCrossKeySemantics(_ context: SemanticValidationContext) -> [ValidationIssue] {
+        guard let settings = context.settings else { return [] }
+
+        var issues: [ValidationIssue] = []
+
+        let permissionAllow = stringArrayValue(in: jsonValue(for: "permissions.allow", in: settings))
+            .isEmpty ? stringArrayValue(in: objectValue(for: "permissions", in: settings)?["allow"]) : stringArrayValue(in: jsonValue(for: "permissions.allow", in: settings))
+        let permissionDeny = stringArrayValue(in: jsonValue(for: "permissions.deny", in: settings))
+            .isEmpty ? stringArrayValue(in: objectValue(for: "permissions", in: settings)?["deny"]) : stringArrayValue(in: jsonValue(for: "permissions.deny", in: settings))
+        let permissionOverlap = Set(permissionAllow).intersection(permissionDeny).sorted()
+        if !permissionOverlap.isEmpty {
+            issues.append(
+                ValidationIssue(
+                    code: .semantic("settings.permissionsAllowDenyConflict"),
+                    severity: .warning,
+                    category: .semantic,
+                    message: "Resolved permissions both allow and deny: \(permissionOverlap.joined(separator: ", ")). Claude will still require a single effective policy, so these entries need review.",
+                    source: sourceForKeyPath("permissions", in: settings),
+                    keyPath: "permissions"
+                )
+            )
+        }
+
+        let allowedMcpFingerprints = restrictionRuleFingerprints(for: "allowedMcpServers", in: settings)
+        let deniedMcpFingerprints = restrictionRuleFingerprints(for: "deniedMcpServers", in: settings)
+        let overlappingMcpRules = allowedMcpFingerprints.intersection(deniedMcpFingerprints).sorted()
+        if !overlappingMcpRules.isEmpty {
+            issues.append(
+                ValidationIssue(
+                    code: .semantic("settings.mcpAllowDenyConflict"),
+                    severity: .warning,
+                    category: .semantic,
+                    message: "Resolved MCP policy contains rule(s) in both allow and deny lists: \(overlappingMcpRules.joined(separator: "; ")). Deny rules will still prevent those matches from being usable.",
+                    source: sourceForKeyPath("allowedMcpServers", in: settings) ?? sourceForKeyPath("deniedMcpServers", in: settings),
+                    keyPath: "allowedMcpServers"
+                )
+            )
+        }
+
+        if boolValue(for: "sandbox.enabled", in: settings) == false {
+            let ineffectiveKeys = configuredNestedKeys(
+                in: jsonValue(for: "sandbox", in: settings),
+                rootKey: "sandbox"
+            ).filter { $0 != "sandbox.enabled" }
+
+            if !ineffectiveKeys.isEmpty {
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("sandbox.disabledMakesSubsettingsIneffective"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "Sandbox is disabled, so these sandbox settings will not take effect: \(ineffectiveKeys.joined(separator: ", ")).",
+                        source: sourceForKeyPath("sandbox.enabled", in: settings),
+                        keyPath: "sandbox.enabled",
+                        relatedSources: ineffectiveKeys.compactMap { sourceForKeyPath($0, in: settings) }
+                    )
+                )
+            }
+        }
+
+        let filesystemPairs = [
+            ("sandbox.filesystem.allowWrite", "sandbox.filesystem.denyWrite", "write"),
+            ("sandbox.filesystem.allowRead", "sandbox.filesystem.denyRead", "read")
+        ]
+        for (allowKey, denyKey, accessLabel) in filesystemPairs {
+            let overlap = Set(stringArrayValue(for: allowKey, in: settings))
+                .intersection(stringArrayValue(for: denyKey, in: settings))
+                .sorted()
+            if !overlap.isEmpty {
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("sandbox.effectiveFilesystemConflict"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "Resolved sandbox \(accessLabel) policy both allows and denies: \(overlap.joined(separator: ", ")).",
+                        source: sourceForKeyPath(allowKey, in: settings) ?? sourceForKeyPath(denyKey, in: settings),
+                        keyPath: allowKey
+                    )
+                )
+            }
+        }
+
+        if boolValue(for: "sandbox.filesystem.allowManagedReadPathsOnly", in: settings) == true {
+            let lowerScopeSources = participantSources(for: "sandbox.filesystem.allowRead", in: settings)
+                .filter { $0.scope != .managed }
+            if !lowerScopeSources.isEmpty {
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("sandbox.managedReadPathsOnlySuppressesLowerScope"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "sandbox.filesystem.allowRead includes lower-scope paths, but 'sandbox.filesystem.allowManagedReadPathsOnly' means only managed read paths will take effect.",
+                        source: sourceForKeyPath("sandbox.filesystem.allowManagedReadPathsOnly", in: settings),
+                        keyPath: "sandbox.filesystem.allowManagedReadPathsOnly",
+                        relatedSources: lowerScopeSources.map(ValidationSourceReference.init(resolutionSource:))
+                    )
+                )
+            }
+        }
+
+        if boolValue(for: "sandbox.network.allowManagedDomainsOnly", in: settings) == true {
+            let lowerScopeSources = participantSources(for: "sandbox.network.allowedDomains", in: settings)
+                .filter { $0.scope != .managed }
+            if !lowerScopeSources.isEmpty {
+                issues.append(
+                    ValidationIssue(
+                        code: .semantic("sandbox.managedDomainsOnlySuppressesLowerScope"),
+                        severity: .warning,
+                        category: .semantic,
+                        message: "sandbox.network.allowedDomains includes lower-scope entries, but 'sandbox.network.allowManagedDomainsOnly' means only managed domains will take effect.",
+                        source: sourceForKeyPath("sandbox.network.allowManagedDomainsOnly", in: settings),
+                        keyPath: "sandbox.network.allowManagedDomainsOnly",
+                        relatedSources: lowerScopeSources.map(ValidationSourceReference.init(resolutionSource:))
+                    )
+                )
+            }
+        }
+
+        return issues
+    }
+
+    private static func validateManagedOnlySettingSemantics(_ context: SemanticValidationContext) -> [ValidationIssue] {
+        guard let settings = context.settings else { return [] }
+
+        let registry = SettingsKeyRegistry.shared
+        var issues: [ValidationIssue] = []
+
+        for entry in settings.entries {
+            guard let definition = registry.definition(for: entry.keyPath),
+                  definition.isManagedOnly,
+                  entry.value.winningSource?.scope == .managed else {
+                continue
+            }
+
+            let lowerScopeParticipants = entry.value.trace.participants.filter { $0.scope != .managed }
+            guard !lowerScopeParticipants.isEmpty else { continue }
+
+            let code: ValidationCode
+            let message: String
+
+            switch definition.category {
+            case .pluginsMarketplaces:
+                code = .semantic("plugins.managedPolicyMasksLowerScope")
+                message = "Managed plugin marketplace policy for '\(entry.keyPath)' is active, so lower-scope marketplace settings will not take effect."
+            case .mcpControls:
+                code = .semantic("mcp.managedPolicyMasksLowerScopeSetting")
+                message = "Managed MCP policy for '\(entry.keyPath)' is active, so lower-scope MCP policy settings will not take effect."
+            case .hooksHookPolicy:
+                code = .semantic("hooks.managedPolicyMasksLowerScopeSetting")
+                message = "Managed hook policy for '\(entry.keyPath)' is active, so lower-scope hook policy settings will not take effect."
+            case .sandbox:
+                code = .semantic("sandbox.managedPolicyMasksLowerScopeSetting")
+                message = "Managed sandbox policy for '\(entry.keyPath)' is active, so lower-scope sandbox settings will not take effect."
+            default:
+                code = .semantic("settings.managedPolicyMasksLowerScope")
+                message = "Managed policy for '\(entry.keyPath)' is active, so lower-scope settings will not take effect."
+            }
+
+            issues.append(
+                ValidationIssue(
+                    code: code,
+                    severity: .warning,
+                    category: .semantic,
+                    message: message,
+                    source: entry.value.winningSource.map(ValidationSourceReference.init(resolutionSource:)),
+                    keyPath: entry.keyPath,
+                    relatedSources: lowerScopeParticipants.map(ValidationSourceReference.init(resolutionSource:))
+                )
+            )
+        }
+
+        return issues
+    }
+
     private static func collectResolutionIssues(
         rootIssues: [ResolutionIssue],
         nestedIssues: [ResolutionIssue]
@@ -904,6 +1220,175 @@ struct SemanticValidator {
         return (rootIssues + nestedIssues)
             .sorted { $0.id < $1.id }
             .filter { seen.insert($0.id).inserted }
+    }
+
+    private static func sourceForKeyPath(
+        _ keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> ValidationSourceReference? {
+        settingsEntry(for: keyPath, in: settings)?
+            .value
+            .winningSource
+            .map(ValidationSourceReference.init(resolutionSource:))
+    }
+
+    private static func participantSources(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> [ResolutionSource] {
+        settingsEntry(for: keyPath, in: settings)?
+            .value
+            .trace
+            .participants ?? []
+    }
+
+    private static func valueExists(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> Bool {
+        jsonValue(for: keyPath, in: settings) != nil
+    }
+
+    private static func boolValue(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> Bool? {
+        jsonValue(for: keyPath, in: settings)?
+            .boolValue
+    }
+
+    private static func stringArrayValue(in value: JSONValue?) -> [String] {
+        value?.stringArrayValue ?? []
+    }
+
+    private static func stringArrayValue(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> [String] {
+        jsonValue(for: keyPath, in: settings)?
+            .stringArrayValue ?? []
+    }
+
+    private static func restrictionRuleFingerprints(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> Set<String> {
+        guard let value = jsonValue(for: keyPath, in: settings),
+            case let .array(items) = value else {
+            return []
+        }
+
+        return Set(items.map(canonicalRuleFingerprint))
+    }
+
+    private static func objectValue(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> [String: JSONValue]? {
+        guard let value = jsonValue(for: keyPath, in: settings),
+              case let .object(object) = value else {
+            return nil
+        }
+        return object
+    }
+
+    private static func canonicalRuleFingerprint(_ value: JSONValue) -> String {
+        switch value {
+        case let .object(object):
+            let normalizedPairs = object.keys.sorted().map { key in
+                let rawValue = object[key] ?? .null
+                switch rawValue {
+                case let .string(stringValue):
+                    return "\(key)=\(stringValue)"
+                case let .array(values):
+                    let parts = values.compactMap { element -> String? in
+                        if case let .string(stringValue) = element { return stringValue }
+                        return nil
+                    }
+                    return "\(key)=[\(parts.joined(separator: ","))]"
+                default:
+                    return "\(key)=\(rawValue)"
+                }
+            }
+            return normalizedPairs.joined(separator: "|")
+        default:
+            return "\(value)"
+        }
+    }
+
+    private static func settingsEntry(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> ResolvedSettingsEntry? {
+        if let exact = settings.entries.first(where: { $0.keyPath == keyPath }) {
+            return exact
+        }
+
+        let components = keyPath.split(separator: ".").map(String.init)
+        guard components.count > 1 else { return nil }
+
+        for index in stride(from: components.count - 1, through: 1, by: -1) {
+            let parentKey = components.prefix(index).joined(separator: ".")
+            if let parentEntry = settings.entries.first(where: { $0.keyPath == parentKey }) {
+                return parentEntry
+            }
+        }
+
+        return nil
+    }
+
+    private static func jsonValue(
+        for keyPath: String,
+        in settings: ResolvedSettingsSnapshot
+    ) -> JSONValue? {
+        if let exact = settings.entries.first(where: { $0.keyPath == keyPath })?.value.effectiveValue {
+            return exact
+        }
+
+        let components = keyPath.split(separator: ".").map(String.init)
+        guard components.count > 1 else { return nil }
+
+        for index in stride(from: components.count - 1, through: 1, by: -1) {
+            let parentKey = components.prefix(index).joined(separator: ".")
+            guard let parentValue = settings.entries.first(where: { $0.keyPath == parentKey })?.value.effectiveValue else {
+                continue
+            }
+
+            var cursor = parentValue
+            var found = true
+            for childKey in components.dropFirst(index) {
+                guard case let .object(object) = cursor,
+                      let childValue = object[childKey] else {
+                    found = false
+                    break
+                }
+                cursor = childValue
+            }
+
+            if found {
+                return cursor
+            }
+        }
+
+        return nil
+    }
+
+    private static func configuredNestedKeys(
+        in value: JSONValue?,
+        rootKey: String
+    ) -> [String] {
+        guard let value else { return [] }
+
+        switch value {
+        case .null:
+            return []
+        case let .object(object):
+            return object.keys.sorted().flatMap { key in
+                configuredNestedKeys(in: object[key], rootKey: "\(rootKey).\(key)")
+            }
+        default:
+            return [rootKey]
+        }
     }
 
     private static func semanticIssues(
@@ -924,40 +1409,69 @@ struct SemanticValidator {
 }
 
 struct SchemaValidator {
-    func validate(settings document: ParsedSettingsDocument) -> ValidationResult {
+
+    // MARK: - Known enum values (forward-compatible: unknown values produce info, not error)
+
+    private static let knownEffortLevels: Set<String> = ["low", "medium", "high"]
+    private static let knownPermissionDefaultModes: Set<String> = [
+        "default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions", "delegate"
+    ]
+    private static let knownHookHandlerTypes: Set<String> = ["command", "http", "prompt", "agent"]
+    private static let knownHookShells: Set<String> = ["bash", "powershell"]
+
+    // MARK: - Number range constants
+
+    private static let portRange = 1...65535
+    private static let maxHookTimeout = 3600
+
+    // MARK: - Settings validation
+
+    func validate(
+        settings document: ParsedSettingsDocument,
+        schemaFetcherService: SchemaFetcherService? = nil
+    ) -> ValidationResult {
         let context = SchemaValidationContext(
             family: "settings",
             source: ValidationSourceReference(sourcePath: document.source.displayPath)
         )
         var issues: [ValidationIssue] = []
+        let effectiveRegistry = schemaFetcherService?.currentMergedRegistry ?? SchemaFetcher.builtInRegistry
 
-        if document.value.autoMode == true, document.value.disableAutoMode == true {
-            issues.append(
-                makeIssue(
-                    code: .schema("settings.autoModeConflict"),
-                    severity: .error,
-                    message: "'autoMode' and 'disableAutoMode' cannot both be true.",
-                    context: context,
-                    keyPath: "autoMode"
-                )
-            )
+        if schemaFetcherService != nil {
+            issues.append(contentsOf: validateUnsupportedTopLevelKeys(document, registry: effectiveRegistry, context: context))
         }
 
-        if let topLevelValue = document.value.includeCoAuthoredBy,
-           let attributionValue = document.value.attribution?.includeCoAuthoredBy,
-           topLevelValue != attributionValue {
+        // --- Enum value checks ---
+
+        if let effortLevel = document.value.effortLevel?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !effortLevel.isEmpty,
+           !Self.knownEffortLevels.contains(effortLevel) {
             issues.append(
                 makeIssue(
-                    code: .schema("settings.attributionConflict"),
-                    severity: .warning,
-                    message: "Top-level includeCoAuthoredBy conflicts with attribution.includeCoAuthoredBy.",
+                    code: .schema("settings.unknownEnumValue"),
+                    severity: .info,
+                    message: "effortLevel '\(effortLevel)' is not a recognized value; known values: \(Self.knownEffortLevels.sorted().joined(separator: ", ")).",
                     context: context,
-                    keyPath: "attribution.includeCoAuthoredBy"
+                    keyPath: "effortLevel"
                 )
             )
         }
 
         if let permissions = document.value.permissions {
+            if let mode = permissions.defaultMode?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !mode.isEmpty,
+               !Self.knownPermissionDefaultModes.contains(mode) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.unknownEnumValue"),
+                        severity: .info,
+                        message: "permissions.defaultMode '\(mode)' is not a recognized value; known values: \(Self.knownPermissionDefaultModes.sorted().joined(separator: ", ")).",
+                        context: context,
+                        keyPath: "permissions.defaultMode"
+                    )
+                )
+            }
+
             if permissions.mode != nil, permissions.allow != nil || permissions.deny != nil {
                 issues.append(
                     makeIssue(
@@ -986,10 +1500,182 @@ struct SchemaValidator {
             }
         }
 
+        // --- Number range checks ---
+
+        if let feedbackRate = document.value.feedbackSurveyRate {
+            if feedbackRate < 0.0 || feedbackRate > 1.0 {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.numberOutOfRange"),
+                        severity: .error,
+                        message: "feedbackSurveyRate must be between 0.0 and 1.0, got \(feedbackRate).",
+                        context: context,
+                        keyPath: "feedbackSurveyRate"
+                    )
+                )
+            }
+        }
+
+        if let cleanupDays = document.value.cleanupPeriodDays {
+            if cleanupDays < 0 {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.numberOutOfRange"),
+                        severity: .error,
+                        message: "cleanupPeriodDays must be non-negative, got \(cleanupDays).",
+                        context: context,
+                        keyPath: "cleanupPeriodDays"
+                    )
+                )
+            }
+        }
+
+        // --- Auto mode conflict ---
+
+        if document.value.autoMode == true, document.value.disableAutoMode == true {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.autoModeConflict"),
+                    severity: .error,
+                    message: "'autoMode' and 'disableAutoMode' cannot both be true.",
+                    context: context,
+                    keyPath: "autoMode"
+                )
+            )
+        }
+
+        // --- Sandbox nested families ---
+
+        if let sandbox = document.value.sandbox {
+            if let network = sandbox.network {
+                if let httpPort = network.httpProxyPort, !Self.portRange.contains(httpPort) {
+                    issues.append(
+                        makeIssue(
+                            code: .schema("settings.numberOutOfRange"),
+                            severity: .error,
+                            message: "sandbox.network.httpProxyPort must be between 1 and 65535, got \(httpPort).",
+                            context: context,
+                            keyPath: "sandbox.network.httpProxyPort"
+                        )
+                    )
+                }
+
+                if let socksPort = network.socksProxyPort, !Self.portRange.contains(socksPort) {
+                    issues.append(
+                        makeIssue(
+                            code: .schema("settings.numberOutOfRange"),
+                            severity: .error,
+                            message: "sandbox.network.socksProxyPort must be between 1 and 65535, got \(socksPort).",
+                            context: context,
+                            keyPath: "sandbox.network.socksProxyPort"
+                        )
+                    )
+                }
+            }
+
+            if let filesystem = sandbox.filesystem {
+                let writeAllow = Set(filesystem.allowWrite ?? [])
+                let writeDeny = Set(filesystem.denyWrite ?? [])
+                let writeOverlap = writeAllow.intersection(writeDeny).sorted()
+                if !writeOverlap.isEmpty {
+                    issues.append(
+                        makeIssue(
+                            code: .schema("settings.sandboxFilesystemOverlap"),
+                            severity: .warning,
+                            message: "sandbox.filesystem.allowWrite and denyWrite overlap: \(writeOverlap.joined(separator: ", ")).",
+                            context: context,
+                            keyPath: "sandbox.filesystem"
+                        )
+                    )
+                }
+
+                let readAllow = Set(filesystem.allowRead ?? [])
+                let readDeny = Set(filesystem.denyRead ?? [])
+                let readOverlap = readAllow.intersection(readDeny).sorted()
+                if !readOverlap.isEmpty {
+                    issues.append(
+                        makeIssue(
+                            code: .schema("settings.sandboxFilesystemOverlap"),
+                            severity: .warning,
+                            message: "sandbox.filesystem.allowRead and denyRead overlap: \(readOverlap.joined(separator: ", ")).",
+                            context: context,
+                            keyPath: "sandbox.filesystem"
+                        )
+                    )
+                }
+            }
+        }
+
+        // --- MCP restriction rule shape checks ---
+
+        if let allowedRules = document.value.allowedMcpServers {
+            for (index, rule) in allowedRules.enumerated() {
+                issues.append(
+                    contentsOf: validateMcpRestrictionRuleShape(
+                        rule,
+                        keyPath: "allowedMcpServers[\(index)]",
+                        context: context
+                    )
+                )
+            }
+        }
+
+        if let deniedRules = document.value.deniedMcpServers {
+            for (index, rule) in deniedRules.enumerated() {
+                issues.append(
+                    contentsOf: validateMcpRestrictionRuleShape(
+                        rule,
+                        keyPath: "deniedMcpServers[\(index)]",
+                        context: context
+                    )
+                )
+            }
+        }
+
+        // --- Plugin marketplace source shape checks ---
+
+        if let strictMarketplaces = document.value.strictKnownMarketplaces {
+            for (index, marketplace) in strictMarketplaces.enumerated() {
+                issues.append(
+                    contentsOf: validateMarketplaceShape(
+                        marketplace,
+                        keyPath: "strictKnownMarketplaces[\(index)]",
+                        context: context
+                    )
+                )
+            }
+        }
+
+        if let blockedMarketplaces = document.value.blockedMarketplaces {
+            for (index, marketplace) in blockedMarketplaces.enumerated() {
+                issues.append(
+                    contentsOf: validateMarketplaceShape(
+                        marketplace,
+                        keyPath: "blockedMarketplaces[\(index)]",
+                        context: context
+                    )
+                )
+            }
+        }
+
+        if let extraMarketplaces = document.value.extraKnownMarketplaces {
+            for key in extraMarketplaces.keys.sorted() {
+                guard let marketplace = extraMarketplaces[key] else { continue }
+                issues.append(
+                    contentsOf: validateMarketplaceShape(
+                        marketplace,
+                        keyPath: "extraKnownMarketplaces.\(key)",
+                        context: context
+                    )
+                )
+            }
+        }
+
+        // --- Hook validation (expanded) ---
+
         if let hooks = document.value.hooks {
-            for eventName in hooks.events.keys.sorted() {
-                guard let event = hooks.events[eventName] else { continue }
-                let eventPath = "hooks.\(eventName)"
+            for event in hooks.events.values.sorted(by: { $0.eventName < $1.eventName }) {
+                let eventPath = "hooks.\(event.eventName)"
 
                 if event.actions.isEmpty {
                     issues.append(
@@ -1007,20 +1693,24 @@ struct SchemaValidator {
                     let actionPath = "\(eventPath).actions[\(index)]"
                     let hasCommand = isNonEmpty(action.command)
                     let hasURL = isNonEmpty(action.url)
+                    let hasTemplate = isNonEmpty(action.template)
+                    let hasAgentId = isNonEmpty(action.agentId)
 
-                    if hasCommand == hasURL {
-                        issues.append(
-                            makeIssue(
-                                code: .schema("settings.hookActionTransportShape"),
-                                severity: .error,
-                                message: "Hook action must define exactly one of command or url.",
-                                context: context,
-                                keyPath: actionPath
-                            )
-                        )
-                    }
-
+                    // Transport shape: command-based or url-based handlers
                     if let type = action.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !type.isEmpty {
+                        // Enum value check for handler type
+                        if !Self.knownHookHandlerTypes.contains(type) {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.unknownEnumValue"),
+                                    severity: .info,
+                                    message: "Hook action type '\(type)' is not a recognized handler type; known types: \(Self.knownHookHandlerTypes.sorted().joined(separator: ", ")).",
+                                    context: context,
+                                    keyPath: "\(actionPath).type"
+                                )
+                            )
+                        }
+
                         if type == "command", !hasCommand {
                             issues.append(
                                 makeIssue(
@@ -1041,25 +1731,352 @@ struct SchemaValidator {
                                     keyPath: "\(actionPath).type"
                                 )
                             )
+                        } else if type == "prompt", !hasTemplate {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.hookActionTypeMismatch"),
+                                    severity: .error,
+                                    message: "Hook action type 'prompt' requires a template value.",
+                                    context: context,
+                                    keyPath: "\(actionPath).type"
+                                )
+                            )
+                        } else if type == "agent", !hasAgentId {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.hookActionTypeMismatch"),
+                                    severity: .error,
+                                    message: "Hook action type 'agent' requires an agent_id value.",
+                                    context: context,
+                                    keyPath: "\(actionPath).type"
+                                )
+                            )
+                        }
+                    } else {
+                        // No explicit type: infer from fields. Must have exactly one transport indicator.
+                        if !hasCommand, !hasURL, !hasTemplate, !hasAgentId {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.hookActionTransportShape"),
+                                    severity: .error,
+                                    message: "Hook action must define at least one of command, url, template, or agent_id.",
+                                    context: context,
+                                    keyPath: actionPath
+                                )
+                            )
                         }
                     }
 
-                    if let timeoutMs = action.timeoutMs, timeoutMs < 0 {
+                    // Shell enum check
+                    if let shell = action.shell?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                       !shell.isEmpty,
+                       !Self.knownHookShells.contains(shell) {
                         issues.append(
                             makeIssue(
-                                code: .schema("settings.hookActionNegativeTimeout"),
-                                severity: .error,
-                                message: "Hook action timeoutMs must be non-negative.",
+                                code: .schema("settings.unknownEnumValue"),
+                                severity: .info,
+                                message: "Hook action shell '\(shell)' is not a recognized value; known values: \(Self.knownHookShells.sorted().joined(separator: ", ")).",
                                 context: context,
-                                keyPath: "\(actionPath).timeoutMs"
+                                keyPath: "\(actionPath).shell"
                             )
                         )
+                    }
+
+                    // Timeout range check
+                    if let timeout = action.timeout {
+                        if timeout < 0 {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.hookActionNegativeTimeout"),
+                                    severity: .error,
+                                    message: "Hook action timeout must be non-negative.",
+                                    context: context,
+                                    keyPath: "\(actionPath).timeout"
+                                )
+                            )
+                        } else if timeout > Self.maxHookTimeout {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.numberOutOfRange"),
+                                    severity: .warning,
+                                    message: "Hook action timeout \(timeout) exceeds recommended maximum of \(Self.maxHookTimeout) seconds.",
+                                    context: context,
+                                    keyPath: "\(actionPath).timeout"
+                                )
+                            )
+                        }
+                    }
+
+                    // Property compatibility: shell/async only valid for command type
+                    if action.shell != nil || action.isAsync != nil {
+                        let effectiveType = action.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+                        let isCommandType = effectiveType == "command" || (effectiveType.isEmpty && hasCommand && !hasURL && !hasTemplate && !hasAgentId)
+                        if !isCommandType {
+                            if action.shell != nil {
+                                issues.append(
+                                    makeIssue(
+                                        code: .schema("settings.hookPropertyIncompatible"),
+                                        severity: .warning,
+                                        message: "Hook action property 'shell' is only applicable to command-type handlers.",
+                                        context: context,
+                                        keyPath: "\(actionPath).shell"
+                                    )
+                                )
+                            }
+                            if action.isAsync != nil {
+                                issues.append(
+                                    makeIssue(
+                                        code: .schema("settings.hookPropertyIncompatible"),
+                                        severity: .warning,
+                                        message: "Hook action property 'async' is only applicable to command-type handlers.",
+                                        context: context,
+                                        keyPath: "\(actionPath).async"
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Property compatibility: headers/allowedEnvVars only valid for http type
+                    if action.headers != nil || action.allowedEnvVars != nil {
+                        let effectiveType = action.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+                        let isHTTPType = effectiveType == "http" || (effectiveType.isEmpty && hasURL && !hasCommand && !hasTemplate && !hasAgentId)
+                        if !isHTTPType {
+                            if action.headers != nil {
+                                issues.append(
+                                    makeIssue(
+                                        code: .schema("settings.hookPropertyIncompatible"),
+                                        severity: .warning,
+                                        message: "Hook action property 'headers' is only applicable to http-type handlers.",
+                                        context: context,
+                                        keyPath: "\(actionPath).headers"
+                                    )
+                                )
+                            }
+                            if action.allowedEnvVars != nil {
+                                issues.append(
+                                    makeIssue(
+                                        code: .schema("settings.hookPropertyIncompatible"),
+                                        severity: .warning,
+                                        message: "Hook action property 'allowedEnvVars' is only applicable to http-type handlers.",
+                                        context: context,
+                                        keyPath: "\(actionPath).allowedEnvVars"
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Property compatibility: model only valid for prompt/agent type
+                    if action.model != nil {
+                        let effectiveType = action.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+                        let isPromptOrAgentType = effectiveType == "prompt" || effectiveType == "agent" ||
+                            (effectiveType.isEmpty && (hasTemplate || hasAgentId) && !hasCommand && !hasURL)
+                        if !isPromptOrAgentType {
+                            issues.append(
+                                makeIssue(
+                                    code: .schema("settings.hookPropertyIncompatible"),
+                                    severity: .warning,
+                                    message: "Hook action property 'model' is only applicable to prompt or agent-type handlers.",
+                                    context: context,
+                                    keyPath: "\(actionPath).model"
+                                )
+                            )
+                        }
                     }
                 }
             }
         }
 
         return ValidationResult(issues: issues)
+    }
+
+    private func validateUnsupportedTopLevelKeys(
+        _ document: ParsedSettingsDocument,
+        registry: [String: SchemaRule],
+        context: SchemaValidationContext
+    ) -> [ValidationIssue] {
+        document.unsupportedTopLevelKeys.keys.sorted().map { key in
+            if registry[key] != nil {
+                return makeIssue(
+                    code: .schema("settings.schemaKnownRemoteKey"),
+                    severity: .info,
+                    message: "Key '\(key)' is recognized by the fetched schema but not yet modeled locally.",
+                    context: context,
+                    keyPath: key
+                )
+            }
+
+            return makeIssue(
+                code: .schema("settings.unknownKey"),
+                severity: .warning,
+                message: "Key '\(key)' is not recognized by either the built-in or fetched schema registry.",
+                context: context,
+                keyPath: key
+            )
+        }
+    }
+
+    // MARK: - MCP restriction rule shape validation
+
+    private func validateMcpRestrictionRuleShape(
+        _ rule: McpRestrictionRule,
+        keyPath: String,
+        context: SchemaValidationContext
+    ) -> [ValidationIssue] {
+        var issues: [ValidationIssue] = []
+        let discriminatorCount = [rule.serverName != nil, rule.serverCommand != nil, rule.serverUrl != nil]
+            .filter { $0 }.count
+
+        if discriminatorCount == 0 {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.mcpRestrictionRuleMissingDiscriminator"),
+                    severity: .error,
+                    message: "MCP restriction rule must define exactly one of serverName, serverCommand, or serverUrl.",
+                    context: context,
+                    keyPath: keyPath
+                )
+            )
+        } else if discriminatorCount > 1 {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.mcpRestrictionRuleAmbiguous"),
+                    severity: .error,
+                    message: "MCP restriction rule must define exactly one of serverName, serverCommand, or serverUrl; found \(discriminatorCount).",
+                    context: context,
+                    keyPath: keyPath
+                )
+            )
+        }
+
+        if let serverCommand = rule.serverCommand, serverCommand.isEmpty {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.mcpRestrictionRuleEmptyCommand"),
+                    severity: .error,
+                    message: "MCP restriction rule serverCommand must not be empty.",
+                    context: context,
+                    keyPath: "\(keyPath).serverCommand"
+                )
+            )
+        }
+
+        return issues
+    }
+
+    // MARK: - Plugin marketplace source shape validation
+
+    private func validateMarketplaceShape(
+        _ marketplace: ParsedPluginMarketplace,
+        keyPath: String,
+        context: SchemaValidationContext
+    ) -> [ValidationIssue] {
+        var issues: [ValidationIssue] = []
+
+        guard let source = marketplace.source else {
+            issues.append(
+                makeIssue(
+                    code: .schema("settings.marketplaceMissingSource"),
+                    severity: .error,
+                    message: "Plugin marketplace entry must include a source definition.",
+                    context: context,
+                    keyPath: keyPath
+                )
+            )
+            return issues
+        }
+
+        switch source {
+        case .github(let src):
+            if !isNonEmpty(src.repo) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "GitHub marketplace source requires a non-empty 'repo' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.repo"
+                    )
+                )
+            }
+        case .git(let src):
+            if !isNonEmpty(src.url) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "Git marketplace source requires a non-empty 'url' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.url"
+                    )
+                )
+            }
+        case .url(let src):
+            if !isNonEmpty(src.url) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "URL marketplace source requires a non-empty 'url' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.url"
+                    )
+                )
+            }
+        case .npm(let src):
+            if !isNonEmpty(src.package) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "NPM marketplace source requires a non-empty 'package' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.package"
+                    )
+                )
+            }
+        case .file(let src):
+            if !isNonEmpty(src.path) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "File marketplace source requires a non-empty 'path' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.path"
+                    )
+                )
+            }
+        case .directory(let src):
+            if !isNonEmpty(src.path) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "Directory marketplace source requires a non-empty 'path' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.path"
+                    )
+                )
+            }
+        case .hostPattern(let src):
+            if !isNonEmpty(src.pattern) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("settings.marketplaceSourceMissingField"),
+                        severity: .error,
+                        message: "HostPattern marketplace source requires a non-empty 'pattern' field.",
+                        context: context,
+                        keyPath: "\(keyPath).source.pattern"
+                    )
+                )
+            }
+        case .inline, .unknown:
+            break
+        }
+
+        return issues
     }
 
     func validate(claudeJson document: ParsedClaudeJsonDocument) -> ValidationResult {
@@ -1470,22 +2487,56 @@ struct SchemaValidator {
         context: SchemaValidationContext
     ) -> [ValidationIssue] {
         var issues: [ValidationIssue] = []
-        let hasCommand = isNonEmpty(server.command)
-        let hasURL = isNonEmpty(server.url)
-
-        if hasCommand == hasURL {
+        switch server.transportType {
+        case .stdio:
+            if !isNonEmpty(server.command) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("mcp.serverTransportShape"),
+                        severity: .error,
+                        message: "MCP stdio server requires command to be set.",
+                        context: context,
+                        keyPath: keyPath
+                    )
+                )
+            }
+        case .http, .sse:
+            if !isNonEmpty(server.url) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("mcp.serverTransportShape"),
+                        severity: .error,
+                        message: "MCP URL-based server requires url to be set.",
+                        context: context,
+                        keyPath: keyPath
+                    )
+                )
+            }
+        case .plugin:
+            if !isNonEmpty(server.pluginId) {
+                issues.append(
+                    makeIssue(
+                        code: .schema("mcp.serverTransportShape"),
+                        severity: .error,
+                        message: "Plugin-provided MCP server requires pluginId to be set.",
+                        context: context,
+                        keyPath: keyPath
+                    )
+                )
+            }
+        case .unknown:
             issues.append(
                 makeIssue(
                     code: .schema("mcp.serverTransportShape"),
                     severity: .error,
-                    message: "MCP server must define exactly one of command or url.",
+                    message: "MCP server must define a supported transport.",
                     context: context,
                     keyPath: keyPath
                 )
             )
         }
 
-        if server.args != nil, !hasCommand {
+        if server.args != nil, server.transportType == .unknown {
             issues.append(
                 makeIssue(
                     code: .schema("mcp.argsWithoutCommand"),
@@ -1497,7 +2548,7 @@ struct SchemaValidator {
             )
         }
 
-        if server.headers != nil, !hasURL {
+        if server.headers != nil, server.transportType == .unknown {
             issues.append(
                 makeIssue(
                     code: .schema("mcp.headersWithoutUrl"),
@@ -1721,17 +2772,20 @@ enum SettingsSourceTier: Int, Comparable, CaseIterable, Sendable {
 
 struct SettingsSourceCandidate: Equatable, Sendable {
     let tier: SettingsSourceTier
+    let precedenceRank: Int
     let source: ResolutionSource
     let document: ParsedSettingsDocument?
     let issues: [ResolutionIssue]
 
     init(
         tier: SettingsSourceTier,
+        precedenceRank: Int = 0,
         source: ResolutionSource,
         document: ParsedSettingsDocument?,
         issues: [ResolutionIssue] = []
     ) {
         self.tier = tier
+        self.precedenceRank = precedenceRank
         self.source = source
         self.document = document
         self.issues = issues.sorted { $0.id < $1.id }
@@ -1776,7 +2830,250 @@ struct ResolvedSettingsSourceSelection: Equatable, Sendable {
     }
 }
 
+enum ManagedSettingsTierKind: String, Equatable, Sendable {
+    case serverManaged
+    case mdmPolicy
+    case fileBased
+
+    var displayName: String {
+        switch self {
+        case .serverManaged:
+            return "Server-managed settings"
+        case .mdmPolicy:
+            return "MDM / OS policy"
+        case .fileBased:
+            return "File-based managed settings"
+        }
+    }
+}
+
+struct ManagedSettingsActiveTier: Equatable, Sendable {
+    let kind: ManagedSettingsTierKind
+    let sources: [ResolutionSource]
+    let notes: [String]
+
+    init(
+        kind: ManagedSettingsTierKind,
+        sources: [ResolutionSource],
+        notes: [String] = []
+    ) {
+        self.kind = kind
+        self.sources = ResolutionTrace(participants: sources).participants
+        self.notes = notes
+    }
+}
+
+struct ManagedSettingsResolution: Equatable, Sendable {
+    let activeTier: ManagedSettingsActiveTier?
+    let settingsCandidates: [SettingsSourceCandidate]
+    let managedMcpDocuments: [McpDocumentCandidate]
+    let issues: [ResolutionIssue]
+    let notes: [String]
+
+    init(
+        activeTier: ManagedSettingsActiveTier?,
+        settingsCandidates: [SettingsSourceCandidate],
+        managedMcpDocuments: [McpDocumentCandidate],
+        issues: [ResolutionIssue] = [],
+        notes: [String] = []
+    ) {
+        self.activeTier = activeTier
+        self.settingsCandidates = settingsCandidates
+        self.managedMcpDocuments = managedMcpDocuments
+        self.issues = issues.sorted { $0.id < $1.id }
+        self.notes = notes
+    }
+}
+
+struct ManagedScopeStatusModel: Equatable, Sendable {
+    let title: String
+    let detail: String
+    let activeTierLabel: String
+    let sourceSummaries: [String]
+    /// Describes whether the managed root path could be read, is genuinely absent, or was
+    /// blocked by sandbox policy. Views use this to show an explicit fallback banner rather than
+    /// silently treating inaccessible managed paths as "no policy".
+    let accessOutcome: ManagedAccessOutcome
+
+    /// Convenience initialiser for backward-compatible call sites that do not yet supply an
+    /// access outcome. Defaults to `.missing` (no managed config deployed).
+    init(resolution: ManagedSettingsResolution?) {
+        self.init(resolution: resolution, accessOutcome: .missing)
+    }
+
+    /// Designated initialiser. `accessOutcome` describes how the managed path probe went
+    /// regardless of whether any resolution was produced.
+    init(resolution: ManagedSettingsResolution?, accessOutcome: ManagedAccessOutcome) {
+        self.accessOutcome = accessOutcome
+
+        if let activeTier = resolution?.activeTier {
+            self.title = "Active managed tier"
+            self.detail = activeTier.kind.displayName
+            self.activeTierLabel = activeTier.kind.rawValue
+            self.sourceSummaries = activeTier.sources.map {
+                $0.displayName ?? $0.sourcePath ?? $0.identifier
+            }
+        } else {
+            self.title = "No managed tier active"
+            self.detail = "No server-managed settings, MDM policy, or file-based managed settings are currently active."
+            self.activeTierLabel = "none"
+            self.sourceSummaries = []
+        }
+    }
+}
+
+struct ManagedSettingsResolver {
+    struct Input: Equatable, Sendable {
+        let serverManagedSettings: SettingsSourceCandidate?
+        let mdmManagedSettings: SettingsSourceCandidate?
+        let fileBasedSettings: [SettingsSourceCandidate]
+        let fileBasedManagedMcp: McpDocumentCandidate?
+
+        init(
+            serverManagedSettings: SettingsSourceCandidate? = nil,
+            mdmManagedSettings: SettingsSourceCandidate? = nil,
+            fileBasedSettings: [SettingsSourceCandidate] = [],
+            fileBasedManagedMcp: McpDocumentCandidate? = nil
+        ) {
+            self.serverManagedSettings = serverManagedSettings
+            self.mdmManagedSettings = mdmManagedSettings
+            self.fileBasedSettings = fileBasedSettings
+            self.fileBasedManagedMcp = fileBasedManagedMcp
+        }
+    }
+
+    func resolve(input: Input) -> ManagedSettingsResolution {
+        if let serverManaged = input.serverManagedSettings, isManagedTierPresent(serverManaged) {
+            return ManagedSettingsResolution(
+                activeTier: ManagedSettingsActiveTier(
+                    kind: .serverManaged,
+                    sources: [serverManaged.source],
+                    notes: ["Server-managed settings are active and suppress lower managed tiers."]
+                ),
+                settingsCandidates: [serverManaged],
+                managedMcpDocuments: [],
+                issues: serverManaged.issues,
+                notes: [
+                    "Server-managed settings are active.",
+                    "MDM / OS policy and file-based managed settings were suppressed."
+                ]
+            )
+        }
+
+        if let mdmManaged = input.mdmManagedSettings, isManagedTierPresent(mdmManaged) {
+            return ManagedSettingsResolution(
+                activeTier: ManagedSettingsActiveTier(
+                    kind: .mdmPolicy,
+                    sources: [mdmManaged.source],
+                    notes: ["MDM / OS policy is active and suppresses file-based managed settings."]
+                ),
+                settingsCandidates: [mdmManaged],
+                managedMcpDocuments: [],
+                issues: mdmManaged.issues,
+                notes: [
+                    "MDM / OS policy is active.",
+                    "File-based managed settings were suppressed because a higher managed tier is active."
+                ]
+            )
+        }
+
+        let fileBasedCandidates = activeFileBasedCandidates(from: input.fileBasedSettings)
+        if !fileBasedCandidates.isEmpty {
+            let activeTier = ManagedSettingsActiveTier(
+                kind: .fileBased,
+                sources: fileBasedCandidates.map(\.source),
+                notes: ["File-based managed settings merge internally in deterministic order."]
+            )
+
+            var issues = fileBasedCandidates.flatMap(\.issues)
+            if let managedMcp = input.fileBasedManagedMcp {
+                issues.append(contentsOf: managedMcp.issues)
+            }
+
+            return ManagedSettingsResolution(
+                activeTier: activeTier,
+                settingsCandidates: fileBasedCandidates,
+                managedMcpDocuments: input.fileBasedManagedMcp.map { [$0] } ?? [],
+                issues: deduplicatedIssues(issues),
+                notes: [
+                    "File-based managed settings are active.",
+                    "managed-settings.json loads before managed-settings.d/*.json.",
+                    "Drop-in fragments are ordered lexicographically by path, and later fragments take precedence."
+                ]
+            )
+        }
+
+        return ManagedSettingsResolution(
+            activeTier: nil,
+            settingsCandidates: [],
+            managedMcpDocuments: [],
+            notes: ["No managed settings tier is active."]
+        )
+    }
+
+    private func isManagedTierPresent(_ candidate: SettingsSourceCandidate) -> Bool {
+        candidate.source.availability != .missing
+    }
+
+    private func activeFileBasedCandidates(from candidates: [SettingsSourceCandidate]) -> [SettingsSourceCandidate] {
+        let available = candidates.filter { isManagedTierPresent($0) }
+        guard !available.isEmpty else {
+            return []
+        }
+
+        let loadOrder = available.sorted(by: Self.fileBasedLoadOrder)
+        let highPrecedenceFirst = Array(loadOrder.reversed())
+
+        return highPrecedenceFirst.enumerated().map { index, candidate in
+            SettingsSourceCandidate(
+                tier: candidate.tier,
+                precedenceRank: index,
+                source: candidate.source,
+                document: candidate.document,
+                issues: candidate.issues
+            )
+        }
+    }
+
+    private static func fileBasedLoadOrder(lhs: SettingsSourceCandidate, rhs: SettingsSourceCandidate) -> Bool {
+        let lhsPriority = fileBasedPathPriority(lhs.source.sourcePath)
+        let rhsPriority = fileBasedPathPriority(rhs.source.sourcePath)
+
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+
+        let lhsPath = lhs.source.sourcePath ?? lhs.source.id
+        let rhsPath = rhs.source.sourcePath ?? rhs.source.id
+        return lhsPath.localizedStandardCompare(rhsPath) == .orderedAscending
+    }
+
+    private static func fileBasedPathPriority(_ path: String?) -> Int {
+        guard let path else { return 2 }
+        if path.hasSuffix("/managed-settings.json") {
+            return 0
+        }
+        if path.contains("/managed-settings.d/") {
+            return 1
+        }
+        return 2
+    }
+
+    private func deduplicatedIssues(_ issues: [ResolutionIssue]) -> [ResolutionIssue] {
+        var seen = Set<String>()
+        return issues
+            .sorted { $0.id < $1.id }
+            .filter { seen.insert($0.id).inserted }
+    }
+}
+
 struct SettingsResolver {
+    private let registry: SettingsKeyRegistry
+
+    init(registry: SettingsKeyRegistry = .shared) {
+        self.registry = registry
+    }
+
     func resolvePrecedence(candidates: [SettingsSourceCandidate]) -> ResolvedSettingsSourceSelection {
         let orderedCandidates = Self.sortCandidates(candidates)
         let allIssues = Self.collectCandidateIssues(orderedCandidates)
@@ -1820,6 +3117,7 @@ struct SettingsResolver {
 
     func buildSnapshot(from selection: ResolvedSettingsSourceSelection) -> ResolvedSettingsSnapshot {
         let candidatesBySourceID = Dictionary(uniqueKeysWithValues: selection.candidates.map { ($0.source.id, $0) })
+        let hasManagedCandidate = selection.candidates.contains(where: { $0.tier == .managed && $0.source.availability == .present })
         var mergedEntries: [ResolvedSettingsEntry] = []
         var aggregateIssues = selection.issues
 
@@ -1839,21 +3137,55 @@ struct SettingsResolver {
             )
             aggregateIssues.append(contentsOf: mergeResult.issues)
 
+            var entryNotes = mergeResult.notes
+
+            let isManagedOnlyKey = registry.definition(for: entry.keyPath)?.isManagedOnly == true
+            let winnerIsManaged = mergeResult.winningSource.map { source in
+                source.scope == .managed
+            } ?? false
+            let hasOverriddenLowerScope = mergeResult.overriddenSources.contains(where: { $0.scope != .managed })
+
+            if winnerIsManaged && hasOverriddenLowerScope {
+                entryNotes.append("Managed policy is active for '\(entry.keyPath)'; lower-scope values are ineffective.")
+            }
+
+            if isManagedOnlyKey && !winnerIsManaged && !participantPairs.isEmpty {
+                let nonManagedSources = participantPairs.filter { $0.0.scope != .managed }
+                if !nonManagedSources.isEmpty {
+                    let sourceNames = nonManagedSources.map { $0.0.identifier }.joined(separator: ", ")
+                    aggregateIssues.append(
+                        ResolutionIssue(
+                            code: .conflict,
+                            severity: .warning,
+                            message: "Key '\(entry.keyPath)' is managed-only but appears in non-managed source(s): \(sourceNames).",
+                            source: nonManagedSources.first?.0,
+                            keyPath: entry.keyPath,
+                            relatedSources: nonManagedSources.map(\.0)
+                        )
+                    )
+                    entryNotes.append("Key '\(entry.keyPath)' is managed-only; non-managed contributions are reported as issues.")
+                }
+            }
+
             let value = ResolvedValue(
                 effectiveValue: mergeResult.effectiveValue,
                 winningSource: mergeResult.winningSource,
                 trace: ResolutionTrace(
                     participants: entry.participants,
                     overridden: mergeResult.overriddenSources,
-                    notes: mergeResult.notes
+                    notes: entryNotes
                 ),
                 mergeMethod: mergeResult.mergeMethod,
-                issues: mergeResult.issues
+                issues: mergeResult.issues,
+                notes: entryNotes
             )
             mergedEntries.append(ResolvedSettingsEntry(keyPath: entry.keyPath, value: value))
         }
 
-        let mergedNotes = selection.notes + ["Settings merge rules applied by key family."]
+        var mergedNotes = selection.notes + ["Settings merge rules applied by key family."]
+        if hasManagedCandidate {
+            mergedNotes.append("Managed policy is active and takes precedence over all other scopes.")
+        }
         return ResolvedSettingsSnapshot(entries: mergedEntries, issues: aggregateIssues, notes: mergedNotes)
     }
 
@@ -1875,37 +3207,12 @@ struct SettingsResolver {
         let notes: [String]
     }
 
-    private static let replaceKeys: Set<String> = [
-        "$schema",
-        "apiKeyHelper",
-        "autoMemoryDirectory",
-        "cleanupPeriodDays",
-        "companyAnnouncements",
-        "includeCoAuthoredBy",
-        "includeGitInstructions",
-        "autoMode",
-        "disableAutoMode",
-        "useAutoModeDuringPlan",
-        "disableDeepLinkRegistration",
-        "allowManagedHooksOnly"
-    ]
-
-    private static let deepMergeObjectKeys: Set<String> = [
-        "env",
-        "attribution"
-    ]
-
-    private static let appendUniqueKeys: Set<String> = [
-        "allowedHttpHookUrls",
-        "httpHookAllowedEnvVars"
-    ]
-
     private func mergeEntry(
         keyPath: String,
         participants: [(ResolutionSource, JSONValue)],
         inheritedIssues: [ResolutionIssue]
     ) -> EntryMergeResult {
-        let rule = Self.mergeRule(for: keyPath)
+        let rule = mergeRule(for: keyPath)
         switch rule {
         case .replace:
             return mergeByReplace(participants: participants, keyPath: keyPath, inheritedIssues: inheritedIssues)
@@ -1922,23 +3229,34 @@ struct SettingsResolver {
         }
     }
 
-    private static func mergeRule(for keyPath: String) -> SettingsMergeRule {
-        if replaceKeys.contains(keyPath) {
-            return .replace
-        }
-        if deepMergeObjectKeys.contains(keyPath) {
-            return .deepMergeObject
-        }
-        if appendUniqueKeys.contains(keyPath) {
-            return .appendUnique
-        }
+    private func mergeRule(for keyPath: String) -> SettingsMergeRule {
         if keyPath == "permissions" {
             return .permissions
         }
         if keyPath == "hooks" {
             return .hooks
         }
+
+        if let definition = registry.definition(for: keyPath) {
+            return Self.mapMergeHint(definition.mergeHint)
+        }
+
         return .passthrough
+    }
+
+    private static func mapMergeHint(_ hint: MergeMethod) -> SettingsMergeRule {
+        switch hint {
+        case .selectHighestPrecedence, .replace:
+            return .replace
+        case .deepMergeObject:
+            return .deepMergeObject
+        case .append, .appendUnique, .setUnion:
+            return .appendUnique
+        case .keyedByIdentifier:
+            return .hooks
+        case .passthrough:
+            return .passthrough
+        }
     }
 
     private func mergeByReplace(
@@ -2293,6 +3611,7 @@ struct SettingsResolver {
 
         for (source, objectValue) in objectParticipants {
             for eventName in objectValue.keys.sorted() {
+                let normalizedEventName = HookEventType(eventName: eventName).storageKey
                 let eventPath = "\(keyPath).\(eventName)"
                 guard let parsedEvent = parseHookEvent(
                     eventValue: objectValue[eventName] ?? .null,
@@ -2303,15 +3622,15 @@ struct SettingsResolver {
                     continue
                 }
 
-                guard let existing = mergedEvents[eventName] else {
-                    mergedEvents[eventName] = parsedEvent
+                guard let existing = mergedEvents[normalizedEventName] else {
+                    mergedEvents[normalizedEventName] = parsedEvent
                     continue
                 }
 
                 switch (existing, parsedEvent) {
                 case let (.array(existingActions), .array(newActions)):
                     let mergedActions = Self.appendUniqueJSONArrays([existingActions, newActions])
-                    mergedEvents[eventName] = .array(actions: mergedActions)
+                    mergedEvents[normalizedEventName] = .array(actions: mergedActions)
                 case let (.object(existingMatcher, existingActions, existingExtras), .object(newMatcher, newActions, newExtras)):
                     let mergedActions = Self.appendUniqueJSONArrays([existingActions, newActions])
                     var mergedExtras = existingExtras
@@ -2319,7 +3638,7 @@ struct SettingsResolver {
                         mergedExtras[extraKey] = extraValue
                     }
                     let mergedMatcher = existingMatcher ?? newMatcher
-                    mergedEvents[eventName] = .object(matcher: mergedMatcher, actions: mergedActions, extras: mergedExtras)
+                    mergedEvents[normalizedEventName] = .object(matcher: mergedMatcher, actions: mergedActions, extras: mergedExtras)
                 default:
                     issues.append(
                         ResolutionIssue(
@@ -2484,6 +3803,9 @@ struct SettingsResolver {
         candidates.sorted {
             if $0.tier != $1.tier {
                 return $0.tier < $1.tier
+            }
+            if $0.precedenceRank != $1.precedenceRank {
+                return $0.precedenceRank < $1.precedenceRank
             }
             return $0.source.id < $1.source.id
         }
@@ -2694,6 +4016,36 @@ struct McpEnvironmentNote: Equatable, Sendable {
     let message: String
 }
 
+// MARK: - MCP Policy Models
+
+enum McpServerEffectiveState: String, Equatable, Sendable {
+    /// Server is active and available for use.
+    case active
+    /// Server is disabled by enabledMcpjsonServers/disabledMcpjsonServers policy.
+    case disabled
+    /// Server is blocked by deniedMcpServers or allowManagedMcpServersOnly policy.
+    case blocked
+    /// Server originates from a managed source and cannot be overridden.
+    case managed
+    /// Server has no usable configuration from any source.
+    case unresolved
+}
+
+enum McpPolicyReason: String, Equatable, Sendable {
+    case allowManagedMcpServersOnly
+    case enableAllProjectMcpServers
+    case enabledMcpjsonServers
+    case disabledMcpjsonServers
+    case allowedMcpServers
+    case deniedMcpServers
+}
+
+struct McpPolicyEffect: Equatable, Sendable {
+    let reason: McpPolicyReason
+    let policySource: ResolutionSource?
+    let message: String
+}
+
 struct MCPResolver {
     func buildCandidates(from documents: [McpDocumentCandidate]) -> [McpSourceCandidate] {
         let orderedDocuments = documents.sorted {
@@ -2729,8 +4081,459 @@ struct MCPResolver {
         return candidates
     }
 
+    struct PolicyInput: Equatable, Sendable {
+        let allowManagedMcpServersOnly: Bool
+        let enableAllProjectMcpServers: Bool
+        let enabledMcpjsonServers: [String]
+        let disabledMcpjsonServers: [String]
+        let allowedMcpServers: [McpRestrictionRule]
+        let deniedMcpServers: [McpRestrictionRule]
+        let policySource: ResolutionSource?
+
+        init(
+            allowManagedMcpServersOnly: Bool = false,
+            enableAllProjectMcpServers: Bool = false,
+            enabledMcpjsonServers: [String] = [],
+            disabledMcpjsonServers: [String] = [],
+            allowedMcpServers: [McpRestrictionRule] = [],
+            deniedMcpServers: [McpRestrictionRule] = [],
+            policySource: ResolutionSource? = nil
+        ) {
+            self.allowManagedMcpServersOnly = allowManagedMcpServersOnly
+            self.enableAllProjectMcpServers = enableAllProjectMcpServers
+            self.enabledMcpjsonServers = enabledMcpjsonServers
+            self.disabledMcpjsonServers = disabledMcpjsonServers
+            self.allowedMcpServers = allowedMcpServers
+            self.deniedMcpServers = deniedMcpServers
+            self.policySource = policySource
+        }
+    }
+
     func resolve(documents: [McpDocumentCandidate]) -> ResolvedMcpSnapshot {
         resolve(candidates: buildCandidates(from: documents))
+    }
+
+    func resolveWithPolicy(
+        documents: [McpDocumentCandidate],
+        policy: PolicyInput
+    ) -> ResolvedMcpSnapshot {
+        resolveWithPolicy(candidates: buildCandidates(from: documents), policy: policy)
+    }
+
+    func resolveWithPolicy(
+        candidates: [McpSourceCandidate],
+        policy: PolicyInput
+    ) -> ResolvedMcpSnapshot {
+        // First, do basic precedence resolution
+        let baseSnapshot = resolve(candidates: candidates)
+
+        // Then apply policy enforcement to each server
+        var globalPolicyEffects: [McpPolicyEffect] = []
+        var policyIssues: [ResolutionIssue] = []
+        var policyNotes: [String] = []
+
+        if policy.allowManagedMcpServersOnly {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .allowManagedMcpServersOnly,
+                policySource: policy.policySource,
+                message: "Only managed MCP servers are allowed by 'allowManagedMcpServersOnly' from \(policy.policySource?.displayName ?? policy.policySource?.identifier ?? "unknown source")."
+            ))
+            policyNotes.append("allowManagedMcpServersOnly is active; non-managed MCP servers are blocked.")
+        }
+
+        if policy.enableAllProjectMcpServers {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .enableAllProjectMcpServers,
+                policySource: policy.policySource,
+                message: "All project MCP servers are auto-enabled by 'enableAllProjectMcpServers'."
+            ))
+            policyNotes.append("enableAllProjectMcpServers is active; project MCP servers are auto-approved.")
+        }
+
+        if !policy.deniedMcpServers.isEmpty {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .deniedMcpServers,
+                policySource: policy.policySource,
+                message: "deniedMcpServers rules are active with \(policy.deniedMcpServers.count) rule(s)."
+            ))
+        }
+
+        if !policy.allowedMcpServers.isEmpty {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .allowedMcpServers,
+                policySource: policy.policySource,
+                message: "allowedMcpServers rules are active with \(policy.allowedMcpServers.count) rule(s)."
+            ))
+        }
+
+        var policyAwareServers: [ResolvedMcpServerEntry] = []
+        for entry in baseSnapshot.servers {
+            let (effectiveState, stateExplanation, serverEffects, serverIssues) = evaluateServerPolicy(
+                entry: entry,
+                policy: policy,
+                candidates: candidates
+            )
+            policyIssues.append(contentsOf: serverIssues)
+
+            policyAwareServers.append(ResolvedMcpServerEntry(
+                serverID: entry.serverID,
+                resolvedConfig: entry.resolvedConfig,
+                environmentNotes: entry.environmentNotes,
+                effectiveState: effectiveState,
+                stateExplanation: stateExplanation,
+                policyEffects: serverEffects
+            ))
+        }
+
+        let allIssues = deduplicatedIssues(baseSnapshot.issues + policyIssues)
+        let allNotes = baseSnapshot.notes + policyNotes
+
+        return ResolvedMcpSnapshot(
+            servers: policyAwareServers,
+            issues: allIssues,
+            notes: allNotes,
+            policyEffects: globalPolicyEffects
+        )
+    }
+
+    private func evaluateServerPolicy(
+        entry: ResolvedMcpServerEntry,
+        policy: PolicyInput,
+        candidates: [McpSourceCandidate]
+    ) -> (McpServerEffectiveState, String, [McpPolicyEffect], [ResolutionIssue]) {
+        var effects: [McpPolicyEffect] = []
+        var issues: [ResolutionIssue] = []
+
+        // If there's no usable config, the server is unresolved regardless of policy
+        guard entry.resolvedConfig.effectiveValue != nil else {
+            return (.unresolved, "No usable MCP configuration was found for '\(entry.serverID)'.", effects, issues)
+        }
+
+        let winningSource = entry.resolvedConfig.winningSource
+        let winningTier = candidates.first(where: { $0.source.id == winningSource?.id })?.tier
+        let isManaged = winningSource?.scope == .managed || winningTier == .managed
+
+        // Check if this server is managed
+        if isManaged {
+            effects.append(McpPolicyEffect(
+                reason: .allowManagedMcpServersOnly,
+                policySource: winningSource,
+                message: "Server '\(entry.serverID)' is a managed MCP server and cannot be overridden."
+            ))
+            return (.managed, "Server '\(entry.serverID)' is provided by managed configuration and is always active.", effects, issues)
+        }
+
+        // 1. allowManagedMcpServersOnly blocks all non-managed servers
+        if policy.allowManagedMcpServersOnly {
+            let effect = McpPolicyEffect(
+                reason: .allowManagedMcpServersOnly,
+                policySource: policy.policySource,
+                message: "Server '\(entry.serverID)' is blocked because allowManagedMcpServersOnly is active."
+            )
+            effects.append(effect)
+            issues.append(ResolutionIssue(
+                code: .mcpPolicySuppressed,
+                severity: .warning,
+                message: "MCP server '\(entry.serverID)' is blocked because allowManagedMcpServersOnly is active and this server is not managed.",
+                source: winningSource,
+                keyPath: entry.serverID
+            ))
+            return (.blocked, "Server '\(entry.serverID)' is blocked because only managed MCP servers are allowed.", effects, issues)
+        }
+
+        // 2. deniedMcpServers — deny rules always win
+        if let matchingDeny = matchesDenyRule(serverID: entry.serverID, config: entry.resolvedConfig.effectiveValue, rules: policy.deniedMcpServers) {
+            let effect = McpPolicyEffect(
+                reason: .deniedMcpServers,
+                policySource: policy.policySource,
+                message: "Server '\(entry.serverID)' is blocked by deniedMcpServers rule: \(matchingDeny)."
+            )
+            effects.append(effect)
+            issues.append(ResolutionIssue(
+                code: .mcpDenyRuleMatch,
+                severity: .warning,
+                message: "MCP server '\(entry.serverID)' is blocked by a deniedMcpServers rule (\(matchingDeny)).",
+                source: policy.policySource,
+                keyPath: entry.serverID
+            ))
+            return (.blocked, "Server '\(entry.serverID)' is blocked by a deniedMcpServers rule (\(matchingDeny)).", effects, issues)
+        }
+
+        // 3. disabledMcpjsonServers — explicit disable by name
+        if policy.disabledMcpjsonServers.contains(entry.serverID) {
+            let effect = McpPolicyEffect(
+                reason: .disabledMcpjsonServers,
+                policySource: policy.policySource,
+                message: "Server '\(entry.serverID)' is disabled by disabledMcpjsonServers."
+            )
+            effects.append(effect)
+            issues.append(ResolutionIssue(
+                code: .mcpPolicySuppressed,
+                severity: .info,
+                message: "MCP server '\(entry.serverID)' is disabled because it appears in disabledMcpjsonServers.",
+                source: policy.policySource,
+                keyPath: entry.serverID
+            ))
+            return (.disabled, "Server '\(entry.serverID)' is explicitly disabled by disabledMcpjsonServers.", effects, issues)
+        }
+
+        // 4. allowedMcpServers — if non-empty, servers must match to be allowed
+        if !policy.allowedMcpServers.isEmpty {
+            if matchesAllowRule(serverID: entry.serverID, config: entry.resolvedConfig.effectiveValue, rules: policy.allowedMcpServers) == nil {
+                let effect = McpPolicyEffect(
+                    reason: .allowedMcpServers,
+                    policySource: policy.policySource,
+                    message: "Server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule."
+                )
+                effects.append(effect)
+                issues.append(ResolutionIssue(
+                    code: .mcpPolicySuppressed,
+                    severity: .warning,
+                    message: "MCP server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule.",
+                    source: policy.policySource,
+                    keyPath: entry.serverID
+                ))
+                return (.blocked, "Server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule.", effects, issues)
+            } else {
+                effects.append(McpPolicyEffect(
+                    reason: .allowedMcpServers,
+                    policySource: policy.policySource,
+                    message: "Server '\(entry.serverID)' matches an allowedMcpServers rule."
+                ))
+            }
+        }
+
+        // 5. enabledMcpjsonServers — if non-empty, only listed servers are auto-enabled
+        if !policy.enabledMcpjsonServers.isEmpty {
+            if policy.enabledMcpjsonServers.contains(entry.serverID) {
+                effects.append(McpPolicyEffect(
+                    reason: .enabledMcpjsonServers,
+                    policySource: policy.policySource,
+                    message: "Server '\(entry.serverID)' is explicitly enabled by enabledMcpjsonServers."
+                ))
+            }
+        }
+
+        // 6. enableAllProjectMcpServers — auto-approve project-tier servers
+        let isProjectTier = winningTier == .project || winningTier == .local
+        if policy.enableAllProjectMcpServers && isProjectTier {
+            effects.append(McpPolicyEffect(
+                reason: .enableAllProjectMcpServers,
+                policySource: policy.policySource,
+                message: "Server '\(entry.serverID)' is auto-enabled by enableAllProjectMcpServers."
+            ))
+        }
+
+        return (.active, "Server '\(entry.serverID)' is active.", effects, issues)
+    }
+
+    private func matchesDenyRule(serverID: String, config: JSONValue?, rules: [McpRestrictionRule]) -> String? {
+        for rule in rules {
+            if let match = matchesRestrictionRule(serverID: serverID, config: config, rule: rule) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func matchesAllowRule(serverID: String, config: JSONValue?, rules: [McpRestrictionRule]) -> String? {
+        for rule in rules {
+            if let match = matchesRestrictionRule(serverID: serverID, config: config, rule: rule) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func matchesRestrictionRule(serverID: String, config: JSONValue?, rule: McpRestrictionRule) -> String? {
+        // Match by server name
+        if let ruleName = rule.serverName, ruleName == serverID {
+            return "serverName: \(ruleName)"
+        }
+
+        guard case let .object(configObj)? = config else {
+            return nil
+        }
+
+        // Match by command
+        if let ruleCommand = rule.serverCommand {
+            if let commandValue = configObj["command"], case let .string(command) = commandValue {
+                if let argsValue = configObj["args"], case let .array(args) = argsValue {
+                    let fullCommand = [command] + args.compactMap { arg -> String? in
+                        if case let .string(s) = arg { return s }
+                        return nil
+                    }
+                    if fullCommand.starts(with: ruleCommand) {
+                        return "serverCommand: \(ruleCommand.joined(separator: " "))"
+                    }
+                } else if ruleCommand.count == 1 && ruleCommand[0] == command {
+                    return "serverCommand: \(command)"
+                }
+            }
+        }
+
+        // Match by URL
+        if let ruleUrl = rule.serverUrl {
+            if let urlValue = configObj["url"], case let .string(url) = urlValue {
+                if url.hasPrefix(ruleUrl) || url == ruleUrl {
+                    return "serverUrl: \(ruleUrl)"
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// Applies MCP policy enforcement to an already-resolved snapshot.
+    /// This is used when the snapshot was resolved externally and we only need to layer policy on top.
+    func applyPolicy(to snapshot: ResolvedMcpSnapshot, policy: PolicyInput) -> ResolvedMcpSnapshot {
+        var globalPolicyEffects: [McpPolicyEffect] = []
+        var policyIssues: [ResolutionIssue] = []
+        var policyNotes: [String] = []
+
+        if policy.allowManagedMcpServersOnly {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .allowManagedMcpServersOnly,
+                policySource: policy.policySource,
+                message: "Only managed MCP servers are allowed by 'allowManagedMcpServersOnly' from \(policy.policySource?.displayName ?? policy.policySource?.identifier ?? "unknown source")."
+            ))
+            policyNotes.append("allowManagedMcpServersOnly is active; non-managed MCP servers are blocked.")
+        }
+
+        if policy.enableAllProjectMcpServers {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .enableAllProjectMcpServers,
+                policySource: policy.policySource,
+                message: "All project MCP servers are auto-enabled by 'enableAllProjectMcpServers'."
+            ))
+            policyNotes.append("enableAllProjectMcpServers is active; project MCP servers are auto-approved.")
+        }
+
+        if !policy.deniedMcpServers.isEmpty {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .deniedMcpServers,
+                policySource: policy.policySource,
+                message: "deniedMcpServers rules are active with \(policy.deniedMcpServers.count) rule(s)."
+            ))
+        }
+
+        if !policy.allowedMcpServers.isEmpty {
+            globalPolicyEffects.append(McpPolicyEffect(
+                reason: .allowedMcpServers,
+                policySource: policy.policySource,
+                message: "allowedMcpServers rules are active with \(policy.allowedMcpServers.count) rule(s)."
+            ))
+        }
+
+        var policyAwareServers: [ResolvedMcpServerEntry] = []
+        for entry in snapshot.servers {
+            let (effectiveState, stateExplanation, serverEffects, serverIssues) = evaluateServerPolicyFromSnapshot(
+                entry: entry,
+                policy: policy
+            )
+            policyIssues.append(contentsOf: serverIssues)
+
+            policyAwareServers.append(ResolvedMcpServerEntry(
+                serverID: entry.serverID,
+                resolvedConfig: entry.resolvedConfig,
+                environmentNotes: entry.environmentNotes,
+                effectiveState: effectiveState,
+                stateExplanation: stateExplanation,
+                policyEffects: serverEffects
+            ))
+        }
+
+        let allIssues = deduplicatedIssues(snapshot.issues + policyIssues)
+        let allNotes = snapshot.notes + policyNotes
+
+        return ResolvedMcpSnapshot(
+            servers: policyAwareServers,
+            issues: allIssues,
+            notes: allNotes,
+            policyEffects: globalPolicyEffects
+        )
+    }
+
+    private func evaluateServerPolicyFromSnapshot(
+        entry: ResolvedMcpServerEntry,
+        policy: PolicyInput
+    ) -> (McpServerEffectiveState, String, [McpPolicyEffect], [ResolutionIssue]) {
+        var effects: [McpPolicyEffect] = []
+        var issues: [ResolutionIssue] = []
+        let winningSource = entry.resolvedConfig.winningSource
+
+        guard entry.resolvedConfig.effectiveValue != nil else {
+            return (.unresolved, "No usable MCP configuration was found for '\(entry.serverID)'.", effects, issues)
+        }
+
+        let isManaged = winningSource?.scope == .managed
+
+        if isManaged {
+            return (.managed, "Server '\(entry.serverID)' is provided by managed configuration and is always active.", [
+                McpPolicyEffect(reason: .allowManagedMcpServersOnly, policySource: winningSource,
+                                message: "Server '\(entry.serverID)' is a managed MCP server and cannot be overridden.")
+            ], issues)
+        }
+
+        // 1. allowManagedMcpServersOnly
+        if policy.allowManagedMcpServersOnly {
+            effects.append(McpPolicyEffect(reason: .allowManagedMcpServersOnly, policySource: policy.policySource,
+                                           message: "Server '\(entry.serverID)' is blocked because allowManagedMcpServersOnly is active."))
+            issues.append(ResolutionIssue(code: .mcpPolicySuppressed, severity: .warning,
+                                         message: "MCP server '\(entry.serverID)' is blocked because allowManagedMcpServersOnly is active and this server is not managed.",
+                                         source: winningSource, keyPath: entry.serverID))
+            return (.blocked, "Server '\(entry.serverID)' is blocked because only managed MCP servers are allowed.", effects, issues)
+        }
+
+        // 2. deniedMcpServers
+        if let matchingDeny = matchesDenyRule(serverID: entry.serverID, config: entry.resolvedConfig.effectiveValue, rules: policy.deniedMcpServers) {
+            effects.append(McpPolicyEffect(reason: .deniedMcpServers, policySource: policy.policySource,
+                                           message: "Server '\(entry.serverID)' is blocked by deniedMcpServers rule: \(matchingDeny)."))
+            issues.append(ResolutionIssue(code: .mcpDenyRuleMatch, severity: .warning,
+                                         message: "MCP server '\(entry.serverID)' is blocked by a deniedMcpServers rule (\(matchingDeny)).",
+                                         source: policy.policySource, keyPath: entry.serverID))
+            return (.blocked, "Server '\(entry.serverID)' is blocked by a deniedMcpServers rule (\(matchingDeny)).", effects, issues)
+        }
+
+        // 3. disabledMcpjsonServers
+        if policy.disabledMcpjsonServers.contains(entry.serverID) {
+            effects.append(McpPolicyEffect(reason: .disabledMcpjsonServers, policySource: policy.policySource,
+                                           message: "Server '\(entry.serverID)' is disabled by disabledMcpjsonServers."))
+            issues.append(ResolutionIssue(code: .mcpPolicySuppressed, severity: .info,
+                                         message: "MCP server '\(entry.serverID)' is disabled because it appears in disabledMcpjsonServers.",
+                                         source: policy.policySource, keyPath: entry.serverID))
+            return (.disabled, "Server '\(entry.serverID)' is explicitly disabled by disabledMcpjsonServers.", effects, issues)
+        }
+
+        // 4. allowedMcpServers — if non-empty, must match
+        if !policy.allowedMcpServers.isEmpty {
+            if matchesAllowRule(serverID: entry.serverID, config: entry.resolvedConfig.effectiveValue, rules: policy.allowedMcpServers) == nil {
+                effects.append(McpPolicyEffect(reason: .allowedMcpServers, policySource: policy.policySource,
+                                               message: "Server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule."))
+                issues.append(ResolutionIssue(code: .mcpPolicySuppressed, severity: .warning,
+                                             message: "MCP server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule.",
+                                             source: policy.policySource, keyPath: entry.serverID))
+                return (.blocked, "Server '\(entry.serverID)' is blocked because it does not match any allowedMcpServers rule.", effects, issues)
+            } else {
+                effects.append(McpPolicyEffect(reason: .allowedMcpServers, policySource: policy.policySource,
+                                               message: "Server '\(entry.serverID)' matches an allowedMcpServers rule."))
+            }
+        }
+
+        // 5. enabledMcpjsonServers
+        if !policy.enabledMcpjsonServers.isEmpty && policy.enabledMcpjsonServers.contains(entry.serverID) {
+            effects.append(McpPolicyEffect(reason: .enabledMcpjsonServers, policySource: policy.policySource,
+                                           message: "Server '\(entry.serverID)' is explicitly enabled by enabledMcpjsonServers."))
+        }
+
+        // 6. enableAllProjectMcpServers — check source scope for project
+        let isProjectScope = winningSource?.scope == .project || winningSource?.scope == .projectLocal
+        if policy.enableAllProjectMcpServers && isProjectScope {
+            effects.append(McpPolicyEffect(reason: .enableAllProjectMcpServers, policySource: policy.policySource,
+                                           message: "Server '\(entry.serverID)' is auto-enabled by enableAllProjectMcpServers."))
+        }
+
+        return (.active, "Server '\(entry.serverID)' is active.", effects, issues)
     }
 
     func resolve(candidates: [McpSourceCandidate]) -> ResolvedMcpSnapshot {
@@ -3095,11 +4898,17 @@ struct ResolvedMcpServerEntry: Equatable, Sendable {
     let serverID: String
     let resolvedConfig: ResolvedValue<JSONValue>
     let environmentNotes: [McpEnvironmentNote]
+    let effectiveState: McpServerEffectiveState
+    let stateExplanation: String
+    let policyEffects: [McpPolicyEffect]
 
     init(
         serverID: String,
         resolvedConfig: ResolvedValue<JSONValue>,
-        environmentNotes: [McpEnvironmentNote] = []
+        environmentNotes: [McpEnvironmentNote] = [],
+        effectiveState: McpServerEffectiveState = .active,
+        stateExplanation: String = "",
+        policyEffects: [McpPolicyEffect] = []
     ) {
         self.serverID = serverID
         self.resolvedConfig = resolvedConfig
@@ -3109,6 +4918,9 @@ struct ResolvedMcpServerEntry: Equatable, Sendable {
             }
             return lhs.message < rhs.message
         }
+        self.effectiveState = effectiveState
+        self.stateExplanation = stateExplanation
+        self.policyEffects = policyEffects
     }
 }
 
@@ -3116,11 +4928,88 @@ struct ResolvedMcpSnapshot: Equatable, Sendable {
     let servers: [ResolvedMcpServerEntry]
     let issues: [ResolutionIssue]
     let notes: [String]
+    let policyEffects: [McpPolicyEffect]
 
-    init(servers: [ResolvedMcpServerEntry], issues: [ResolutionIssue] = [], notes: [String] = []) {
+    init(servers: [ResolvedMcpServerEntry], issues: [ResolutionIssue] = [], notes: [String] = [], policyEffects: [McpPolicyEffect] = []) {
         self.servers = servers.sorted { $0.serverID < $1.serverID }
         self.issues = issues.sorted { $0.id < $1.id }
         self.notes = notes
+        self.policyEffects = policyEffects
+    }
+}
+
+extension MCPResolver {
+    /// Extracts MCP policy inputs from a resolved settings snapshot.
+    static func extractPolicyInput(from settings: ResolvedSettingsSnapshot?) -> PolicyInput {
+        guard let settings else { return PolicyInput() }
+
+        func boolSetting(_ key: String) -> (Bool, ResolutionSource?) {
+            guard let entry = settings.entries.first(where: { $0.keyPath == key }),
+                  let value = entry.value.effectiveValue?.boolValue else {
+                return (false, nil)
+            }
+            return (value, entry.value.winningSource)
+        }
+
+        func stringArraySetting(_ key: String) -> [String] {
+            guard let entry = settings.entries.first(where: { $0.keyPath == key }),
+                  let value = entry.value.effectiveValue?.stringArrayValue else {
+                return []
+            }
+            return value
+        }
+
+        func mcpRestrictionRuleSetting(_ key: String) -> [McpRestrictionRule] {
+            guard let entry = settings.entries.first(where: { $0.keyPath == key }),
+                  let value = entry.value.effectiveValue,
+                  case let .array(items) = value else {
+                return []
+            }
+            return items.compactMap { item -> McpRestrictionRule? in
+                guard case let .object(obj) = item else { return nil }
+                let serverName: String? = obj["serverName"].flatMap { v -> String? in
+                    if case let .string(s) = v { return s }
+                    return nil
+                }
+                let serverCommand: [String]? = obj["serverCommand"].flatMap { v -> [String]? in
+                    guard case let .array(arr) = v else { return nil }
+                    return arr.compactMap { elem -> String? in
+                        if case let .string(s) = elem { return s }
+                        return nil
+                    }
+                }
+                let serverUrl: String? = obj["serverUrl"].flatMap { v -> String? in
+                    if case let .string(s) = v { return s }
+                    return nil
+                }
+                guard serverName != nil || serverCommand != nil || serverUrl != nil else { return nil }
+                return McpRestrictionRule(serverName: serverName, serverCommand: serverCommand, serverUrl: serverUrl, unknownFields: nil)
+            }
+        }
+
+        let (managedOnly, managedOnlySource) = boolSetting("allowManagedMcpServersOnly")
+        let (enableAll, _) = boolSetting("enableAllProjectMcpServers")
+        let enabled = stringArraySetting("enabledMcpjsonServers")
+        let disabled = stringArraySetting("disabledMcpjsonServers")
+        let allowed = mcpRestrictionRuleSetting("allowedMcpServers")
+        let denied = mcpRestrictionRuleSetting("deniedMcpServers")
+
+        // Use the most authoritative policy source (managed-only source if available, else first MCP policy source)
+        let policySource = managedOnlySource
+            ?? settings.entries.first(where: {
+                ["allowManagedMcpServersOnly", "enableAllProjectMcpServers", "enabledMcpjsonServers",
+                 "disabledMcpjsonServers", "allowedMcpServers", "deniedMcpServers"].contains($0.keyPath)
+            })?.value.winningSource
+
+        return PolicyInput(
+            allowManagedMcpServersOnly: managedOnly,
+            enableAllProjectMcpServers: enableAll,
+            enabledMcpjsonServers: enabled,
+            disabledMcpjsonServers: disabled,
+            allowedMcpServers: allowed,
+            deniedMcpServers: denied,
+            policySource: policySource
+        )
     }
 }
 
@@ -3894,20 +5783,407 @@ struct SessionProvenanceSummary: Equatable, Sendable {
     let byFamily: [SessionProvenanceFamilySummary]
 }
 
+// MARK: - Hook Resolver Models
+
+enum HookSuppressionReason: String, Equatable, Sendable {
+    case disableAllHooks
+    case allowManagedHooksOnly
+}
+
+struct HookSuppressionEffect: Equatable, Sendable {
+    let reason: HookSuppressionReason
+    let policySource: ResolutionSource?
+    let message: String
+}
+
+struct ResolvedHookHandler: Equatable, Sendable {
+    let handlerType: HookHandlerType?
+    let rawType: String?
+    let command: String?
+    let url: String?
+    let method: String?
+    let body: String?
+    let template: String?
+    let agentId: String?
+    let inputs: [String: JSONValue]?
+    let prompt: String?
+    let timeout: Int?
+    let statusMessage: String?
+    let condition: String?
+    let once: Bool?
+    let shell: String?
+    let isAsync: Bool?
+    let headers: [String: String]?
+    let allowedEnvVars: [String]?
+    let model: String?
+    let rawObject: JSONValue
+    let source: ResolutionSource?
+
+    init(from jsonValue: JSONValue, source: ResolutionSource?) {
+        self.source = source
+        self.rawObject = jsonValue
+
+        guard case let .object(obj) = jsonValue else {
+            self.handlerType = nil
+            self.rawType = nil
+            self.command = nil
+            self.url = nil
+            self.method = nil
+            self.body = nil
+            self.template = nil
+            self.agentId = nil
+            self.inputs = nil
+            self.prompt = nil
+            self.timeout = nil
+            self.statusMessage = nil
+            self.condition = nil
+            self.once = nil
+            self.shell = nil
+            self.isAsync = nil
+            self.headers = nil
+            self.allowedEnvVars = nil
+            self.model = nil
+            return
+        }
+
+        let typeString: String?
+        if case let .string(t) = obj["type"] {
+            typeString = t
+        } else {
+            typeString = nil
+        }
+        self.rawType = typeString
+        self.handlerType = typeString.flatMap { HookHandlerType(rawValue: $0) }
+
+        if case let .string(v) = obj["command"] { self.command = v } else { self.command = nil }
+        if case let .string(v) = obj["url"] { self.url = v } else { self.url = nil }
+        if case let .string(v) = obj["method"] { self.method = v } else { self.method = nil }
+        if case let .string(v) = obj["body"] { self.body = v } else { self.body = nil }
+        if case let .string(v) = obj["template"] { self.template = v } else { self.template = nil }
+        if case let .string(v) = obj["agent_id"] { self.agentId = v } else { self.agentId = nil }
+        if case let .string(v) = obj["prompt"] { self.prompt = v } else { self.prompt = nil }
+        if case let .number(v) = obj["timeout"] { self.timeout = Int(v) } else { self.timeout = nil }
+        if case let .string(v) = obj["statusMessage"] { self.statusMessage = v } else { self.statusMessage = nil }
+        if case let .string(v) = obj["if"] { self.condition = v } else { self.condition = nil }
+        if case let .bool(v) = obj["once"] { self.once = v } else { self.once = nil }
+        if case let .string(v) = obj["shell"] { self.shell = v } else { self.shell = nil }
+        if case let .bool(v) = obj["async"] { self.isAsync = v } else { self.isAsync = nil }
+        if case let .string(v) = obj["model"] { self.model = v } else { self.model = nil }
+
+        if case let .object(inputsObj) = obj["inputs"] {
+            self.inputs = inputsObj
+        } else {
+            self.inputs = nil
+        }
+
+        if case let .object(headersObj) = obj["headers"] {
+            var parsed: [String: String] = [:]
+            for (k, v) in headersObj {
+                if case let .string(s) = v { parsed[k] = s }
+            }
+            self.headers = parsed.isEmpty ? nil : parsed
+        } else {
+            self.headers = nil
+        }
+
+        if case let .array(vars) = obj["allowedEnvVars"] {
+            self.allowedEnvVars = vars.compactMap { v -> String? in
+                if case let .string(s) = v { return s }
+                return nil
+            }
+        } else {
+            self.allowedEnvVars = nil
+        }
+    }
+}
+
 struct ResolvedHookEventEntry: Equatable, Sendable {
     let eventID: String
+    let eventType: HookEventType
     let hooks: ResolvedValue<[JSONValue]>
+    let resolvedHandlers: [ResolvedHookHandler]
+    let suppression: HookSuppressionEffect?
+
+    init(
+        eventID: String,
+        eventType: HookEventType,
+        hooks: ResolvedValue<[JSONValue]>,
+        resolvedHandlers: [ResolvedHookHandler] = [],
+        suppression: HookSuppressionEffect? = nil
+    ) {
+        self.eventID = eventID
+        self.eventType = eventType
+        self.hooks = hooks
+        self.resolvedHandlers = resolvedHandlers
+        self.suppression = suppression
+    }
 }
 
 struct ResolvedHookSnapshot: Equatable, Sendable {
     let events: [ResolvedHookEventEntry]
     let issues: [ResolutionIssue]
     let notes: [String]
+    let policyEffects: [HookSuppressionEffect]
 
-    init(events: [ResolvedHookEventEntry], issues: [ResolutionIssue] = [], notes: [String] = []) {
-        self.events = events.sorted { $0.eventID < $1.eventID }
+    init(
+        events: [ResolvedHookEventEntry],
+        issues: [ResolutionIssue] = [],
+        notes: [String] = [],
+        policyEffects: [HookSuppressionEffect] = []
+    ) {
+        self.events = events.sorted { lhs, rhs in
+            if lhs.eventType.sortKey != rhs.eventType.sortKey {
+                return lhs.eventType.sortKey < rhs.eventType.sortKey
+            }
+            return lhs.eventID < rhs.eventID
+        }
         self.issues = issues.sorted { $0.id < $1.id }
         self.notes = notes
+        self.policyEffects = policyEffects
+    }
+}
+
+// MARK: - HookResolver
+
+struct HookResolver {
+
+    struct Input: Equatable, Sendable {
+        let resolvedSettings: ResolvedSettingsSnapshot
+    }
+
+    func resolve(from input: Input) -> ResolvedHookSnapshot {
+        let settings = input.resolvedSettings
+
+        // 1. Check policy keys
+        let policyEffects = evaluatePolicies(settings: settings)
+        let allHooksDisabled = policyEffects.contains(where: { $0.reason == .disableAllHooks })
+        let managedOnly = policyEffects.contains(where: { $0.reason == .allowManagedHooksOnly })
+
+        // 2. Extract the hooks entry
+        guard let hookEntry = settings.entries.first(where: { $0.keyPath == "hooks" }) else {
+            var notes = ["No 'hooks' key found in resolved settings."]
+            if allHooksDisabled {
+                notes.append("Additionally, disableAllHooks is active; all hooks would be suppressed even if present.")
+            }
+            return ResolvedHookSnapshot(events: [], notes: notes, policyEffects: policyEffects)
+        }
+
+        var issues = hookEntry.value.issues
+        var notes = hookEntry.value.notes
+
+        guard let rootValue = hookEntry.value.effectiveValue else {
+            notes.append("Hooks projection is unresolved because no effective hooks object was selected.")
+            return ResolvedHookSnapshot(events: [], issues: dedup(issues), notes: notes, policyEffects: policyEffects)
+        }
+
+        guard case let .object(rootObject) = rootValue else {
+            issues.append(
+                ResolutionIssue(
+                    code: .unsupportedShape,
+                    severity: .warning,
+                    message: "Resolved hooks value must be an object keyed by event identifier.",
+                    source: hookEntry.value.winningSource,
+                    keyPath: "hooks"
+                )
+            )
+            return ResolvedHookSnapshot(events: [], issues: dedup(issues), notes: notes, policyEffects: policyEffects)
+        }
+
+        // Determine the source scope of the hooks entry
+        let hookSourceScope = hookEntry.value.winningSource?.scope
+
+        // 3. Iterate events and build entries
+        var events: [ResolvedHookEventEntry] = []
+        for eventID in rootObject.keys.sorted() {
+            let eventPath = "hooks.\(eventID)"
+            guard let rawEventValue = rootObject[eventID] else { continue }
+            let eventType = HookEventType(eventName: eventID)
+
+            let extraction = extractHookActions(
+                eventID: eventID,
+                eventPath: eventPath,
+                value: rawEventValue,
+                source: hookEntry.value.winningSource
+            )
+
+            issues.append(contentsOf: extraction.issues)
+            notes.append(contentsOf: extraction.notes)
+
+            // Build typed handlers
+            let handlers: [ResolvedHookHandler] = (extraction.actions ?? []).map {
+                ResolvedHookHandler(from: $0, source: hookEntry.value.winningSource)
+            }
+
+            // Determine suppression at the event level
+            let suppression: HookSuppressionEffect?
+            if allHooksDisabled {
+                suppression = policyEffects.first(where: { $0.reason == .disableAllHooks })
+                issues.append(
+                    ResolutionIssue(
+                        code: .hookPolicySuppressed,
+                        severity: .info,
+                        message: "Hook event '\(eventID)' is suppressed because disableAllHooks is active.",
+                        source: hookEntry.value.winningSource,
+                        keyPath: eventPath
+                    )
+                )
+            } else if managedOnly, hookSourceScope != .managed {
+                suppression = policyEffects.first(where: { $0.reason == .allowManagedHooksOnly })
+                issues.append(
+                    ResolutionIssue(
+                        code: .hookPolicySuppressed,
+                        severity: .warning,
+                        message: "Hook event '\(eventID)' is suppressed because allowManagedHooksOnly is active and hooks originate from scope '\(hookSourceScope?.rawValue ?? "unknown")'.",
+                        source: hookEntry.value.winningSource,
+                        keyPath: eventPath
+                    )
+                )
+            } else {
+                suppression = nil
+            }
+
+            let value = ResolvedValue(
+                effectiveValue: extraction.actions,
+                winningSource: hookEntry.value.winningSource,
+                trace: hookEntry.value.trace,
+                mergeMethod: .passthrough,
+                issues: dedup(hookEntry.value.issues + extraction.issues),
+                notes: dedup(hookEntry.value.notes + extraction.notes)
+            )
+            events.append(ResolvedHookEventEntry(
+                eventID: eventID,
+                eventType: eventType,
+                hooks: value,
+                resolvedHandlers: handlers,
+                suppression: suppression
+            ))
+        }
+
+        if events.isEmpty {
+            notes.append("Resolved settings include a hooks key but no valid hook event entries were produced.")
+        } else {
+            notes.append("Hooks were derived from the resolved settings 'hooks' object.")
+        }
+
+        if allHooksDisabled {
+            notes.append("All hooks are suppressed by the disableAllHooks policy.")
+        }
+        if managedOnly {
+            notes.append("Only managed hooks are permitted by the allowManagedHooksOnly policy.")
+        }
+
+        return ResolvedHookSnapshot(
+            events: events,
+            issues: dedup(issues),
+            notes: dedup(notes),
+            policyEffects: policyEffects
+        )
+    }
+
+    // MARK: - Private
+
+    private func evaluatePolicies(settings: ResolvedSettingsSnapshot) -> [HookSuppressionEffect] {
+        var effects: [HookSuppressionEffect] = []
+
+        if let entry = settings.entries.first(where: { $0.keyPath == "disableAllHooks" }),
+           entry.value.effectiveValue?.boolValue == true
+        {
+            effects.append(HookSuppressionEffect(
+                reason: .disableAllHooks,
+                policySource: entry.value.winningSource,
+                message: "All hooks are disabled by 'disableAllHooks' from \(entry.value.winningSource?.displayName ?? entry.value.winningSource?.identifier ?? "unknown source")."
+            ))
+        }
+
+        if let entry = settings.entries.first(where: { $0.keyPath == "allowManagedHooksOnly" }),
+           entry.value.effectiveValue?.boolValue == true
+        {
+            effects.append(HookSuppressionEffect(
+                reason: .allowManagedHooksOnly,
+                policySource: entry.value.winningSource,
+                message: "Only managed hooks are allowed by 'allowManagedHooksOnly' from \(entry.value.winningSource?.displayName ?? entry.value.winningSource?.identifier ?? "unknown source")."
+            ))
+        }
+
+        return effects
+    }
+
+    private func extractHookActions(
+        eventID: String,
+        eventPath: String,
+        value: JSONValue,
+        source: ResolutionSource?
+    ) -> (actions: [JSONValue]?, issues: [ResolutionIssue], notes: [String]) {
+        switch value {
+        case let .array(actions):
+            return (
+                actions: actions,
+                issues: [],
+                notes: ["Hooks event '\(eventID)' was loaded from an array value."]
+            )
+        case let .object(object):
+            guard let hookValue = object["hooks"] else {
+                return (
+                    actions: nil,
+                    issues: [
+                        ResolutionIssue(
+                            code: .unsupportedShape,
+                            severity: .warning,
+                            message: "Hook event object must include a 'hooks' array.",
+                            source: source,
+                            keyPath: eventPath
+                        )
+                    ],
+                    notes: ["Hooks event '\(eventID)' is incomplete and did not provide a 'hooks' array."]
+                )
+            }
+            guard case let .array(actions) = hookValue else {
+                return (
+                    actions: nil,
+                    issues: [
+                        ResolutionIssue(
+                            code: .typeMismatch,
+                            severity: .warning,
+                            message: "Hook event 'hooks' field must be an array.",
+                            source: source,
+                            keyPath: "\(eventPath).hooks"
+                        )
+                    ],
+                    notes: ["Hooks event '\(eventID)' had a non-array 'hooks' payload."]
+                )
+            }
+            return (
+                actions: actions,
+                issues: [],
+                notes: ["Hooks event '\(eventID)' was loaded from object.hooks."]
+            )
+        default:
+            return (
+                actions: nil,
+                issues: [
+                    ResolutionIssue(
+                        code: .unsupportedShape,
+                        severity: .warning,
+                        message: "Hook event values must be an array or object with a 'hooks' array.",
+                        source: source,
+                        keyPath: eventPath
+                    )
+                ],
+                notes: ["Hooks event '\(eventID)' used an unsupported shape and could not be projected."]
+            )
+        }
+    }
+
+    private func dedup(_ issues: [ResolutionIssue]) -> [ResolutionIssue] {
+        var seen = Set<String>()
+        return issues
+            .sorted { $0.id < $1.id }
+            .filter { seen.insert($0.id).inserted }
+    }
+
+    private func dedup(_ notes: [String]) -> [String] {
+        var seen = Set<String>()
+        return notes.filter { seen.insert($0).inserted }
     }
 }
 
@@ -4003,11 +6279,12 @@ struct SessionProjectionBuilder {
 
     func build(from input: Input) -> SessionProjection {
         let hooks = deriveHooks(from: input.settings)
+        let mcp = deriveMcp(from: input.mcp, settings: input.settings)
 
         let settingsIssues = collectSettingsIssues(input.settings)
         let instructionIssues = collectInstructionIssues(input.instructions)
         let hookIssues = collectHookIssues(hooks)
-        let mcpIssues = collectMcpIssues(input.mcp)
+        let mcpIssues = collectMcpIssues(mcp)
         let agentIssues = collectAgentIssues(input.agents)
         let skillIssues = collectSkillIssues(input.skills)
         let validationIssues = input.validationIssues.map { $0.asResolutionIssue() }
@@ -4034,17 +6311,18 @@ struct SessionProjectionBuilder {
         let familyStates = buildFamilyStates(
             input: input,
             hooks: hooks,
+            mcp: mcp,
             byFamilyIssues: byFamilyIssues
         )
         let issueSummary = buildIssueSummary(byFamilyIssues: byFamilyIssues, totalIssues: allIssues)
         let completeness = buildCompleteness(from: familyStates)
-        let provenance = buildProvenance(input: input, hooks: hooks)
+        let provenance = buildProvenance(input: input, hooks: hooks, mcp: mcp)
 
         return SessionProjection(
             settings: input.settings,
             instructions: input.instructions,
             hooks: hooks,
-            mcp: input.mcp,
+            mcp: mcp,
             agents: input.agents,
             skills: input.skills,
             familyStates: familyStates,
@@ -4052,140 +6330,77 @@ struct SessionProjectionBuilder {
             completeness: completeness,
             provenance: provenance,
             issues: allIssues,
-            notes: projectionNotes(input: input, hooks: hooks)
+            notes: projectionNotes(input: input, hooks: hooks, mcp: mcp)
         )
+    }
+
+    private func deriveMcp(from mcp: ResolvedMcpSnapshot?, settings: ResolvedSettingsSnapshot?) -> ResolvedMcpSnapshot? {
+        guard let mcp else { return nil }
+
+        let policyInput = MCPResolver.extractPolicyInput(from: settings)
+
+        // Only apply policy if there are any active policy keys
+        let hasPolicies = policyInput.allowManagedMcpServersOnly ||
+            policyInput.enableAllProjectMcpServers ||
+            !policyInput.enabledMcpjsonServers.isEmpty ||
+            !policyInput.disabledMcpjsonServers.isEmpty ||
+            !policyInput.allowedMcpServers.isEmpty ||
+            !policyInput.deniedMcpServers.isEmpty
+
+        guard hasPolicies else {
+            // No policies — annotate servers with default active state
+            let annotatedServers = mcp.servers.map { entry in
+                let hasConfig = entry.resolvedConfig.effectiveValue != nil
+                let isManaged = entry.resolvedConfig.winningSource?.scope == .managed
+                let state: McpServerEffectiveState = hasConfig ? (isManaged ? .managed : .active) : .unresolved
+                let explanation: String
+                switch state {
+                case .managed:
+                    explanation = "Server '\(entry.serverID)' is provided by managed configuration and is always active."
+                case .active:
+                    explanation = "Server '\(entry.serverID)' is active with no policy restrictions."
+                case .unresolved:
+                    explanation = "No usable MCP configuration was found for '\(entry.serverID)'."
+                default:
+                    explanation = "Server '\(entry.serverID)' state: \(state.rawValue)."
+                }
+                return ResolvedMcpServerEntry(
+                    serverID: entry.serverID,
+                    resolvedConfig: entry.resolvedConfig,
+                    environmentNotes: entry.environmentNotes,
+                    effectiveState: state,
+                    stateExplanation: explanation,
+                    policyEffects: []
+                )
+            }
+            return ResolvedMcpSnapshot(
+                servers: annotatedServers,
+                issues: mcp.issues,
+                notes: mcp.notes,
+                policyEffects: []
+            )
+        }
+
+        // Re-resolve with policy. We need the original candidates, but they're not preserved
+        // in the snapshot. Instead, apply policy post-resolution using the snapshot entries directly.
+        let resolver = MCPResolver()
+        return resolver.applyPolicy(to: mcp, policy: policyInput)
     }
 
     private func deriveHooks(from settings: ResolvedSettingsSnapshot?) -> ResolvedHookSnapshot? {
         guard let settings else { return nil }
-        guard let hookEntry = settings.entries.first(where: { $0.keyPath == "hooks" }) else {
+
+        // Check if there are any hook-related keys at all (hooks, disableAllHooks, allowManagedHooksOnly)
+        let hasHooks = settings.entries.contains(where: { $0.keyPath == "hooks" })
+        let hasDisableAll = settings.entries.contains(where: { $0.keyPath == "disableAllHooks" })
+        let hasManagedOnly = settings.entries.contains(where: { $0.keyPath == "allowManagedHooksOnly" })
+
+        guard hasHooks || hasDisableAll || hasManagedOnly else {
             return nil
         }
 
-        var issues = hookEntry.value.issues
-        var notes = hookEntry.value.notes
-        var events: [ResolvedHookEventEntry] = []
-
-        guard let rootValue = hookEntry.value.effectiveValue else {
-            notes.append("Hooks projection is unresolved because no effective hooks object was selected.")
-            return ResolvedHookSnapshot(events: [], issues: deduplicatedIssues(issues), notes: notes)
-        }
-
-        guard case let .object(rootObject) = rootValue else {
-            issues.append(
-                ResolutionIssue(
-                    code: .unsupportedShape,
-                    severity: .warning,
-                    message: "Resolved hooks value must be an object keyed by event identifier.",
-                    source: hookEntry.value.winningSource,
-                    keyPath: "hooks"
-                )
-            )
-            return ResolvedHookSnapshot(events: [], issues: deduplicatedIssues(issues), notes: notes)
-        }
-
-        for eventID in rootObject.keys.sorted() {
-            let eventPath = "hooks.\(eventID)"
-            guard let rawEventValue = rootObject[eventID] else { continue }
-
-            let extraction = extractHookActions(
-                eventID: eventID,
-                eventPath: eventPath,
-                value: rawEventValue,
-                source: hookEntry.value.winningSource
-            )
-
-            issues.append(contentsOf: extraction.issues)
-            notes.append(contentsOf: extraction.notes)
-
-            let value = ResolvedValue(
-                effectiveValue: extraction.actions,
-                winningSource: hookEntry.value.winningSource,
-                trace: hookEntry.value.trace,
-                mergeMethod: .passthrough,
-                issues: deduplicatedIssues(hookEntry.value.issues + extraction.issues),
-                notes: deduplicatedNotes(hookEntry.value.notes + extraction.notes)
-            )
-            events.append(ResolvedHookEventEntry(eventID: eventID, hooks: value))
-        }
-
-        if events.isEmpty {
-            notes.append("Resolved settings include a hooks key but no valid hook event entries were produced.")
-        } else {
-            notes.append("Hooks were derived from the resolved settings 'hooks' object.")
-        }
-
-        return ResolvedHookSnapshot(
-            events: events,
-            issues: deduplicatedIssues(issues),
-            notes: deduplicatedNotes(notes)
-        )
-    }
-
-    private func extractHookActions(
-        eventID: String,
-        eventPath: String,
-        value: JSONValue,
-        source: ResolutionSource?
-    ) -> (actions: [JSONValue]?, issues: [ResolutionIssue], notes: [String]) {
-        switch value {
-        case let .array(actions):
-            return (
-                actions: actions,
-                issues: [],
-                notes: ["Hooks event '\(eventID)' was loaded from an array value."]
-            )
-        case let .object(object):
-            guard let hookValue = object["hooks"] else {
-                return (
-                    actions: nil,
-                    issues: [
-                        ResolutionIssue(
-                            code: .unsupportedShape,
-                            severity: .warning,
-                            message: "Hook event object must include a 'hooks' array.",
-                            source: source,
-                            keyPath: eventPath
-                        )
-                    ],
-                    notes: ["Hooks event '\(eventID)' is incomplete and did not provide a 'hooks' array."]
-                )
-            }
-            guard case let .array(actions) = hookValue else {
-                return (
-                    actions: nil,
-                    issues: [
-                        ResolutionIssue(
-                            code: .typeMismatch,
-                            severity: .warning,
-                            message: "Hook event 'hooks' field must be an array.",
-                            source: source,
-                            keyPath: "\(eventPath).hooks"
-                        )
-                    ],
-                    notes: ["Hooks event '\(eventID)' had a non-array 'hooks' payload."]
-                )
-            }
-            return (
-                actions: actions,
-                issues: [],
-                notes: ["Hooks event '\(eventID)' was loaded from object.hooks."]
-            )
-        default:
-            return (
-                actions: nil,
-                issues: [
-                    ResolutionIssue(
-                        code: .unsupportedShape,
-                        severity: .warning,
-                        message: "Hook event values must be an array or object with a 'hooks' array.",
-                        source: source,
-                        keyPath: eventPath
-                    )
-                ],
-                notes: ["Hooks event '\(eventID)' used an unsupported shape and could not be projected."]
-            )
-        }
+        let resolver = HookResolver()
+        return resolver.resolve(from: HookResolver.Input(resolvedSettings: settings))
     }
 
     private func collectSettingsIssues(_ settings: ResolvedSettingsSnapshot?) -> [ResolutionIssue] {
@@ -4231,13 +6446,15 @@ struct SessionProjectionBuilder {
     private func buildFamilyStates(
         input: Input,
         hooks: ResolvedHookSnapshot?,
+        mcp: ResolvedMcpSnapshot? = nil,
         byFamilyIssues: [(SessionProjectionFamily, [ResolutionIssue])]
     ) -> [ProjectionFamilyState] {
+        let effectiveMcp = mcp ?? input.mcp
         let availableByFamily: [SessionProjectionFamily: Bool] = [
             .settings: input.settings != nil,
             .instructions: input.instructions != nil,
             .hooks: hooks != nil,
-            .mcp: input.mcp != nil,
+            .mcp: effectiveMcp != nil,
             .agents: input.agents != nil,
             .skills: input.skills != nil
         ]
@@ -4245,7 +6462,7 @@ struct SessionProjectionBuilder {
             .settings: input.settings?.notes ?? [],
             .instructions: input.instructions?.notes ?? [],
             .hooks: hooks?.notes ?? [],
-            .mcp: input.mcp?.notes ?? [],
+            .mcp: effectiveMcp?.notes ?? [],
             .agents: input.agents?.notes ?? [],
             .skills: input.skills?.notes ?? []
         ]
@@ -4334,12 +6551,13 @@ struct SessionProjectionBuilder {
         )
     }
 
-    private func buildProvenance(input: Input, hooks: ResolvedHookSnapshot?) -> SessionProvenanceSummary {
+    private func buildProvenance(input: Input, hooks: ResolvedHookSnapshot?, mcp: ResolvedMcpSnapshot? = nil) -> SessionProvenanceSummary {
+        let effectiveMcp = mcp ?? input.mcp
         let familyRows: [SessionProvenanceFamilySummary] = [
             provenanceForSettings(input.settings),
             provenanceForInstructions(input.instructions),
             provenanceForHooks(hooks),
-            provenanceForMcp(input.mcp),
+            provenanceForMcp(effectiveMcp),
             provenanceForAgents(input.agents),
             provenanceForSkills(input.skills)
         ]
@@ -4420,12 +6638,16 @@ struct SessionProjectionBuilder {
         )
     }
 
-    private func projectionNotes(input: Input, hooks: ResolvedHookSnapshot?) -> [String] {
+    private func projectionNotes(input: Input, hooks: ResolvedHookSnapshot?, mcp: ResolvedMcpSnapshot? = nil) -> [String] {
+        let effectiveMcp = mcp ?? input.mcp
         var notes = input.notes
         notes.append("Session projection is computed in-memory and is never persisted as shadow truth.")
         notes.append("Projection collections use deterministic ordering for stable tests and UI.")
         if hooks == nil {
             notes.append("Hooks projection was unavailable because no resolved settings hooks key was present.")
+        }
+        if let mcpSnapshot = effectiveMcp, !mcpSnapshot.policyEffects.isEmpty {
+            notes.append("MCP policy enforcement is active with \(mcpSnapshot.policyEffects.count) policy effect(s).")
         }
         return deduplicatedNotes(notes)
     }

@@ -1,0 +1,9 @@
+{
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["github.com"],
+      "httpProxyPort": 99999,
+      "socksProxyPort": 0
+    }
+  }
+}

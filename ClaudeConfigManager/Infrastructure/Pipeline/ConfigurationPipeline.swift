@@ -58,6 +58,7 @@ final class ConfigurationPipeline: ObservableObject {
     @Published private(set) var scanResult: ScanResult?
     @Published private(set) var parseResults: [ParseResultRecord] = []
     @Published private(set) var projection: SessionProjection?
+    @Published private(set) var semanticIssues: [ValidationIssue] = []
 
     private let workspaceScanner: WorkspaceScanner
     private let rootLocator: RootLocator
@@ -122,6 +123,19 @@ final class ConfigurationPipeline: ObservableObject {
         )
         let projection = SessionProjectionBuilder().build(from: builderInput)
         self.projection = projection
+
+        // Phase 6: Semantic validation
+        let semanticValidator = SemanticValidator()
+        let semanticContext = SemanticValidationContext(
+            settings: settingsSnapshot,
+            instructions: instructionSnapshot,
+            mcp: mcpSnapshot,
+            agents: agentSnapshot,
+            skills: skillSnapshot,
+            existingIssues: []
+        )
+        let semanticResult = semanticValidator.validate(context: semanticContext)
+        self.semanticIssues = semanticResult.issues
 
         pipelineState = .completed
         logger.info("Pipeline completed successfully")
@@ -219,14 +233,19 @@ final class ConfigurationPipeline: ObservableObject {
 
     private func parseFile(_ file: DiscoveredFile, scope: DiscoveryScopeIdentity) -> ParseResultRecord {
         let configFileType = mapDiscoveredFileKindToConfigFileType(file.kind)
-        let resolutionScope = mapDiscoveryScopeToResolutionScope(scope)
+        let resolutionScope: ResolutionScope
+        if file.kind == .projectSettingsLocalJSON {
+            resolutionScope = .projectLocal
+        } else {
+            resolutionScope = mapDiscoveryScopeToResolutionScope(scope)
+        }
 
         do {
             let data = try Data(contentsOf: file.url)
 
             switch file.kind {
             case .managedSettingsJSON, .userSettingsJSON, .projectSettingsJSON, .projectSettingsLocalJSON:
-                let parseResult = settingsParser.parse(data: data, sourceURL: file.url)
+                let parseResult = settingsParser.parse(data: data, sourceURL: file.url, scope: resolutionScope)
                 return ParseResultRecord(
                     id: file.id.rawValue,
                     sourceFile: file.url,
@@ -309,7 +328,7 @@ final class ConfigurationPipeline: ObservableObject {
                 )
 
             case .managedSettingsDropIn:
-                let parseResult = settingsParser.parse(data: data, sourceURL: file.url)
+                let parseResult = settingsParser.parse(data: data, sourceURL: file.url, scope: resolutionScope)
                 return ParseResultRecord(
                     id: file.id.rawValue,
                     sourceFile: file.url,

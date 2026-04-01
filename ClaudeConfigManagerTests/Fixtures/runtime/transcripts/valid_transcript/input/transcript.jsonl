@@ -1,0 +1,4 @@
+{"type":"human","message":{"role":"user","content":[{"type":"text","text":"Hello, world!"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello! How can I help you today?"}],"model":"claude-opus-4-6","usage":{"input_tokens":50,"output_tokens":15}}}
+{"type":"tool_use","name":"Read","input":{"file_path":"/tmp/example.txt"}}
+{"type":"tool_result","tool_use_id":"toolu_abc123","content":"Example file contents"}

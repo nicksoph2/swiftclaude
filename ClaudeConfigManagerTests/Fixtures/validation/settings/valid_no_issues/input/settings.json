@@ -1,0 +1,24 @@
+{
+  "effortLevel": "high",
+  "feedbackSurveyRate": 0.5,
+  "cleanupPeriodDays": 30,
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": ["Read"],
+    "deny": ["Bash"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "network": {
+      "httpProxyPort": 8080,
+      "socksProxyPort": 1080
+    },
+    "filesystem": {
+      "allowWrite": ["/tmp"],
+      "denyWrite": ["/var"]
+    }
+  },
+  "allowedMcpServers": [
+    { "serverName": "github" }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "cwd": "/Users/alice/.claude/worktrees/my-feature",
+  "session_id": "sess-wt-001",
+  "transcript_path": "/Users/alice/.claude/projects/-Users-alice-projects-myproject/sess-wt-001.jsonl",
+  "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus"
+  },
+  "workspace": {
+    "current_dir": "/Users/alice/.claude/worktrees/my-feature",
+    "project_dir": "/Users/alice/projects/myproject"
+  },
+  "cost": {
+    "total_cost_usd": 1.23,
+    "total_duration_ms": 99000
+  },
+  "context_window": {
+    "total_input_tokens": 65000,
+    "total_output_tokens": 15000,
+    "context_window_size": 200000,
+    "used_percentage": 32.5,
+    "remaining_percentage": 67.5,
+    "current_usage": {
+      "input_tokens": 9500,
+      "output_tokens": 1400,
+      "cache_creation_input_tokens": 6000,
+      "cache_read_input_tokens": 2500
+    }
+  },
+  "worktree": {
+    "name": "my-feature",
+    "path": "/Users/alice/.claude/worktrees/my-feature",
+    "branch": "worktree-my-feature",
+    "original_cwd": "/Users/alice/projects/myproject",
+    "original_branch": "main"
+  }
+}

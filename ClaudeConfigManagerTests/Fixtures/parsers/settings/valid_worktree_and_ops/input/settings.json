@@ -1,0 +1,13 @@
+{
+  "worktree": {
+    "sparsePaths": ["packages/my-app", "shared/utils"],
+    "symlinkDirectories": ["node_modules", ".cache"]
+  },
+  "cleanupPeriodDays": 20,
+  "companyAnnouncements": ["Welcome to Acme Corp!"],
+  "plansDirectory": "./plans",
+  "autoUpdatesChannel": "stable",
+  "disableDeepLinkRegistration": "disable",
+  "useAutoModeDuringPlan": false,
+  "showClearContextOnPlanAccept": true
+}

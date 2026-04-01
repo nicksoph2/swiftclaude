@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct SessionScopeView: View {
     private enum SessionPanel: String, CaseIterable, Identifiable {
         case settings
@@ -7,6 +8,8 @@ struct SessionScopeView: View {
         case hooks
         case mcp
         case agentsSkills
+        case transcripts
+        case usage
 
         var id: String { rawValue }
 
@@ -22,21 +25,63 @@ struct SessionScopeView: View {
                 return "MCP"
             case .agentsSkills:
                 return "Agents & Skills"
+            case .transcripts:
+                return "Transcripts"
+            case .usage:
+                return "Usage"
             }
         }
     }
 
     @EnvironmentObject private var debugMonitor: AppDebugMonitor
+    @EnvironmentObject private var rootSelection: RootSelectionViewModel
     @State private var selectedPanel: SessionPanel = .settings
+    @StateObject private var runtimeSessionDiscovery: RuntimeSessionDiscovery
+    @StateObject private var transcriptScanner: TranscriptScanner
+    @StateObject private var usageAggregator: UsageAggregator
 
     private let projection: SessionProjection
+    private let isLiveProjection: Bool
 
-    init(projection: SessionProjection = SessionScopeView.previewProjection) {
-        self.projection = projection
+    init(
+        projection: SessionProjection? = nil,
+        runtimeSessionDiscovery: RuntimeSessionDiscovery? = nil,
+        transcriptScanner: TranscriptScanner? = nil
+    ) {
+        let isLive = projection != nil
+        self.projection = projection ?? SessionScopeView.previewProjection
+        self.isLiveProjection = isLive
+        let discovery = runtimeSessionDiscovery ?? RuntimeSessionDiscovery()
+        let scanner = transcriptScanner ?? TranscriptScanner()
+        _runtimeSessionDiscovery = StateObject(wrappedValue: discovery)
+        _transcriptScanner = StateObject(wrappedValue: scanner)
+        _usageAggregator = StateObject(
+            wrappedValue: UsageAggregator(transcriptScanner: scanner, runtimeDiscovery: discovery)
+        )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if !isLiveProjection {
+                HStack(spacing: 12) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Showing sample data — select a Claude folder to see your live configuration")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color(.controlBackgroundColor))
+                .cornerRadius(8)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+            }
+
+            RuntimeSessionCardView(discovery: runtimeSessionDiscovery)
+                .padding(.horizontal, 24)
+                .padding(.top, isLiveProjection ? 20 : 0)
+
             Picker("Session Panel", selection: $selectedPanel) {
                 ForEach(SessionPanel.allCases) { panel in
                     Text(panel.title).tag(panel)
@@ -44,7 +89,6 @@ struct SessionScopeView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 24)
-            .padding(.top, 20)
 
             switch selectedPanel {
             case .settings:
@@ -57,9 +101,20 @@ struct SessionScopeView: View {
                 SessionMCPView(viewModel: SessionMCPViewModel(projection: projection))
             case .agentsSkills:
                 SessionAgentsSkillsView(viewModel: SessionAgentsSkillsViewModel(projection: projection))
+            case .transcripts:
+                TranscriptBrowserView(scanner: transcriptScanner)
+            case .usage:
+                UsageDashboardView(aggregator: usageAggregator)
             }
         }
         .onAppear {
+            runtimeSessionDiscovery.updateClaudeRootURL(rootSelection.selectedGlobalRootURL)
+            transcriptScanner.updateClaudeRootURL(rootSelection.selectedGlobalRootURL)
+            Task {
+                await runtimeSessionDiscovery.discoverFromTranscripts()
+                await transcriptScanner.scanTranscripts()
+                await usageAggregator.refreshAll()
+            }
             debugMonitor.recordDetail(
                 title: "Session",
                 subtitle: "Read-only effective settings, instructions, hooks, and MCP state with provenance.",
@@ -74,9 +129,19 @@ struct SessionScopeView: View {
                     "MCP availability: \(projection.familyStates.first(where: { $0.family == .mcp })?.availability.rawValue ?? "unknown")",
                     "Agents availability: \(projection.familyStates.first(where: { $0.family == .agents })?.availability.rawValue ?? "unknown")",
                     "Skills availability: \(projection.familyStates.first(where: { $0.family == .skills })?.availability.rawValue ?? "unknown")",
+                    "Runtime session source: \(runtimeSessionDiscovery.dataSource.displayName)",
                     "Total projection issues: \(projection.issueSummary.totalIssues)"
                 ]
             )
+        }
+        .onChange(of: rootSelection.selectedGlobalRootURL) { _, newValue in
+            runtimeSessionDiscovery.updateClaudeRootURL(newValue)
+            transcriptScanner.updateClaudeRootURL(newValue)
+            Task {
+                await runtimeSessionDiscovery.discoverFromTranscripts()
+                await transcriptScanner.scanTranscripts()
+                await usageAggregator.refreshAll()
+            }
         }
         .navigationTitle("Session")
     }
@@ -99,6 +164,111 @@ struct SessionScopeView: View {
 
         let settings = ResolvedSettingsSnapshot(
             entries: [
+                // Model family
+                ResolvedSettingsEntry(
+                    keyPath: "model",
+                    value: ResolvedValue(
+                        effectiveValue: .string("claude-sonnet-4-6"),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(
+                            participants: [userSource],
+                            notes: ["Default model from user settings."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "effortLevel",
+                    value: ResolvedValue(
+                        effectiveValue: .string("high"),
+                        winningSource: projectLocalSource,
+                        trace: ResolutionTrace(
+                            participants: [projectLocalSource, userSource],
+                            overridden: [userSource],
+                            notes: ["Project-local override for effort level."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                // Permissions family
+                ResolvedSettingsEntry(
+                    keyPath: "permissions.defaultMode",
+                    value: ResolvedValue(
+                        effectiveValue: .string("default"),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(
+                            participants: [userSource],
+                            notes: ["User-scope default permission mode."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                // Hooks Policy family
+                ResolvedSettingsEntry(
+                    keyPath: "allowManagedHooksOnly",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: projectLocalSource,
+                        trace: ResolutionTrace(
+                            participants: [projectLocalSource, userSource],
+                            overridden: [userSource],
+                            notes: ["Managed-only hooks policy was enforced by project-local settings."]
+                        ),
+                        mergeMethod: .replace,
+                        notes: ["Policy constraint contributes to Session hooks restrictions."]
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "allowedHttpHookUrls",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("https://hooks.example.internal/*")]),
+                        winningSource: projectLocalSource,
+                        trace: ResolutionTrace(
+                            participants: [projectLocalSource],
+                            notes: ["HTTP hook URL allowlist configured at project-local scope."]
+                        ),
+                        mergeMethod: .appendUnique
+                    )
+                ),
+                // Sandbox family
+                ResolvedSettingsEntry(
+                    keyPath: "sandbox.enabled",
+                    value: ResolvedValue(
+                        effectiveValue: .bool(true),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(
+                            participants: [userSource],
+                            notes: ["Sandbox enabled from user settings."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                ResolvedSettingsEntry(
+                    keyPath: "sandbox.network.allowedDomains",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("api.example.com"), .string("cdn.example.com")]),
+                        winningSource: projectLocalSource,
+                        trace: ResolutionTrace(
+                            participants: [projectLocalSource, userSource],
+                            notes: ["Network domain allowlist merged across scopes."]
+                        ),
+                        mergeMethod: .appendUnique
+                    )
+                ),
+                // Plugins & Marketplaces family
+                ResolvedSettingsEntry(
+                    keyPath: "enabledPlugins",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("code-review"), .string("test-runner")]),
+                        winningSource: projectLocalSource,
+                        trace: ResolutionTrace(
+                            participants: [projectLocalSource],
+                            notes: ["Project-local plugin selection."]
+                        ),
+                        mergeMethod: .appendUnique
+                    )
+                ),
+                // UI & Session Experience family
                 ResolvedSettingsEntry(
                     keyPath: "cleanupPeriodDays",
                     value: ResolvedValue(
@@ -130,61 +300,41 @@ struct SessionScopeView: View {
                     )
                 ),
                 ResolvedSettingsEntry(
-                    keyPath: "allowManagedHooksOnly",
+                    keyPath: "defaultShell",
                     value: ResolvedValue(
-                        effectiveValue: .bool(true),
-                        winningSource: projectLocalSource,
+                        effectiveValue: .string("zsh"),
+                        winningSource: userSource,
                         trace: ResolutionTrace(
-                            participants: [projectLocalSource, userSource],
-                            overridden: [userSource],
-                            notes: ["Managed-only hooks policy was enforced by project-local settings."]
+                            participants: [userSource],
+                            notes: ["Default shell from user settings."]
                         ),
-                        mergeMethod: .replace,
-                        notes: ["Policy constraint contributes to Session hooks restrictions."]
+                        mergeMethod: .selectHighestPrecedence
                     )
                 ),
+                // Memory & CLAUDE.md family
                 ResolvedSettingsEntry(
-                    keyPath: "allowedHttpHookUrls",
+                    keyPath: "autoMemoryEnabled",
                     value: ResolvedValue(
-                        effectiveValue: .array([.string("https://hooks.example.internal/*")]),
+                        effectiveValue: .bool(true),
+                        winningSource: userSource,
+                        trace: ResolutionTrace(
+                            participants: [userSource],
+                            notes: ["Auto-memory enabled from user settings."]
+                        ),
+                        mergeMethod: .selectHighestPrecedence
+                    )
+                ),
+                // Worktree family
+                ResolvedSettingsEntry(
+                    keyPath: "worktree.sparsePaths",
+                    value: ResolvedValue(
+                        effectiveValue: .array([.string("src/"), .string("tests/")]),
                         winningSource: projectLocalSource,
                         trace: ResolutionTrace(
                             participants: [projectLocalSource],
-                            notes: ["HTTP hook URL allowlist configured at project-local scope."]
+                            notes: ["Sparse checkout paths from project-local settings."]
                         ),
                         mergeMethod: .appendUnique
-                    )
-                ),
-                ResolvedSettingsEntry(
-                    keyPath: "hooks",
-                    value: ResolvedValue(
-                        effectiveValue: .object([
-                            "preToolUse": .object([
-                                "matcher": .string("Bash"),
-                                "hooks": .array([
-                                    .object([
-                                        "type": .string("command"),
-                                        "command": .string("echo validating command"),
-                                        "timeoutMs": .number(1500)
-                                    ])
-                                ])
-                            ]),
-                            "postToolUse": .array([
-                                .object([
-                                    "type": .string("http"),
-                                    "url": .string("https://hooks.example.internal/post-tool"),
-                                    "timeoutMs": .number(3000)
-                                ])
-                            ])
-                        ]),
-                        winningSource: projectLocalSource,
-                        trace: ResolutionTrace(
-                            participants: [projectLocalSource, userSource],
-                            overridden: [userSource],
-                            notes: ["Hooks merged by event and action identity."]
-                        ),
-                        mergeMethod: .keyedByIdentifier,
-                        notes: ["Preview fixture: includes matcher and mixed action transport types."]
                     )
                 )
             ],
@@ -735,6 +885,303 @@ struct SessionScopeView: View {
     }()
 }
 
+@MainActor
+struct TranscriptBrowserView: View {
+    @ObservedObject var scanner: TranscriptScanner
+
+    @State private var selectedTranscriptPath: String?
+    @State private var selectedEntries: [TranscriptEntry] = []
+    @State private var selectedIssues: [TranscriptDiscoveryError] = []
+    @State private var showRawJSON = false
+    @State private var isLoadingContent = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            transcriptList
+                .frame(minWidth: 300, maxWidth: 360)
+
+            transcriptDetail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 24)
+        .task(id: scanner.recentTranscripts.map(\.id)) {
+            if selectedTranscript == nil {
+                selectedTranscriptPath = scanner.recentTranscripts.first?.transcriptPath
+            }
+            await loadSelectedTranscript()
+        }
+    }
+
+    private var transcriptList: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Transcripts", systemImage: "text.document")
+                .font(.title3.weight(.semibold))
+
+            if scanner.recentTranscripts.isEmpty {
+                Text("No primary session transcripts were discovered under the selected Claude root.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        Text("Recent Sessions")
+                            .font(.headline)
+                            .padding(.bottom, 2)
+
+                        ForEach(scanner.recentTranscripts) { transcript in
+                            transcriptButton(transcript)
+                        }
+
+                        if !subagentTranscripts.isEmpty {
+                            Divider()
+                                .padding(.vertical, 6)
+
+                            Text("Subagents")
+                                .font(.headline)
+                                .padding(.bottom, 2)
+
+                            ForEach(subagentTranscripts) { transcript in
+                                transcriptButton(transcript)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !scanner.discoveryIssues.isEmpty {
+                issueCard(title: "Discovery issues", issues: scanner.discoveryIssues)
+            }
+        }
+        .padding(20)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.separator.opacity(0.35))
+        )
+    }
+
+    private var transcriptDetail: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let selectedTranscript {
+                header(for: selectedTranscript)
+
+                HStack {
+                    Toggle("Raw JSON", isOn: $showRawJSON)
+                        .toggleStyle(.switch)
+                    Spacer()
+                    if isLoadingContent {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                if !selectedIssues.isEmpty {
+                    issueCard(title: "File issues", issues: selectedIssues)
+                }
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if selectedEntries.isEmpty {
+                            Text(selectedTranscript.lineCount == 0 ? "This transcript file is empty." : "No transcript entries could be rendered.")
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(16)
+                                .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        } else {
+                            ForEach(selectedEntries) { entry in
+                                entryCard(entry)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("Select a transcript to browse its contents.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .padding(20)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.separator.opacity(0.35))
+        )
+    }
+
+    private var selectedTranscript: TranscriptMetadata? {
+        guard let selectedTranscriptPath else {
+            return nil
+        }
+
+        return scanner.allTranscripts.first(where: { $0.transcriptPath == selectedTranscriptPath })
+    }
+
+    private var subagentTranscripts: [TranscriptMetadata] {
+        scanner.subagentTranscripts(forParentSessionID: selectedTranscript?.sessionId)
+    }
+
+    private func transcriptButton(_ transcript: TranscriptMetadata) -> some View {
+        Button {
+            selectedTranscriptPath = transcript.transcriptPath
+            Task {
+                await loadSelectedTranscript()
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(transcript.sessionId ?? "Unknown Session")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if transcript.isRecent {
+                        badge("Recent", color: .green)
+                    }
+                    if transcript.transcriptKind == .subagent {
+                        badge("Subagent", color: .blue)
+                    }
+                }
+
+                Text(transcript.model ?? "Model unavailable")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Text("\(ByteCountFormatter.string(fromByteCount: transcript.fileSize, countStyle: .file)) | \(transcript.modifiedAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.system(.footnote, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                isSelected(transcript)
+                    ? AnyShapeStyle(Color.accentColor.opacity(0.14))
+                    : AnyShapeStyle(.quaternary.opacity(0.18)),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func header(for transcript: TranscriptMetadata) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(transcript.sessionId ?? "Unknown Session", systemImage: "doc.text.magnifyingglass")
+                    .font(.title3.weight(.semibold))
+
+                Spacer()
+
+                if transcript.transcriptKind == .subagent, let agentId = transcript.agentId {
+                    badge(agentId, color: .blue)
+                }
+            }
+
+            Text(transcript.transcriptPath)
+                .font(.system(.footnote, design: .monospaced))
+                .textSelection(.enabled)
+                .foregroundStyle(.secondary)
+
+            Text("Lines: \(transcript.lineCount) | Model: \(transcript.model ?? "Unavailable") | Modified: \(transcript.modifiedAt.formatted(date: .abbreviated, time: .standard))")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func entryCard(_ entry: TranscriptEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Line \(entry.lineNumber)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if let type = entry.type {
+                    badge(type, color: color(for: type))
+                }
+
+                if let role = entry.role {
+                    badge(role, color: .gray)
+                }
+
+                if let timestamp = entry.timestamp {
+                    Spacer()
+                    Text(timestamp.formatted(date: .omitted, time: .standard))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text(showRawJSON ? entry.prettyRawJSON : entry.displayText)
+                .font(.system(.body, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func issueCard(title: String, issues: [TranscriptDiscoveryError]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+
+            ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
+                Text(issue.localizedDescription)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func badge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.16), in: Capsule())
+    }
+
+    private func color(for type: String) -> Color {
+        switch type {
+        case "human", "user":
+            return .orange
+        case "assistant":
+            return .green
+        case "tool_use":
+            return .blue
+        case "tool_result":
+            return .mint
+        default:
+            return .gray
+        }
+    }
+
+    private func isSelected(_ transcript: TranscriptMetadata) -> Bool {
+        transcript.transcriptPath == selectedTranscriptPath
+    }
+
+    private func loadSelectedTranscript() async {
+        guard let selectedTranscriptPath else {
+            selectedEntries = []
+            selectedIssues = []
+            return
+        }
+
+        isLoadingContent = true
+        defer { isLoadingContent = false }
+
+        let (entries, issues) = await scanner.loadTranscriptContent(path: selectedTranscriptPath)
+        selectedEntries = entries
+        selectedIssues = issues
+    }
+}
+
 struct SessionSettingsView: View {
     let viewModel: SessionSettingsViewModel
 
@@ -787,7 +1234,7 @@ struct SessionSettingsView: View {
                     .background(viewModel.stateBadgeColor.opacity(0.18), in: Capsule())
             }
 
-            Text("\(viewModel.rowCount) settings rows across \(viewModel.sections.count) sections")
+            Text("\(viewModel.rowCount) settings across \(viewModel.populatedFamilyCount) families")
                 .font(.subheadline)
 
             Text("Issues: \(viewModel.errorCount) errors, \(viewModel.warningCount) warnings, \(viewModel.infoCount) info")
@@ -836,10 +1283,10 @@ struct SessionSettingsView: View {
     private func sectionCard(_ section: SessionSettingsSectionModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(section.title)
+                Label(section.title, systemImage: section.systemImage)
                     .font(.headline)
                 Spacer()
-                Text("\(section.rows.count) row\(section.rows.count == 1 ? "" : "s")")
+                Text("\(section.rows.count) setting\(section.rows.count == 1 ? "" : "s")")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -1305,6 +1752,10 @@ struct SessionHooksView: View {
                 headerCard
                 summaryCard
 
+                if !viewModel.policyBanners.isEmpty {
+                    policyBannersCard
+                }
+
                 if !viewModel.restrictionBadges.isEmpty {
                     restrictionsCard
                 }
@@ -1315,8 +1766,8 @@ struct SessionHooksView: View {
                 case .empty:
                     emptyStateCard
                 case .populated:
-                    ForEach(viewModel.groups) { group in
-                        groupCard(group)
+                    ForEach(viewModel.catalogSections) { section in
+                        sectionCard(section)
                     }
                     diagnosticsCard
                 }
@@ -1374,6 +1825,33 @@ struct SessionHooksView: View {
         )
     }
 
+    private var policyBannersCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Policy")
+                .font(.headline)
+
+            ForEach(viewModel.policyBanners) { banner in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(banner.title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(banner.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(banner.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.separator.opacity(0.25))
+        )
+    }
+
     private var restrictionsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Restrictions")
@@ -1425,13 +1903,42 @@ struct SessionHooksView: View {
         .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private func sectionCard(_ section: HookCatalogSectionModel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(section.title)
+                        .font(.title3.weight(.semibold))
+                    Text(section.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(section.groups.count) event\(section.groups.count == 1 ? "" : "s")")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(section.groups) { group in
+                groupCard(group)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.separator.opacity(0.25))
+        )
+    }
+
     private func groupCard(_ group: HookGroupModel) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(group.eventTitle)
                         .font(.headline)
-                    Text("Matcher: \(group.matcherLabel)")
+                    Text(group.matcherDetail)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -1443,6 +1950,22 @@ struct SessionHooksView: View {
 
             if !group.issueBadges.isEmpty {
                 issueBadgesView(group.issueBadges)
+            }
+
+            if !group.capabilityBadges.isEmpty {
+                capabilityBadgesView(group.capabilityBadges)
+            }
+
+            if let suppressionDetail = group.suppressionDetail {
+                Text(suppressionDetail)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.orange)
+            }
+
+            if let capabilityNote = group.capabilityNote {
+                Text(capabilityNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             ForEach(group.rows) { row in
@@ -1467,7 +1990,7 @@ struct SessionHooksView: View {
     private func rowCard(_ row: HookRowModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
-                Text(row.actionSummary)
+                Text(row.handlerTitle)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text("#\(row.displayIndex)")
@@ -1477,9 +2000,20 @@ struct SessionHooksView: View {
                     .background(.quaternary, in: Capsule())
             }
 
-            Text(row.rawPayloadSummary)
-                .font(.system(.footnote, design: .monospaced))
+            Text(row.primaryDetail)
+                .font(.footnote)
                 .textSelection(.enabled)
+
+            ForEach(row.detailLines, id: \.self) { line in
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            if !row.indicatorBadges.isEmpty {
+                hookDetailBadgesView(row.indicatorBadges)
+            }
 
             if let winner = row.winningSourceChip {
                 Text("Winning source: \(winner.label)")
@@ -1515,6 +2049,11 @@ struct SessionHooksView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Text(row.rawPayloadSummary)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1575,6 +2114,30 @@ struct SessionHooksView: View {
             }
         }
     }
+
+    private func capabilityBadgesView(_ badges: [HookCapabilityBadgeModel]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(badges) { badge in
+                Text(badge.title)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(badge.color.opacity(0.18), in: Capsule())
+            }
+        }
+    }
+
+    private func hookDetailBadgesView(_ badges: [HookDetailBadgeModel]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(badges) { badge in
+                Text(badge.title)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(badge.color.opacity(0.18), in: Capsule())
+            }
+        }
+    }
 }
 
 struct SessionMCPView: View {
@@ -1585,6 +2148,9 @@ struct SessionMCPView: View {
             VStack(alignment: .leading, spacing: 18) {
                 headerCard
                 summaryCard
+                if !viewModel.policyBanners.isEmpty {
+                    policyBannersCard
+                }
 
                 switch viewModel.state {
                 case .missing:
@@ -1632,6 +2198,11 @@ struct SessionMCPView: View {
 
             Text("\(viewModel.serverRows.count) effective server\(viewModel.serverRows.count == 1 ? "" : "s"), \(viewModel.overriddenServers.count) with overrides")
                 .font(.subheadline)
+            if viewModel.state != .missing {
+                Text(viewModel.stateBreakdownSummary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             Text("Issues: \(viewModel.errorCount) errors, \(viewModel.warningCount) warnings, \(viewModel.infoCount) info")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1654,6 +2225,33 @@ struct SessionMCPView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.separator.opacity(0.35))
+        )
+    }
+
+    private var policyBannersCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("MCP Policy")
+                .font(.headline)
+
+            ForEach(viewModel.policyBanners) { banner in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(banner.title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(banner.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(banner.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.separator.opacity(0.25))
         )
     }
 
@@ -1705,14 +2303,41 @@ struct SessionMCPView: View {
                 Text(row.serverID)
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                 Spacer()
-                Text(row.mergeMethodLabel)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: Capsule())
+                HStack(spacing: 8) {
+                    Text(row.effectiveStateLabel)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(row.effectiveStateColor.opacity(0.18), in: Capsule())
+                    Text(row.mergeMethodLabel)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.quaternary, in: Capsule())
+                }
             }
 
-            Text(row.configSummary)
+            Text(row.stateExplanation)
+                .font(.footnote)
+                .foregroundStyle(row.effectiveState == .managed ? .primary : .secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Transport: \(row.transportLabel)")
+                    .font(.footnote.weight(.semibold))
+                if let detail = row.transportPrimaryDetail {
+                    Text(detail)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                ForEach(row.transportDetailLines, id: \.self) { detail in
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+
+            Text("Raw config: \(row.configSummary)")
                 .font(.system(.footnote, design: .monospaced))
                 .textSelection(.enabled)
 
@@ -1745,6 +2370,24 @@ struct SessionMCPView: View {
                 issueBadgesView(row.issueBadges)
             }
 
+            if !row.policyEffectBadges.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(row.policyEffectBadges) { badge in
+                        Text(badge.title)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(badge.color.opacity(0.16), in: Capsule())
+                    }
+                }
+
+                ForEach(row.policyEffectDetails, id: \.self) { detail in
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if !row.environmentNotes.isEmpty {
                 HStack(spacing: 8) {
                     Text("\(row.environmentNotes.count) env note\(row.environmentNotes.count == 1 ? "" : "s")")
@@ -1768,7 +2411,11 @@ struct SessionMCPView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(row.backgroundColor.opacity(0.22), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(row.effectiveState == .managed ? row.effectiveStateColor.opacity(0.4) : .clear)
+        )
     }
 
     private var overridesCard: some View {
@@ -2704,8 +3351,14 @@ struct SessionMCPViewModel: Equatable {
     let serverRows: [McpServerRowModel]
     let overriddenServers: [OverriddenServerModel]
     let diagnostics: [McpDiagnosticModel]
+    let policyBanners: [McpPolicyBannerModel]
     let issueBadges: [IssueBadgeModel]
     let summaryNotes: [String]
+    let activeCount: Int
+    let disabledCount: Int
+    let blockedCount: Int
+    let managedCount: Int
+    let unresolvedCount: Int
     let conflictCount: Int
     let invalidDefinitionCount: Int
     let environmentNoteCount: Int
@@ -2721,10 +3374,16 @@ struct SessionMCPViewModel: Equatable {
             serverRows = []
             overriddenServers = []
             diagnostics = []
+            policyBanners = []
             issueBadges = []
             summaryNotes = SessionSettingsViewModel.deduplicated(
                 projection.completeness.confidenceNotes + projection.notes
             )
+            activeCount = 0
+            disabledCount = 0
+            blockedCount = 0
+            managedCount = 0
+            unresolvedCount = 0
             conflictCount = 0
             invalidDefinitionCount = 0
             environmentNoteCount = 0
@@ -2737,6 +3396,11 @@ struct SessionMCPViewModel: Equatable {
 
         let rows = mcp.servers.map(McpServerRowModel.init).sorted { $0.serverID < $1.serverID }
         serverRows = rows
+        activeCount = rows.filter { $0.effectiveState == .active }.count
+        disabledCount = rows.filter { $0.effectiveState == .disabled }.count
+        blockedCount = rows.filter { $0.effectiveState == .blocked }.count
+        managedCount = rows.filter { $0.effectiveState == .managed }.count
+        unresolvedCount = rows.filter { $0.effectiveState == .unresolved }.count
 
         overriddenServers = rows
             .filter { $0.overriddenSourceChips.isEmpty == false }
@@ -2752,6 +3416,7 @@ struct SessionMCPViewModel: Equatable {
         let nestedIssues = rows.flatMap(\.issues)
         let allIssues = SessionMCPViewModel.deduplicatedIssues(mcp.issues + nestedIssues)
         diagnostics = SessionMCPViewModel.buildDiagnostics(rows: rows, issues: allIssues)
+        policyBanners = SessionMCPViewModel.policyBanners(from: mcp.policyEffects)
         issueBadges = IssueBadgeModel.badges(for: allIssues)
         errorCount = allIssues.filter { $0.severity == .error }.count
         warningCount = allIssues.filter { $0.severity == .warning }.count
@@ -2807,6 +3472,17 @@ struct SessionMCPViewModel: Equatable {
         }
     }
 
+    var stateBreakdownSummary: String {
+        let parts = [
+            activeCount > 0 ? "\(activeCount) active" : nil,
+            managedCount > 0 ? "\(managedCount) managed" : nil,
+            blockedCount > 0 ? "\(blockedCount) blocked" : nil,
+            disabledCount > 0 ? "\(disabledCount) disabled" : nil,
+            unresolvedCount > 0 ? "\(unresolvedCount) unresolved" : nil
+        ].compactMap { $0 }
+        return parts.isEmpty ? "No effective-state rows are currently available." : parts.joined(separator: ", ")
+    }
+
     private static let invalidIssueCodes: Set<ResolutionIssueCode> = [
         .invalidSource,
         .inaccessibleSource,
@@ -2858,21 +3534,83 @@ struct SessionMCPViewModel: Equatable {
         guard keyPath.hasPrefix("mcpServers.") else { return keyPath }
         return String(keyPath.dropFirst("mcpServers.".count).split(separator: ".").first ?? "")
     }
+
+    private static func policyBanners(from effects: [McpPolicyEffect]) -> [McpPolicyBannerModel] {
+        effects.compactMap { effect in
+            let sourceLabel = effect.policySource?.displayName ?? effect.policySource?.sourcePath ?? effect.policySource?.identifier
+            let detail = sourceLabel.map { "\(effect.message) Source: \($0)." } ?? effect.message
+            switch effect.reason {
+            case .allowManagedMcpServersOnly:
+                return McpPolicyBannerModel(title: "Managed MCP only", detail: detail, tone: .warning)
+            case .enableAllProjectMcpServers:
+                return McpPolicyBannerModel(title: "Project MCP auto-enabled", detail: detail, tone: .info)
+            case .allowedMcpServers:
+                return McpPolicyBannerModel(title: "MCP allow rules active", detail: detail, tone: .info)
+            case .deniedMcpServers:
+                return McpPolicyBannerModel(title: "MCP deny rules active", detail: detail, tone: .warning)
+            case .enabledMcpjsonServers:
+                return McpPolicyBannerModel(title: "Named MCP auto-enabled", detail: detail, tone: .info)
+            case .disabledMcpjsonServers:
+                return McpPolicyBannerModel(title: "Named MCP disabled", detail: detail, tone: .warning)
+            }
+        }
+    }
 }
 
 struct McpServerRowModel: Identifiable, Equatable {
     let serverID: String
     let configSummary: String
+    let effectiveState: McpServerEffectiveState
+    let stateExplanation: String
+    let transportLabel: String
+    let transportPrimaryDetail: String?
+    let transportDetailLines: [String]
     let mergeMethod: MergeMethod
     let winningSourceChip: SourceChipModel?
     let participantSourceChips: [SourceChipModel]
     let overriddenSourceChips: [SourceChipModel]
+    let policyEffectBadges: [McpPolicyEffectBadgeModel]
+    let policyEffectDetails: [String]
     let issues: [ResolutionIssue]
     let issueBadges: [IssueBadgeModel]
     let notes: [String]
     let environmentNotes: [McpEnvironmentRowNote]
 
     var id: String { serverID }
+
+    var effectiveStateLabel: String {
+        switch effectiveState {
+        case .active:
+            return "Active"
+        case .disabled:
+            return "Disabled"
+        case .blocked:
+            return "Blocked"
+        case .managed:
+            return "Managed"
+        case .unresolved:
+            return "Unresolved"
+        }
+    }
+
+    var effectiveStateColor: Color {
+        switch effectiveState {
+        case .active:
+            return .green
+        case .disabled:
+            return .orange
+        case .blocked:
+            return .red
+        case .managed:
+            return .mint
+        case .unresolved:
+            return .gray
+        }
+    }
+
+    var backgroundColor: Color {
+        effectiveState == .managed ? .mint : .gray
+    }
 
     var mergeMethodLabel: String {
         switch mergeMethod {
@@ -2909,14 +3647,88 @@ struct McpServerRowModel: Identifiable, Equatable {
     init(entry: ResolvedMcpServerEntry) {
         serverID = entry.serverID
         configSummary = McpServerRowModel.formatJSON(entry.resolvedConfig.effectiveValue)
+        effectiveState = entry.effectiveState
+        stateExplanation = entry.stateExplanation
+        let transportDetails = McpServerRowModel.transportDetails(for: entry.resolvedConfig.effectiveValue)
+        transportLabel = transportDetails.label
+        transportPrimaryDetail = transportDetails.primaryDetail
+        transportDetailLines = transportDetails.detailLines
         mergeMethod = entry.resolvedConfig.mergeMethod
         winningSourceChip = entry.resolvedConfig.winningSource.map(SourceChipModel.init)
         participantSourceChips = entry.resolvedConfig.trace.participants.map(SourceChipModel.init)
         overriddenSourceChips = entry.resolvedConfig.trace.overridden.map(SourceChipModel.init)
+        policyEffectBadges = entry.policyEffects.map(McpPolicyEffectBadgeModel.init)
+        policyEffectDetails = SessionSettingsViewModel.deduplicated(entry.policyEffects.map(\.message))
         issues = entry.resolvedConfig.issues
         issueBadges = IssueBadgeModel.badges(for: entry.resolvedConfig.issues)
         notes = SessionSettingsViewModel.deduplicated(entry.resolvedConfig.notes + entry.resolvedConfig.trace.notes)
         environmentNotes = entry.environmentNotes.map(McpEnvironmentRowNote.init)
+    }
+
+    private static func transportDetails(for value: JSONValue?) -> (label: String, primaryDetail: String?, detailLines: [String]) {
+        guard case let .object(object)? = value else {
+            return ("Unresolved", nil, [])
+        }
+
+        let command = stringValue(object["command"])
+        let args = stringArrayValue(object["args"])
+        let url = stringValue(object["url"])
+        let pluginID = stringValue(object["pluginId"])
+        let pluginName = stringValue(object["pluginName"])
+        let cwd = stringValue(object["cwd"])
+        let transport = stringValue(object["transport"])?.lowercased()
+        let envCount = objectValue(object["env"])?.count ?? 0
+        let headerCount = objectValue(object["headers"])?.count ?? 0
+
+        let label: String
+        let primaryDetail: String?
+        if let pluginID, !pluginID.isEmpty {
+            label = "Plugin"
+            primaryDetail = pluginName.flatMap { $0.isEmpty ? nil : "\($0) (\(pluginID))" } ?? pluginID
+        } else if let command, !command.isEmpty {
+            label = "stdio"
+            primaryDetail = ([command] + args).joined(separator: " ")
+        } else if let url, !url.isEmpty {
+            label = transport == "sse" ? "SSE" : "HTTP"
+            primaryDetail = url
+        } else if let transport, !transport.isEmpty {
+            label = transport.uppercased()
+            primaryDetail = nil
+        } else {
+            label = "Unknown"
+            primaryDetail = nil
+        }
+
+        var details: [String] = []
+        if let cwd, !cwd.isEmpty {
+            details.append("Working directory: \(cwd)")
+        }
+        if envCount > 0 {
+            details.append("Environment: \(envCount) variable\(envCount == 1 ? "" : "s")")
+        }
+        if headerCount > 0 {
+            details.append("Headers: \(headerCount) configured")
+        }
+
+        return (label, primaryDetail, details)
+    }
+
+    private static func stringValue(_ value: JSONValue?) -> String? {
+        guard case let .string(string)? = value else { return nil }
+        return string
+    }
+
+    private static func stringArrayValue(_ value: JSONValue?) -> [String] {
+        guard case let .array(array)? = value else { return [] }
+        return array.compactMap {
+            guard case let .string(string) = $0 else { return nil }
+            return string
+        }
+    }
+
+    private static func objectValue(_ value: JSONValue?) -> [String: JSONValue]? {
+        guard case let .object(object)? = value else { return nil }
+        return object
     }
 
     private static func formatJSON(_ value: JSONValue?) -> String {
@@ -3020,6 +3832,64 @@ struct McpDiagnosticModel: Identifiable, Equatable {
     }
 }
 
+struct McpPolicyBannerModel: Identifiable, Equatable {
+    enum Tone: Equatable {
+        case warning
+        case info
+    }
+
+    let title: String
+    let detail: String
+    let tone: Tone
+
+    var id: String { "\(title)-\(detail)" }
+
+    var color: Color {
+        switch tone {
+        case .warning:
+            return .orange
+        case .info:
+            return .blue
+        }
+    }
+}
+
+struct McpPolicyEffectBadgeModel: Identifiable, Equatable {
+    let reason: McpPolicyReason
+
+    var id: String { reason.rawValue }
+
+    var title: String {
+        switch reason {
+        case .allowManagedMcpServersOnly:
+            return "Managed Only"
+        case .enableAllProjectMcpServers:
+            return "Project Auto-Enable"
+        case .enabledMcpjsonServers:
+            return "Explicitly Enabled"
+        case .disabledMcpjsonServers:
+            return "Explicitly Disabled"
+        case .allowedMcpServers:
+            return "Allow Rule"
+        case .deniedMcpServers:
+            return "Deny Rule"
+        }
+    }
+
+    var color: Color {
+        switch reason {
+        case .allowManagedMcpServersOnly, .disabledMcpjsonServers, .deniedMcpServers:
+            return .orange
+        case .enableAllProjectMcpServers, .enabledMcpjsonServers, .allowedMcpServers:
+            return .blue
+        }
+    }
+
+    init(effect: McpPolicyEffect) {
+        reason = effect.reason
+    }
+}
+
 struct SessionHooksViewModel: Equatable {
     enum State: Equatable {
         case missing
@@ -3028,7 +3898,9 @@ struct SessionHooksViewModel: Equatable {
     }
 
     let state: State
+    let catalogSections: [HookCatalogSectionModel]
     let groups: [HookGroupModel]
+    let policyBanners: [HookPolicyBannerModel]
     let restrictionBadges: [HookRestrictionBadgeModel]
     let issues: [HookIssueModel]
     let issueBadges: [IssueBadgeModel]
@@ -3043,7 +3915,9 @@ struct SessionHooksViewModel: Equatable {
         let familyState = projection.familyStates.first(where: { $0.family == .hooks })
         guard let hooks = projection.hooks else {
             state = .missing
+            catalogSections = []
             groups = []
+            policyBanners = []
             restrictionBadges = []
             issues = []
             issueBadges = []
@@ -3062,17 +3936,21 @@ struct SessionHooksViewModel: Equatable {
         groups = hooks.events
             .map { event in
                 HookGroupModel(
-                    eventID: event.eventID,
+                    event: event,
                     matcher: eventMatchers[event.eventID],
-                    value: event.hooks
                 )
             }
             .sorted { lhs, rhs in
+                if lhs.eventType.sortKey != rhs.eventType.sortKey {
+                    return lhs.eventType.sortKey < rhs.eventType.sortKey
+                }
                 if lhs.eventID != rhs.eventID {
                     return lhs.eventID < rhs.eventID
                 }
                 return lhs.matcherLabel < rhs.matcherLabel
             }
+        catalogSections = HookCatalogSectionModel.sections(from: groups)
+        policyBanners = SessionHooksViewModel.policyBanners(from: hooks.policyEffects)
         restrictionBadges = SessionHooksViewModel.restrictionBadges(from: projection.settings)
         rowCount = groups.reduce(into: 0) { partialResult, group in
             partialResult += group.rows.count
@@ -3084,7 +3962,8 @@ struct SessionHooksViewModel: Equatable {
                 hooks.events.flatMap(\.hooks.issues) +
                 projection.issues.filter { issue in
                     guard let keyPath = issue.keyPath else { return false }
-                    return keyPath == "allowManagedHooksOnly" ||
+                    return keyPath == "disableAllHooks" ||
+                        keyPath == "allowManagedHooksOnly" ||
                         keyPath == "allowedHttpHookUrls" ||
                         keyPath == "httpHookAllowedEnvVars" ||
                         keyPath.hasPrefix("hooks")
@@ -3166,19 +4045,6 @@ struct SessionHooksViewModel: Equatable {
 
         var rows: [HookRestrictionBadgeModel] = []
         if
-            let managedOnly = settings.entries.first(where: { $0.keyPath == "allowManagedHooksOnly" }),
-            managedOnly.value.effectiveValue?.boolValue == true
-        {
-            rows.append(
-                HookRestrictionBadgeModel(
-                    title: "Managed Hooks Only",
-                    detail: "Only managed hooks are permitted by the effective policy.",
-                    tone: .warning
-                )
-            )
-        }
-
-        if
             let urlsEntry = settings.entries.first(where: { $0.keyPath == "allowedHttpHookUrls" }),
             let urls = urlsEntry.value.effectiveValue?.stringArrayValue,
             urls.isEmpty == false
@@ -3209,6 +4075,26 @@ struct SessionHooksViewModel: Equatable {
         return rows
     }
 
+    private static func policyBanners(from effects: [HookSuppressionEffect]) -> [HookPolicyBannerModel] {
+        effects.compactMap { effect in
+            let sourceLabel = effect.policySource?.displayName ?? effect.policySource?.identifier
+            switch effect.reason {
+            case .disableAllHooks:
+                return HookPolicyBannerModel(
+                    title: "All hooks disabled",
+                    detail: sourceLabel.map { "\(effect.message) Source: \($0)." } ?? effect.message,
+                    tone: .warning
+                )
+            case .allowManagedHooksOnly:
+                return HookPolicyBannerModel(
+                    title: "Managed hooks only",
+                    detail: sourceLabel.map { "\(effect.message) Source: \($0)." } ?? effect.message,
+                    tone: .warning
+                )
+            }
+        }
+    }
+
     private static func deduplicatedIssues(_ issues: [ResolutionIssue]) -> [ResolutionIssue] {
         var seen = Set<String>()
         return issues
@@ -3217,36 +4103,154 @@ struct SessionHooksViewModel: Equatable {
     }
 }
 
+private extension HookEventType {
+    var catalogSection: HookCatalogSectionModel.Kind {
+        switch self {
+        case .sessionStart, .sessionEnd, .instructionsLoaded, .setup:
+            return .sessionLifecycle
+        case .userPromptSubmit, .preToolUse, .postToolUse, .postToolUseFailure, .permissionRequest, .stop, .stopFailure:
+            return .toolAndTurnFlow
+        case .preCompact, .postCompact, .elicitation, .elicitationResult:
+            return .compactionAndPrompting
+        case .subagentStart, .subagentStop, .taskCreated, .taskCompleted, .teammateIdle:
+            return .agentsAndTasks
+        case .notification, .configChange, .worktreeCreate, .worktreeRemove, .cwdChanged, .fileChanged:
+            return .workspaceAndRuntime
+        case .unknown:
+            return .futureOrUnknown
+        }
+    }
+}
+
+struct HookCatalogSectionModel: Identifiable, Equatable {
+    enum Kind: String, Equatable {
+        case sessionLifecycle
+        case toolAndTurnFlow
+        case compactionAndPrompting
+        case agentsAndTasks
+        case workspaceAndRuntime
+        case futureOrUnknown
+
+        var title: String {
+            switch self {
+            case .sessionLifecycle:
+                return "Session Lifecycle"
+            case .toolAndTurnFlow:
+                return "Tool And Turn Flow"
+            case .compactionAndPrompting:
+                return "Compaction And Prompting"
+            case .agentsAndTasks:
+                return "Agents And Tasks"
+            case .workspaceAndRuntime:
+                return "Workspace And Runtime"
+            case .futureOrUnknown:
+                return "Future Or Unknown"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .sessionLifecycle:
+                return "Startup, shutdown, setup, and instruction-loading hooks."
+            case .toolAndTurnFlow:
+                return "Prompt, tool, permission, and stop events in the main turn flow."
+            case .compactionAndPrompting:
+                return "Compaction checkpoints and elicitation-style prompt interactions."
+            case .agentsAndTasks:
+                return "Subagent, teammate, and task lifecycle events."
+            case .workspaceAndRuntime:
+                return "Config, worktree, cwd, file, and runtime notification events."
+            case .futureOrUnknown:
+                return "Forward-compatible events that do not match the current catalog."
+            }
+        }
+
+        var sortOrder: Int {
+            switch self {
+            case .sessionLifecycle:
+                return 0
+            case .toolAndTurnFlow:
+                return 1
+            case .compactionAndPrompting:
+                return 2
+            case .agentsAndTasks:
+                return 3
+            case .workspaceAndRuntime:
+                return 4
+            case .futureOrUnknown:
+                return 5
+            }
+        }
+    }
+
+    let kind: Kind
+    let groups: [HookGroupModel]
+
+    var id: String { kind.rawValue }
+    var title: String { kind.title }
+    var detail: String { kind.detail }
+
+    static func sections(from groups: [HookGroupModel]) -> [HookCatalogSectionModel] {
+        Dictionary(grouping: groups, by: \.catalogSection)
+            .map { HookCatalogSectionModel(kind: $0.key, groups: $0.value) }
+            .sorted { lhs, rhs in lhs.kind.sortOrder < rhs.kind.sortOrder }
+    }
+}
+
 struct HookGroupModel: Identifiable, Equatable {
     let eventID: String
+    let eventType: HookEventType
     let eventTitle: String
+    let matcherDetail: String
     let matcherLabel: String
+    let catalogSection: HookCatalogSectionModel.Kind
+    let capabilityBadges: [HookCapabilityBadgeModel]
+    let capabilityNote: String?
+    let suppressionDetail: String?
     let rows: [HookRowModel]
     let issueBadges: [IssueBadgeModel]
     let notes: [String]
 
     var id: String { "\(eventID)-\(matcherLabel)" }
 
-    init(eventID: String, matcher: String?, value: ResolvedValue<[JSONValue]>) {
-        self.eventID = eventID
-        eventTitle = eventID
+    init(event: ResolvedHookEventEntry, matcher: String?) {
+        eventID = event.eventID
+        eventType = event.eventType
+        eventTitle = eventType.canonicalName
+        catalogSection = eventType.catalogSection
         matcherLabel = matcher?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             ? matcher!
             : "(none)"
+        matcherDetail = matcherLabel == "(none)"
+            ? "Matcher: none"
+            : "Matcher: \(matcherLabel)"
+        capabilityBadges = HookCapabilityBadgeModel.badges(for: eventType)
+        capabilityNote = eventType.supportsPromptErasure
+            ? "Prompt erasure: a successful block result can remove the user's prompt from model context."
+            : nil
+        suppressionDetail = event.suppression?.message
 
-        let actions = value.effectiveValue ?? []
+        let actions = event.hooks.effectiveValue ?? []
         rows = actions.enumerated().map { pair in
-            HookRowModel(index: pair.offset, payload: pair.element, value: value)
+            HookRowModel(
+                index: pair.offset,
+                payload: pair.element,
+                handler: event.resolvedHandlers.indices.contains(pair.offset) ? event.resolvedHandlers[pair.offset] : nil,
+                value: event.hooks
+            )
         }
-        issueBadges = IssueBadgeModel.badges(for: value.issues)
-        notes = SessionSettingsViewModel.deduplicated(value.trace.notes + value.notes)
+        issueBadges = IssueBadgeModel.badges(for: event.hooks.issues)
+        notes = SessionSettingsViewModel.deduplicated(event.hooks.trace.notes + event.hooks.notes)
     }
 }
 
 struct HookRowModel: Identifiable, Equatable {
     let id: String
     let displayIndex: Int
-    let actionSummary: String
+    let handlerTitle: String
+    let primaryDetail: String
+    let detailLines: [String]
+    let indicatorBadges: [HookDetailBadgeModel]
     let rawPayloadSummary: String
     let winningSourceChip: SourceChipModel?
     let participantSourceChips: [SourceChipModel]
@@ -3254,10 +4258,13 @@ struct HookRowModel: Identifiable, Equatable {
     let issueBadges: [IssueBadgeModel]
     let notes: [String]
 
-    init(index: Int, payload: JSONValue, value: ResolvedValue<[JSONValue]>) {
+    init(index: Int, payload: JSONValue, handler: ResolvedHookHandler?, value: ResolvedValue<[JSONValue]>) {
         displayIndex = index + 1
         id = "\(displayIndex)-\(HookRowModel.formatJSON(payload))"
-        actionSummary = HookRowModel.actionSummary(for: payload)
+        handlerTitle = HookRowModel.handlerTitle(for: handler, payload: payload)
+        primaryDetail = HookRowModel.primaryDetail(for: handler, payload: payload)
+        detailLines = HookRowModel.detailLines(for: handler)
+        indicatorBadges = HookDetailBadgeModel.badges(for: handler)
         rawPayloadSummary = HookRowModel.formatJSON(payload)
         winningSourceChip = value.winningSource.map(SourceChipModel.init)
         participantSourceChips = value.trace.participants.map(SourceChipModel.init)
@@ -3266,30 +4273,76 @@ struct HookRowModel: Identifiable, Equatable {
         notes = SessionSettingsViewModel.deduplicated(value.notes + value.trace.notes)
     }
 
-    private static func actionSummary(for payload: JSONValue) -> String {
+    private static func handlerTitle(for handler: ResolvedHookHandler?, payload: JSONValue) -> String {
+        if let type = handler?.handlerType {
+            switch type {
+            case .command:
+                return "Command handler"
+            case .http:
+                return "HTTP handler"
+            case .prompt:
+                return "Prompt handler"
+            case .agent:
+                return "Agent handler"
+            }
+        }
+
+        if let rawType = handler?.rawType {
+            return "\(rawType.capitalized) handler"
+        }
+
         guard case let .object(object) = payload else {
-            return "Unknown action shape"
+            return "Unknown handler"
+        }
+        return object["type"]?.stringValue.map { "\($0.capitalized) handler" } ?? "Unknown handler"
+    }
+
+    private static func primaryDetail(for handler: ResolvedHookHandler?, payload: JSONValue) -> String {
+        if let handler {
+            switch handler.handlerType {
+            case .command:
+                return "Command: \(handler.command ?? "(missing)")"
+            case .http:
+                return "URL: \(handler.url ?? "(missing)")"
+            case .prompt:
+                return "Prompt: \(handler.prompt ?? "(missing)")"
+            case .agent:
+                return "Agent prompt: \(handler.prompt ?? "(missing)")"
+            case .none:
+                break
+            }
         }
 
-        let type = object["type"]?.stringValue ?? "unknown"
-        let matcher = object["matcher"]?.stringValue
-        let timeout = object["timeoutMs"]?.numberValue.map { "timeout=\(Int($0))ms" }
+        return "Payload: \(formatJSON(payload))"
+    }
 
-        if let command = object["command"]?.stringValue {
-            return [type, "command: \(command)", matcher.map { "matcher: \($0)" }, timeout]
-                .compactMap { $0 }
-                .joined(separator: " | ")
+    private static func detailLines(for handler: ResolvedHookHandler?) -> [String] {
+        guard let handler else { return [] }
+
+        var lines: [String] = []
+        if let statusMessage = handler.statusMessage {
+            lines.append("Status message: \(statusMessage)")
         }
-
-        if let url = object["url"]?.stringValue {
-            return [type, "url: \(url)", matcher.map { "matcher: \($0)" }, timeout]
-                .compactMap { $0 }
-                .joined(separator: " | ")
+        if let condition = handler.condition {
+            lines.append("Condition: \(condition)")
         }
-
-        return [type, matcher.map { "matcher: \($0)" }, timeout]
-            .compactMap { $0 }
-            .joined(separator: " | ")
+        if let model = handler.model {
+            lines.append("Model: \(model)")
+        }
+        if let shell = handler.shell {
+            lines.append("Shell: \(shell)")
+        }
+        if let timeout = handler.timeout {
+            lines.append("Timeout: \(timeout)s")
+        }
+        if let headers = handler.headers, headers.isEmpty == false {
+            let headerSummary = headers.keys.sorted().joined(separator: ", ")
+            lines.append("Headers: \(headerSummary)")
+        }
+        if let allowedEnvVars = handler.allowedEnvVars, allowedEnvVars.isEmpty == false {
+            lines.append("Allowed env vars: \(allowedEnvVars.joined(separator: ", "))")
+        }
+        return lines
     }
 
     private static func formatJSON(_ value: JSONValue?) -> String {
@@ -3326,6 +4379,80 @@ struct HookRowModel: Identifiable, Equatable {
     }
 }
 
+struct HookDetailBadgeModel: Identifiable, Equatable {
+    enum Tone: Equatable {
+        case info
+        case neutral
+
+        var color: Color {
+            switch self {
+            case .info:
+                return .blue
+            case .neutral:
+                return .gray
+            }
+        }
+    }
+
+    let title: String
+    let tone: Tone
+
+    var id: String { title }
+    var color: Color { tone.color }
+
+    static func badges(for handler: ResolvedHookHandler?) -> [HookDetailBadgeModel] {
+        guard let handler else { return [] }
+
+        var badges: [HookDetailBadgeModel] = []
+        if handler.condition != nil {
+            badges.append(HookDetailBadgeModel(title: "Conditional", tone: .info))
+        }
+        if let isAsync = handler.isAsync {
+            badges.append(HookDetailBadgeModel(title: isAsync ? "Async" : "Sync", tone: .neutral))
+        }
+        if handler.once == true {
+            badges.append(HookDetailBadgeModel(title: "Once", tone: .neutral))
+        }
+        return badges
+    }
+}
+
+struct HookCapabilityBadgeModel: Identifiable, Equatable {
+    enum Tone: Equatable {
+        case warning
+        case info
+
+        var color: Color {
+            switch self {
+            case .warning:
+                return .orange
+            case .info:
+                return .blue
+            }
+        }
+    }
+
+    let title: String
+    let tone: Tone
+
+    var id: String { title }
+    var color: Color { tone.color }
+
+    static func badges(for eventType: HookEventType) -> [HookCapabilityBadgeModel] {
+        var rows: [HookCapabilityBadgeModel] = []
+
+        if eventType.isBlocking {
+            rows.append(HookCapabilityBadgeModel(title: "Blocking", tone: .warning))
+        }
+
+        if eventType.supportsContextInjection {
+            rows.append(HookCapabilityBadgeModel(title: "Context injection", tone: .info))
+        }
+
+        return rows
+    }
+}
+
 struct HookRestrictionBadgeModel: Identifiable, Equatable {
     enum Tone: Equatable {
         case warning
@@ -3346,6 +4473,21 @@ struct HookRestrictionBadgeModel: Identifiable, Equatable {
             return .blue
         }
     }
+}
+
+struct HookPolicyBannerModel: Identifiable, Equatable {
+    enum Tone: Equatable {
+        case warning
+
+        var color: Color { .orange }
+    }
+
+    let title: String
+    let detail: String
+    let tone: Tone
+
+    var id: String { title }
+    var color: Color { tone.color }
 }
 
 struct HookIssueModel: Identifiable, Equatable {
@@ -3376,31 +4518,200 @@ struct HookIssueModel: Identifiable, Equatable {
 }
 
 private extension JSONValue {
-    var stringValue: String? {
-        guard case let .string(value) = self else { return nil }
-        return value
-    }
-
     var numberValue: Double? {
         guard case let .number(value) = self else { return nil }
         return value
     }
+}
 
-    var boolValue: Bool? {
-        guard case let .bool(value) = self else { return nil }
-        return value
-    }
+enum SettingsFamily: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case model
+    case permissions
+    case hooksPolicy
+    case mcpPolicy
+    case sandbox
+    case pluginsAndMarketplaces
+    case authenticationAndHelpers
+    case memoryAndClaudeMd
+    case uiAndSessionExperience
+    case worktree
+    case other
 
-    var stringArrayValue: [String]? {
-        guard case let .array(values) = self else { return nil }
-        var strings: [String] = []
-        strings.reserveCapacity(values.count)
-        for value in values {
-            guard case let .string(string) = value else { return nil }
-            strings.append(string)
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .model:
+            return "Model"
+        case .permissions:
+            return "Permissions"
+        case .hooksPolicy:
+            return "Hooks Policy"
+        case .mcpPolicy:
+            return "MCP Policy"
+        case .sandbox:
+            return "Sandbox"
+        case .pluginsAndMarketplaces:
+            return "Plugins & Marketplaces"
+        case .authenticationAndHelpers:
+            return "Authentication & Helpers"
+        case .memoryAndClaudeMd:
+            return "Memory & CLAUDE.md"
+        case .uiAndSessionExperience:
+            return "UI & Session Experience"
+        case .worktree:
+            return "Worktree"
+        case .other:
+            return "Other"
         }
-        return strings
     }
+
+    var systemImage: String {
+        switch self {
+        case .model:
+            return "cpu"
+        case .permissions:
+            return "lock.shield"
+        case .hooksPolicy:
+            return "arrow.triangle.branch"
+        case .mcpPolicy:
+            return "server.rack"
+        case .sandbox:
+            return "shippingbox"
+        case .pluginsAndMarketplaces:
+            return "puzzlepiece.extension"
+        case .authenticationAndHelpers:
+            return "key"
+        case .memoryAndClaudeMd:
+            return "brain.head.profile"
+        case .uiAndSessionExperience:
+            return "paintbrush"
+        case .worktree:
+            return "arrow.triangle.swap"
+        case .other:
+            return "ellipsis.circle"
+        }
+    }
+
+    var sortOrder: Int {
+        switch self {
+        case .model: return 0
+        case .permissions: return 1
+        case .hooksPolicy: return 2
+        case .mcpPolicy: return 3
+        case .sandbox: return 4
+        case .pluginsAndMarketplaces: return 5
+        case .authenticationAndHelpers: return 6
+        case .memoryAndClaudeMd: return 7
+        case .uiAndSessionExperience: return 8
+        case .worktree: return 9
+        case .other: return 10
+        }
+    }
+}
+
+enum SettingsFamilyClassifier {
+    static func classify(_ keyPath: String) -> SettingsFamily {
+        if let exactFamily = exactMatchMap[keyPath] {
+            return exactFamily
+        }
+
+        for (prefix, family) in prefixRulesSortedByLength where keyPath.hasPrefix(prefix) {
+            return family
+        }
+        return .other
+    }
+
+    static func groupByFamily<T>(_ items: [T], keyPath: (T) -> String) -> [(family: SettingsFamily, items: [T])] {
+        var groups: [SettingsFamily: [T]] = [:]
+        for item in items {
+            let family = classify(keyPath(item))
+            groups[family, default: []].append(item)
+        }
+        return SettingsFamily.allCases
+            .filter { groups[$0] != nil }
+            .map { family in
+                (family: family, items: groups[family]!)
+            }
+    }
+
+    private static let exactMatchMap: [String: SettingsFamily] = [
+        "model": .model,
+        "availableModels": .model,
+        "modelOverrides": .model,
+        "effortLevel": .model,
+        "alwaysThinkingEnabled": .model,
+        "fastMode": .model,
+        "fastModePerSessionOptIn": .model,
+        "feedbackSurveyRate": .model,
+        "agent": .model,
+        "autoMode": .model,
+        "disableAutoMode": .model,
+        "useAutoModeDuringPlan": .model,
+        "allowManagedPermissionRulesOnly": .permissions,
+        "disableAllHooks": .hooksPolicy,
+        "allowManagedHooksOnly": .hooksPolicy,
+        "allowedHttpHookUrls": .hooksPolicy,
+        "httpHookAllowedEnvVars": .hooksPolicy,
+        "hooks": .hooksPolicy,
+        "allowManagedMcpServersOnly": .mcpPolicy,
+        "enableAllProjectMcpServers": .mcpPolicy,
+        "enabledMcpjsonServers": .mcpPolicy,
+        "disabledMcpjsonServers": .mcpPolicy,
+        "allowedMcpServers": .mcpPolicy,
+        "deniedMcpServers": .mcpPolicy,
+        "enabledPlugins": .pluginsAndMarketplaces,
+        "extraKnownMarketplaces": .pluginsAndMarketplaces,
+        "strictKnownMarketplaces": .pluginsAndMarketplaces,
+        "blockedMarketplaces": .pluginsAndMarketplaces,
+        "pluginTrustMessage": .pluginsAndMarketplaces,
+        "channelsEnabled": .pluginsAndMarketplaces,
+        "allowedChannelPlugins": .pluginsAndMarketplaces,
+        "pluginConfigs": .pluginsAndMarketplaces,
+        "skippedPlugins": .pluginsAndMarketplaces,
+        "skippedMarketplaces": .pluginsAndMarketplaces,
+        "forceLoginMethod": .authenticationAndHelpers,
+        "forceLoginOrgUUID": .authenticationAndHelpers,
+        "otelHeadersHelper": .authenticationAndHelpers,
+        "awsAuthRefresh": .authenticationAndHelpers,
+        "awsCredentialExport": .authenticationAndHelpers,
+        "apiKeyHelper": .authenticationAndHelpers,
+        "autoMemoryDirectory": .memoryAndClaudeMd,
+        "autoMemoryEnabled": .memoryAndClaudeMd,
+        "claudeMdExcludes": .memoryAndClaudeMd,
+        "includeGitInstructions": .memoryAndClaudeMd,
+        "includeCoAuthoredBy": .memoryAndClaudeMd,
+        "language": .uiAndSessionExperience,
+        "respectGitignore": .uiAndSessionExperience,
+        "outputStyle": .uiAndSessionExperience,
+        "defaultShell": .uiAndSessionExperience,
+        "voiceEnabled": .uiAndSessionExperience,
+        "prefersReducedMotion": .uiAndSessionExperience,
+        "spinnerVerbs": .uiAndSessionExperience,
+        "spinnerTipsEnabled": .uiAndSessionExperience,
+        "spinnerTipsOverride": .uiAndSessionExperience,
+        "showClearContextOnPlanAccept": .uiAndSessionExperience,
+        "fileSuggestion": .uiAndSessionExperience,
+        "companyAnnouncements": .uiAndSessionExperience,
+        "cleanupPeriodDays": .uiAndSessionExperience,
+        "plansDirectory": .uiAndSessionExperience,
+        "autoUpdatesChannel": .uiAndSessionExperience,
+        "disableDeepLinkRegistration": .uiAndSessionExperience,
+        "env": .uiAndSessionExperience
+    ]
+
+    private static let prefixRulesSortedByLength: [(String, SettingsFamily)] = {
+        let rules: [String: SettingsFamily] = [
+            "permissions.": .permissions,
+            "sandbox.": .sandbox,
+            "worktree.": .worktree,
+            "attribution.": .memoryAndClaudeMd,
+            "statusLine.": .uiAndSessionExperience,
+            "statusLine": .uiAndSessionExperience,
+            "hooks.": .hooksPolicy
+        ]
+        return rules.sorted { $0.key.count > $1.key.count }
+    }()
 }
 
 struct SessionInstructionsViewModel: Equatable {
@@ -3660,6 +4971,7 @@ struct SessionSettingsViewModel: Equatable {
     let errorCount: Int
     let warningCount: Int
     let infoCount: Int
+    let populatedFamilyCount: Int
 
     init(projection: SessionProjection) {
         let settingsState = projection.familyStates.first(where: { $0.family == .settings })
@@ -3673,6 +4985,7 @@ struct SessionSettingsViewModel: Equatable {
             state = .missing
             sections = []
             rowCount = 0
+            populatedFamilyCount = 0
             summaryNotes = SessionSettingsViewModel.deduplicated(
                 projection.completeness.confidenceNotes + projection.notes
             )
@@ -3680,24 +4993,26 @@ struct SessionSettingsViewModel: Equatable {
         }
 
         let rowModels = (settings?.entries ?? []).map(ResolvedSettingRowModel.init)
-        let grouped = Dictionary(grouping: rowModels, by: { SessionSettingsSectionModel.sectionKey(for: $0.keyPath) })
 
-        let sectionModels = grouped
-            .keys
-            .sorted()
-            .map { key -> SessionSettingsSectionModel in
-                let rows = (grouped[key] ?? []).sorted { $0.keyPath < $1.keyPath }
-                return SessionSettingsSectionModel(
-                    key: key,
-                    title: SessionSettingsSectionModel.sectionTitle(for: key),
-                    rows: rows,
-                    issueBadges: SessionSettingsViewModel.issueBadges(rows.flatMap(\.issues)),
-                    notes: SessionSettingsViewModel.deduplicated(rows.flatMap(\.notes))
-                )
-            }
+        // Group by semantic family using the data-driven classifier.
+        // Empty families are automatically excluded — they never clutter the UI.
+        let familyGroups = SettingsFamilyClassifier.groupByFamily(rowModels) { $0.keyPath }
+
+        let sectionModels = familyGroups.map { group -> SessionSettingsSectionModel in
+            let rows = group.items.sorted { $0.keyPath < $1.keyPath }
+            return SessionSettingsSectionModel(
+                key: group.family.rawValue,
+                title: group.family.title,
+                systemImage: group.family.systemImage,
+                rows: rows,
+                issueBadges: SessionSettingsViewModel.issueBadges(rows.flatMap(\.issues)),
+                notes: SessionSettingsViewModel.deduplicated(rows.flatMap(\.notes))
+            )
+        }
 
         self.sections = sectionModels
         self.rowCount = rowModels.count
+        self.populatedFamilyCount = sectionModels.count
         self.state = rowModels.isEmpty ? .empty : .populated
 
         let combinedNotes =
@@ -3752,45 +5067,27 @@ struct SessionSettingsViewModel: Equatable {
 struct SessionSettingsSectionModel: Identifiable, Equatable {
     let key: String
     let title: String
+    let systemImage: String
     let rows: [ResolvedSettingRowModel]
     let issueBadges: [IssueBadgeModel]
     let notes: [String]
 
     var id: String { key }
 
-    static func sectionKey(for keyPath: String) -> String {
-        guard let first = keyPath.split(separator: ".", maxSplits: 1).first else {
-            return "general"
-        }
-        return first.isEmpty ? "general" : String(first)
-    }
-
-    static func sectionTitle(for key: String) -> String {
-        if key == "general" {
-            return "General"
-        }
-
-        var spaced = ""
-        for character in key {
-            if character.isUppercase, spaced.isEmpty == false {
-                spaced.append(" ")
-            }
-            if character == "_" {
-                spaced.append(" ")
-            } else {
-                spaced.append(character)
-            }
-        }
-
-        let words = spaced
-            .split(separator: " ")
-            .map(String.init)
-
-        if words.isEmpty {
-            return key.capitalized
-        }
-
-        return words.map { $0.capitalized }.joined(separator: " ")
+    init(
+        key: String,
+        title: String,
+        systemImage: String = "ellipsis.circle",
+        rows: [ResolvedSettingRowModel],
+        issueBadges: [IssueBadgeModel],
+        notes: [String]
+    ) {
+        self.key = key
+        self.title = title
+        self.systemImage = systemImage
+        self.rows = rows
+        self.issueBadges = issueBadges
+        self.notes = notes
     }
 }
 

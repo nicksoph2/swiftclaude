@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "http",
+        "url": "https://hooks.example.com/notify",
+        "method": "POST",
+        "headers": {
+          "Authorization": "Bearer $TOKEN",
+          "Content-Type": "application/json"
+        },
+        "body": "{\"event\": \"$EVENT\", \"tool\": \"$TOOL_NAME\"}",
+        "allowedEnvVars": ["TOKEN"],
+        "timeout": 15
+      }
+    ]
+  }
+}

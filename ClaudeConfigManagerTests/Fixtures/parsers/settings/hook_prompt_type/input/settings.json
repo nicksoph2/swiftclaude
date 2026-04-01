@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "prompt",
+        "template": "Summarise the changes made in this session: $ARGUMENTS",
+        "model": "claude-haiku-4-5-20251001",
+        "timeout": 45
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command"
+      },
+      {
+        "type": "http"
+      },
+      {
+        "type": "prompt"
+      },
+      {
+        "type": "agent"
+      }
+    ]
+  }
+}

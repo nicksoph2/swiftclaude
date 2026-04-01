@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "echo lint",
+        "headers": {
+          "Authorization": "Bearer $HOOK_TOKEN"
+        }
+      },
+      {
+        "type": "http",
+        "url": "https://hooks.example.com/notify",
+        "async": true
+      },
+      {
+        "type": "prompt",
+        "template": "Review: $ARGUMENTS",
+        "headers": {
+          "Authorization": "Bearer $HOOK_TOKEN"
+        }
+      },
+      {
+        "type": "agent",
+        "agent_id": "delegator",
+        "shell": "bash"
+      }
+    ]
+  }
+}

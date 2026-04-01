@@ -1,0 +1,2 @@
+{"sessionId":"sess-parent","timestamp":"2026-03-31T10:00:00Z","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Subagent started"}]}}
+{"sessionId":"sess-parent","timestamp":"2026-03-31T10:00:01Z","type":"assistant","toolUseResult":{"tool":"Read","status":"success"}}

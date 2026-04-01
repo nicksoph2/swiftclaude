@@ -1,0 +1,23 @@
+{
+  "hasErrors": false,
+  "expectedKeyPaths": [
+    "defaultShell",
+    "alwaysThinkingEnabled",
+    "autoMemoryEnabled",
+    "claudeMdExcludes",
+    "enabledPlugins",
+    "extraKnownMarketplaces",
+    "allowedChannelPlugins",
+    "channelsEnabled",
+    "blockedMarketplaces",
+    "pluginTrustMessage",
+    "allowManagedMcpServersOnly",
+    "allowedMcpServers",
+    "strictKnownMarketplaces",
+    "sandbox.network.httpProxyPort",
+    "worktree.sparsePaths",
+    "pluginConfigs",
+    "skippedPlugins",
+    "skippedMarketplaces"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/bob/work",
+  "session_id": "sess-xyz789",
+  "transcript_path": "/Users/bob/.claude/projects/-Users-bob-work/sess-xyz789.jsonl",
+  "model": {
+    "id": "claude-sonnet-4-6",
+    "display_name": "Sonnet"
+  },
+  "workspace": {
+    "current_dir": "/Users/bob/work"
+  },
+  "cost": {
+    "total_cost_usd": 0.0
+  },
+  "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 200000,
+    "current_usage": null
+  }
+}

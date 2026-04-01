@@ -1,0 +1,7 @@
+{
+  "effortLevel": "turbo",
+  "feedbackSurveyRate": 1.5,
+  "modelOverrides": {
+    "claude-opus-4-6": 42
+  }
+}

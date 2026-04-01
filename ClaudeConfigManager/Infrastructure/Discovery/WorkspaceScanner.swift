@@ -3,6 +3,10 @@ import Foundation
 typealias DiscoveredPathStatus = DiscoveryPathStatus
 
 enum DiscoveredFileKind: String, Equatable, Sendable {
+    case managedSettingsJSON
+    case managedSettingsDropIn
+    case managedMcpJSON
+    case managedClaudeMarkdown
     case userSettingsJSON
     case userClaudeMarkdown
     case userClaudeJSON
@@ -18,6 +22,7 @@ enum DiscoveredFileKind: String, Equatable, Sendable {
 }
 
 enum DiscoveredDirectoryKind: String, Equatable, Sendable {
+    case managedSettingsRoot
     case userClaudeRoot
     case userAgentsRoot
     case userSkillsRoot
@@ -108,9 +113,476 @@ struct ScanRequest: Equatable, Sendable {
 }
 
 struct ScanResult: Equatable, Sendable {
+    let managedResult: ManagedScanResult
+    let managedWorkspace: DiscoveredWorkspace?
     let userWorkspace: DiscoveredWorkspace?
     let projectWorkspaces: [DiscoveredWorkspace]
     let issues: [DiscoveryIssue]
+}
+
+protocol ManagedSettingsFileSystem {
+    func fileExists(atPath: String) -> Bool
+    func isReadable(atPath: String) -> Bool
+    func contentsOfDirectory(atPath: String, error: inout NSError?) -> [String]
+    func fileExists(atPath: String, isDirectory: inout ObjCBool) -> Bool
+}
+
+struct DefaultManagedSettingsFileSystem: ManagedSettingsFileSystem {
+    private let fileManager: FileManager
+
+    init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+    }
+
+    func fileExists(atPath: String) -> Bool {
+        fileManager.fileExists(atPath: atPath)
+    }
+
+    func isReadable(atPath: String) -> Bool {
+        fileManager.isReadableFile(atPath: atPath)
+    }
+
+    func contentsOfDirectory(atPath: String, error: inout NSError?) -> [String] {
+        do {
+            return try fileManager.contentsOfDirectory(atPath: atPath)
+        } catch let nsError as NSError {
+            error = nsError
+            return []
+        } catch let unexpectedError {
+            error = NSError(
+                domain: "DefaultManagedSettingsFileSystem",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: String(describing: unexpectedError)]
+            )
+            return []
+        }
+    }
+
+    func fileExists(atPath: String, isDirectory: inout ObjCBool) -> Bool {
+        fileManager.fileExists(atPath: atPath, isDirectory: &isDirectory)
+    }
+}
+
+enum ManagedSettingsNodeStatus: Equatable, Sendable {
+    case missing
+    case readableFile
+    case readableDirectory
+    case unreadableFile
+    case unreadableDirectory
+    case unsupported
+
+    var discoveryPathStatus: DiscoveryPathStatus {
+        switch self {
+        case .missing:
+            return .missing
+        case .readableFile, .readableDirectory:
+            return .present
+        case .unreadableFile, .unreadableDirectory:
+            return .unreadable
+        case .unsupported:
+            return .unsupported
+        }
+    }
+}
+
+struct ManagedSettingsDiscoveryFile: Equatable, Sendable {
+    let url: URL
+    let status: ManagedSettingsNodeStatus
+}
+
+struct ManagedSettingsDiscoverySnapshot {
+    let rootURL: URL
+    let rootStatus: ManagedSettingsNodeStatus
+    let settingsFile: ManagedSettingsDiscoveryFile
+    let dropInDirectoryURL: URL
+    let dropInDirectoryStatus: ManagedSettingsNodeStatus
+    let dropInEnumerationErrorDescription: String?
+    let dropInFiles: [ManagedSettingsDiscoveryFile]
+    let mcpFile: ManagedSettingsDiscoveryFile
+    let claudeMdFile: ManagedSettingsDiscoveryFile
+}
+
+struct ManagedSettingsLocator {
+    static let managedRootPath = "/Library/Application Support/ClaudeCode"
+    static let managedSettingsFileName = "managed-settings.json"
+    static let managedSettingsDropInDirectoryName = "managed-settings.d"
+    static let managedMcpFileName = "managed-mcp.json"
+    static let managedClaudeMdFileName = "CLAUDE.md"
+
+    private let fileSystem: ManagedSettingsFileSystem
+
+    init(fileSystem: ManagedSettingsFileSystem = DefaultManagedSettingsFileSystem()) {
+        self.fileSystem = fileSystem
+    }
+
+    func locateManagedSettingsFile() -> URL? {
+        let snapshot = discoverySnapshot()
+        guard snapshot.settingsFile.status == .readableFile else {
+            return nil
+        }
+        return snapshot.settingsFile.url
+    }
+
+    func locateManagedSettingsDirectory() -> [URL] {
+        discoverySnapshot().dropInFiles
+            .filter { $0.status == .readableFile }
+            .map(\.url)
+    }
+
+    func locateManagedMcpFile() -> URL? {
+        let snapshot = discoverySnapshot()
+        guard snapshot.mcpFile.status == .readableFile else {
+            return nil
+        }
+        return snapshot.mcpFile.url
+    }
+
+    func locateManagedClaudeMdFile() -> URL? {
+        let snapshot = discoverySnapshot()
+        guard snapshot.claudeMdFile.status == .readableFile else {
+            return nil
+        }
+        return snapshot.claudeMdFile.url
+    }
+
+    func discoverySnapshot() -> ManagedSettingsDiscoverySnapshot {
+        let rootURL = URL(fileURLWithPath: Self.managedRootPath, isDirectory: true)
+        let settingsURL = rootURL.appendingPathComponent(Self.managedSettingsFileName, isDirectory: false)
+        let dropInDirectoryURL = rootURL.appendingPathComponent(Self.managedSettingsDropInDirectoryName, isDirectory: true)
+        let mcpURL = rootURL.appendingPathComponent(Self.managedMcpFileName, isDirectory: false)
+        let claudeMdURL = rootURL.appendingPathComponent(Self.managedClaudeMdFileName, isDirectory: false)
+
+        let rootStatus = nodeStatus(at: rootURL.path, expectsDirectory: true)
+        let settingsStatus = nodeStatus(at: settingsURL.path, expectsDirectory: false)
+        let dropInDirectoryStatus = nodeStatus(at: dropInDirectoryURL.path, expectsDirectory: true)
+        let mcpStatus = nodeStatus(at: mcpURL.path, expectsDirectory: false)
+        let claudeMdStatus = nodeStatus(at: claudeMdURL.path, expectsDirectory: false)
+
+        var dropInError: NSError?
+        var dropInFiles: [ManagedSettingsDiscoveryFile] = []
+
+        if dropInDirectoryStatus == .readableDirectory {
+            let entries = fileSystem.contentsOfDirectory(atPath: dropInDirectoryURL.path, error: &dropInError)
+                .filter { $0.lowercased().hasSuffix(".json") }
+                .sorted()
+
+            dropInFiles = entries.map { entry in
+                let fileURL = dropInDirectoryURL.appendingPathComponent(entry, isDirectory: false)
+                return ManagedSettingsDiscoveryFile(url: fileURL, status: nodeStatus(at: fileURL.path, expectsDirectory: false))
+            }
+        }
+
+        return ManagedSettingsDiscoverySnapshot(
+            rootURL: rootURL,
+            rootStatus: rootStatus,
+            settingsFile: ManagedSettingsDiscoveryFile(url: settingsURL, status: settingsStatus),
+            dropInDirectoryURL: dropInDirectoryURL,
+            dropInDirectoryStatus: dropInDirectoryStatus,
+            dropInEnumerationErrorDescription: dropInError.map(String.init(describing:)),
+            dropInFiles: dropInFiles,
+            mcpFile: ManagedSettingsDiscoveryFile(url: mcpURL, status: mcpStatus),
+            claudeMdFile: ManagedSettingsDiscoveryFile(url: claudeMdURL, status: claudeMdStatus)
+        )
+    }
+
+    private func nodeStatus(at path: String, expectsDirectory: Bool) -> ManagedSettingsNodeStatus {
+        var isDirectory = ObjCBool(false)
+        let exists = fileSystem.fileExists(atPath: path, isDirectory: &isDirectory)
+
+        guard exists else {
+            return .missing
+        }
+
+        guard isDirectory.boolValue == expectsDirectory else {
+            return .unsupported
+        }
+
+        let readable = fileSystem.isReadable(atPath: path)
+        if expectsDirectory {
+            return readable ? .readableDirectory : .unreadableDirectory
+        }
+
+        return readable ? .readableFile : .unreadableFile
+    }
+}
+
+// MARK: - M4: Sandbox entitlements and managed access fallback
+
+/// Outcome of probing whether the managed ClaudeCode path is accessible in this process.
+///
+/// In a sandboxed macOS App Store build the OS may hide `/Library/Application Support/ClaudeCode/`
+/// entirely (returning ENOENT) even when the directory exists, so the app must distinguish that
+/// case from a genuine absence of managed configuration and surface it explicitly rather than
+/// silently treating it as "no policy".
+enum ManagedAccessOutcome: Equatable, Sendable {
+    /// Root directory is readable; managed files may be present.
+    case accessible
+    /// Root directory does not exist in the filesystem; no managed config has been deployed.
+    case missing
+    /// Access to the managed root was blocked by macOS sandbox policy. The directory may or may
+    /// not exist on disk — the sandbox prevents the app from observing it.
+    case sandboxRestricted
+    /// Root directory exists but could not be read for a non-sandbox reason (e.g. wrong
+    /// permissions, unexpected node type).
+    case inaccessible(diagnostics: String?)
+
+    /// True when the outcome requires an explicit fallback message in the UI rather than just
+    /// treating managed scope as absent.
+    var requiresExplicitFallbackUI: Bool {
+        switch self {
+        case .accessible, .missing:
+            return false
+        case .sandboxRestricted, .inaccessible:
+            return true
+        }
+    }
+}
+
+// MARK: - Sandbox detection
+
+/// Abstracts sandbox detection so that it can be replaced by a test double.
+protocol SandboxProbing: Sendable {
+    /// True when the current process is running inside a macOS App Sandbox container.
+    var isRunningInSandbox: Bool { get }
+}
+
+/// Production implementation that reads the `APP_SANDBOX_CONTAINER_ID` environment variable,
+/// which the OS sets for every sandboxed process.
+struct SystemSandboxProbe: SandboxProbing {
+    var isRunningInSandbox: Bool {
+        ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    }
+}
+
+// MARK: - ManagedSettingsLocator probe
+
+extension ManagedSettingsLocator {
+    /// Returns the concrete access outcome for the managed ClaudeCode root path.
+    ///
+    /// - Parameter sandboxProbe: A `SandboxProbing` implementation used to determine whether the
+    ///   process is running inside a sandbox. Defaults to the system implementation.
+    /// - Returns: The `ManagedAccessOutcome` describing whether managed files can be read.
+    func probeManagedAccessOutcome(
+        sandboxProbe: SandboxProbing = SystemSandboxProbe()
+    ) -> ManagedAccessOutcome {
+        let snapshot = discoverySnapshot()
+
+        switch snapshot.rootStatus {
+        case .readableDirectory:
+            return .accessible
+
+        case .unreadableDirectory:
+            // The directory exists but cannot be read.
+            if sandboxProbe.isRunningInSandbox {
+                return .sandboxRestricted
+            }
+            return .inaccessible(
+                diagnostics: "Managed root directory exists but is not readable by this process."
+            )
+
+        case .missing:
+            // In a sandbox, paths outside the container appear absent even when they exist on
+            // disk; we cannot distinguish genuine absence from sandbox-hidden presence.
+            if sandboxProbe.isRunningInSandbox {
+                return .sandboxRestricted
+            }
+            return .missing
+
+        case .readableFile, .unreadableFile:
+            return .inaccessible(
+                diagnostics: "Expected a directory at the managed root path but found a file."
+            )
+
+        case .unsupported:
+            return .inaccessible(
+                diagnostics: "Managed root path has an unexpected filesystem node type."
+            )
+        }
+    }
+}
+
+protocol MDMPolicyReading {
+    func readPolicies() -> ParseResult<[String: JSONValue]>
+}
+
+struct MDMPolicyReader: MDMPolicyReading {
+    static let managedPolicyDomain = "com.anthropic.claudecode"
+
+    private let userDefaultsReader: () -> [String: Any]?
+    private let cfPreferencesReader: () -> [String: Any]?
+
+    init() {
+        self.userDefaultsReader = { Self.readPoliciesFromUserDefaults() }
+        self.cfPreferencesReader = { Self.readPoliciesFromCFPreferences() }
+    }
+
+    init(
+        userDefaultsReader: @escaping () -> [String: Any]?,
+        cfPreferencesReader: @escaping () -> [String: Any]? = { nil }
+    ) {
+        self.userDefaultsReader = userDefaultsReader
+        self.cfPreferencesReader = cfPreferencesReader
+    }
+
+    func readPolicies() -> ParseResult<[String: JSONValue]> {
+        let rawPolicies = readFromUserDefaults() ?? readFromCFPreferences() ?? [:]
+        var issues: [SyntaxIssue] = []
+        var converted: [String: JSONValue] = [:]
+
+        for key in rawPolicies.keys.sorted() {
+            guard let rawValue = rawPolicies[key] else {
+                continue
+            }
+
+            if let value = convertToJSONValue(rawValue, keyPath: key, issues: &issues) {
+                converted[key] = value
+            }
+        }
+
+        return ParseResult(value: converted, issues: issues)
+    }
+
+    private func convertToJSONValue(_ value: Any) -> JSONValue? {
+        var issues: [SyntaxIssue] = []
+        return convertToJSONValue(value, keyPath: nil, issues: &issues)
+    }
+
+    private func convertToJSONValue(
+        _ value: Any,
+        keyPath: String?,
+        issues: inout [SyntaxIssue]
+    ) -> JSONValue? {
+        switch value {
+        case let stringValue as String:
+            return .string(stringValue)
+        case let numberValue as NSNumber:
+            if CFGetTypeID(numberValue) == CFBooleanGetTypeID() {
+                return .bool(numberValue.boolValue)
+            }
+            return .number(numberValue.doubleValue)
+        case let boolValue as Bool:
+            return .bool(boolValue)
+        case let dictionary as [String: Any]:
+            var object: [String: JSONValue] = [:]
+            for key in dictionary.keys.sorted() {
+                guard let nestedValue = dictionary[key] else {
+                    continue
+                }
+
+                let nestedKeyPath = keyPath.map { "\($0).\(key)" } ?? key
+                if let convertedValue = convertToJSONValue(nestedValue, keyPath: nestedKeyPath, issues: &issues) {
+                    object[key] = convertedValue
+                }
+            }
+            return .object(object)
+        case let dictionary as NSDictionary:
+            var object: [String: JSONValue] = [:]
+            for case let key as String in dictionary.allKeys.sorted(by: { "\($0)" < "\($1)" }) {
+                let nestedKeyPath = keyPath.map { "\($0).\(key)" } ?? key
+                if let nestedValue = dictionary[key],
+                   let convertedValue = convertToJSONValue(nestedValue, keyPath: nestedKeyPath, issues: &issues) {
+                    object[key] = convertedValue
+                }
+            }
+            return .object(object)
+        case let array as [Any]:
+            return .array(
+                array.enumerated().compactMap { index, element in
+                    let nestedKeyPath = keyPath.map { "\($0)[\(index)]" } ?? "[\(index)]"
+                    return convertToJSONValue(element, keyPath: nestedKeyPath, issues: &issues)
+                }
+            )
+        case let array as NSArray:
+            return .array(
+                array.enumerated().compactMap { index, element in
+                    let nestedKeyPath = keyPath.map { "\($0)[\(index)]" } ?? "[\(index)]"
+                    return convertToJSONValue(element, keyPath: nestedKeyPath, issues: &issues)
+                }
+            )
+        case _ as NSNull:
+            return .null
+        case _ as Data:
+            appendUnsupportedTypeIssue(typeName: "NSData", keyPath: keyPath, issues: &issues)
+            return nil
+        case _ as Date:
+            appendUnsupportedTypeIssue(typeName: "NSDate", keyPath: keyPath, issues: &issues)
+            return nil
+        default:
+            appendUnsupportedTypeIssue(
+                typeName: String(describing: type(of: value)),
+                keyPath: keyPath,
+                issues: &issues
+            )
+            return nil
+        }
+    }
+
+    private func appendUnsupportedTypeIssue(
+        typeName: String,
+        keyPath: String?,
+        issues: inout [SyntaxIssue]
+    ) {
+        let keyDescriptor = keyPath ?? "<root>"
+        issues.append(
+            SyntaxIssue(
+                code: .preservedUnknownValue,
+                severity: .info,
+                message: "MDM key '\(keyDescriptor)' has unsupported plist type \(typeName)",
+                sourcePath: Self.managedPolicyDomain,
+                keyPath: keyPath
+            )
+        )
+    }
+
+    private func readFromUserDefaults() -> [String: Any]? {
+        userDefaultsReader()
+    }
+
+    private func readFromCFPreferences() -> [String: Any]? {
+        cfPreferencesReader()
+    }
+
+    private static func readPoliciesFromUserDefaults() -> [String: Any]? {
+        guard let defaults = UserDefaults(suiteName: managedPolicyDomain) else {
+            return nil
+        }
+
+        if let persistentDomain = defaults.persistentDomain(forName: managedPolicyDomain),
+           !persistentDomain.isEmpty {
+            return persistentDomain
+        }
+
+        let dictionaryRepresentation = defaults.dictionaryRepresentation()
+        return dictionaryRepresentation.isEmpty ? nil : dictionaryRepresentation
+    }
+
+    private static func readPoliciesFromCFPreferences() -> [String: Any]? {
+        readPoliciesFromCFPreferences(user: kCFPreferencesAnyUser, host: kCFPreferencesCurrentHost) ??
+        readPoliciesFromCFPreferences(user: kCFPreferencesAnyUser, host: kCFPreferencesAnyHost)
+    }
+
+    private static func readPoliciesFromCFPreferences(
+        user: CFString,
+        host: CFString
+    ) -> [String: Any]? {
+        guard let keyList = CFPreferencesCopyKeyList(
+            managedPolicyDomain as CFString,
+            user,
+            host
+        ) as? [String],
+        !keyList.isEmpty,
+        let values = CFPreferencesCopyMultiple(
+            keyList as CFArray,
+            managedPolicyDomain as CFString,
+            user,
+            host
+        ) as? [String: Any],
+        !values.isEmpty else {
+            return nil
+        }
+
+        return values
+    }
 }
 
 enum WorkspaceScanningNodeKind: Equatable, Sendable {
@@ -159,18 +631,23 @@ struct FileManagerWorkspaceScanningFileSystem: WorkspaceScanningFileSystem {
 
 struct WorkspaceScanner {
     private let fileSystem: WorkspaceScanningFileSystem
+    private let managedSettingsLocator: ManagedSettingsLocator
     private let homeDirectoryProvider: () -> URL
 
     init(
         fileSystem: WorkspaceScanningFileSystem = FileManagerWorkspaceScanningFileSystem(),
-        homeDirectoryProvider: @escaping () -> URL = { FileManager.default.homeDirectoryForCurrentUser }
+        managedSettingsLocator: ManagedSettingsLocator = ManagedSettingsLocator(),
+        homeDirectoryProvider: @escaping () -> URL = { RealHomeDirectory.url }
     ) {
         self.fileSystem = fileSystem
+        self.managedSettingsLocator = managedSettingsLocator
         self.homeDirectoryProvider = homeDirectoryProvider
     }
 
     func scan(_ request: ScanRequest) -> ScanResult {
         var issues = request.rootResolution.issues
+        let managedResult = ManagedFileLocator().locate()
+        let managedWorkspace = scanManagedWorkspace(issues: &issues)
 
         let userWorkspace = scanUserWorkspace(globalRoot: request.rootResolution.globalRoot, issues: &issues)
 
@@ -184,10 +661,74 @@ struct WorkspaceScanner {
             }
 
         return ScanResult(
+            managedResult: managedResult,
+            managedWorkspace: managedWorkspace,
             userWorkspace: userWorkspace,
             projectWorkspaces: projectWorkspaces,
             issues: deduplicateAndSortIssues(issues)
         )
+    }
+
+    private func scanManagedWorkspace(
+        issues: inout [DiscoveryIssue]
+    ) -> DiscoveredWorkspace {
+        let managedRootURL = RootLocator.normalizedDirectoryURL(
+            URL(fileURLWithPath: ManagedSettingsLocator.managedRootPath, isDirectory: true)
+        )
+        let managedRootPath = RootLocator.normalizedIdentityPath(managedRootURL.path)
+        let managedScope = DiscoveryScopeIdentity.managed()
+        let managedRootScope = RootResolutionScope.managedRoot
+        let discovery = scanManagedSettingsScope(issues: &issues)
+        let rootStatus = discovery.directories.first(where: { $0.kind == .managedSettingsRoot })?.status ?? .missing
+
+        return DiscoveredWorkspace(
+            scope: managedScope,
+            rootScope: managedRootScope,
+            rootURL: managedRootURL,
+            rootNormalizedPath: managedRootPath,
+            rootAccessStatus: rootAccessStatus(for: rootStatus),
+            files: sortFiles(discovery.files),
+            directories: sortDirectories(discovery.directories)
+        )
+    }
+
+    private func scanManagedSettingsScope(
+        issues: inout [DiscoveryIssue]
+    ) -> (files: [DiscoveredFile], directories: [DiscoveredDirectory]) {
+        let scope = DiscoveryScopeIdentity.managed()
+        let snapshot = managedSettingsLocator.discoverySnapshot()
+
+        var files: [DiscoveredFile] = []
+        var directories: [DiscoveredDirectory] = []
+
+        directories.append(
+            DiscoveredDirectory(
+                scope: scope,
+                kind: .managedSettingsRoot,
+                url: snapshot.rootURL,
+                provenance: .canonicalExpected,
+                status: snapshot.rootStatus.discoveryPathStatus
+            )
+        )
+
+        files.append(
+            discoveredManagedFile(scope: scope, kind: .managedSettingsJSON, file: snapshot.settingsFile)
+        )
+        files.append(
+            discoveredManagedFile(scope: scope, kind: .managedMcpJSON, file: snapshot.mcpFile)
+        )
+        files.append(
+            discoveredManagedFile(scope: scope, kind: .managedClaudeMarkdown, file: snapshot.claudeMdFile)
+        )
+        files.append(
+            contentsOf: snapshot.dropInFiles.map {
+                discoveredManagedFile(scope: scope, kind: .managedSettingsDropIn, file: $0)
+            }
+        )
+
+        appendManagedDiscoveryIssues(from: snapshot, scope: scope, issues: &issues)
+
+        return (files, directories)
     }
 
     private func scanUserWorkspace(
@@ -510,6 +1051,20 @@ struct WorkspaceScanner {
         )
     }
 
+    private func discoveredManagedFile(
+        scope: DiscoveryScopeIdentity,
+        kind: DiscoveredFileKind,
+        file: ManagedSettingsDiscoveryFile
+    ) -> DiscoveredFile {
+        DiscoveredFile(
+            scope: scope,
+            kind: kind,
+            url: file.url,
+            provenance: .canonicalExpected,
+            status: file.status.discoveryPathStatus
+        )
+    }
+
     private func discoveredFileStatus(at url: URL) -> DiscoveryPathStatus {
         switch fileSystem.nodeKind(at: url) {
         case .missing:
@@ -580,5 +1135,78 @@ struct WorkspaceScanner {
 
     private func normalizedPath(for url: URL) -> String {
         RootLocator.normalizedIdentityPath(url.path)
+    }
+
+    private func rootAccessStatus(for status: DiscoveryPathStatus) -> RootAccessStatus {
+        switch status {
+        case .present:
+            return .accessible
+        case .missing:
+            return .missing
+        case .unreadable, .inaccessible:
+            return .inaccessible
+        case .unsupported:
+            return .notDirectory
+        }
+    }
+
+    private func appendManagedDiscoveryIssues(
+        from snapshot: ManagedSettingsDiscoverySnapshot,
+        scope: DiscoveryScopeIdentity,
+        issues: inout [DiscoveryIssue]
+    ) {
+        if snapshot.rootStatus == .unreadableDirectory || snapshot.rootStatus == .unsupported {
+            issues.append(
+                DiscoveryIssue(
+                    code: .managedSettingsRootInaccessible,
+                    severity: .warning,
+                    target: .workspace(scope: scope),
+                    message: "The managed ClaudeCode root exists but is not readable.",
+                    path: snapshot.rootURL.path,
+                    scope: .managedRoot
+                )
+            )
+        }
+
+        if snapshot.dropInDirectoryStatus == .unreadableDirectory || snapshot.dropInDirectoryStatus == .unsupported {
+            issues.append(
+                DiscoveryIssue(
+                    code: .managedSettingsDropInInaccessible,
+                    severity: .warning,
+                    target: .scanOperation(scope: scope, path: snapshot.dropInDirectoryURL.path),
+                    message: "The managed settings drop-in directory exists but could not be read.",
+                    path: snapshot.dropInDirectoryURL.path,
+                    scope: .managedRoot
+                )
+            )
+        }
+
+        if let enumerationError = snapshot.dropInEnumerationErrorDescription {
+            issues.append(
+                DiscoveryIssue(
+                    code: .managedSettingsDropInEnumerationFailed,
+                    severity: .warning,
+                    target: .scanOperation(scope: scope, path: snapshot.dropInDirectoryURL.path),
+                    message: "The managed settings drop-in directory could not be enumerated.",
+                    path: snapshot.dropInDirectoryURL.path,
+                    diagnostics: String(describing: enumerationError),
+                    scope: .managedRoot
+                )
+            )
+        }
+
+        let unreadableFiles = [snapshot.settingsFile, snapshot.mcpFile] + snapshot.dropInFiles.filter { $0.status == .unreadableFile }
+        for file in unreadableFiles where file.status == .unreadableFile {
+            issues.append(
+                DiscoveryIssue(
+                    code: .managedSettingsFileUnreadable,
+                    severity: .warning,
+                    target: .file(pathID: DiscoveryPathID(normalizedPath: RootLocator.normalizedIdentityPath(file.url.path), scope: scope, nodeClass: .file)),
+                    message: "A managed Claude configuration file exists but is not readable.",
+                    path: file.url.path,
+                    scope: .managedRoot
+                )
+            )
+        }
     }
 }

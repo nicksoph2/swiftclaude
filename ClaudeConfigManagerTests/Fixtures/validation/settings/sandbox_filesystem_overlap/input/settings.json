@@ -1,0 +1,10 @@
+{
+  "sandbox": {
+    "filesystem": {
+      "allowWrite": ["/tmp", "/var"],
+      "denyWrite": ["/var"],
+      "allowRead": ["/etc"],
+      "denyRead": ["/etc"]
+    }
+  }
+}

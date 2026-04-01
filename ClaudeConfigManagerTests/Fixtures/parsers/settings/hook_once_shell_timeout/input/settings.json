@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "validate.sh",
+        "timeout": 30,
+        "once": true,
+        "shell": "bash"
+      }
+    ]
+  }
+}

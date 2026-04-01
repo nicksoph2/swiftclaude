@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import os
+import SwiftUI
 
 @MainActor
 final class AppRouter: ObservableObject {
@@ -8,11 +9,13 @@ final class AppRouter: ObservableObject {
     @Published private(set) var bookmarkResolutionResults: [BookmarkResolutionResult]
     @Published private(set) var bookmarkBootstrapSummary: BookmarkBootstrapSummary
     @Published private(set) var rootSelectionViewModel: RootSelectionViewModel
+    @Published private(set) var pipeline: ConfigurationPipeline
 
-    var sidebarState: SidebarState
+    @Published var sidebarState: SidebarState
 
     private let bookmarkStore: BookmarkStore?
     private let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "Bootstrap")
+    private var pipelineObservationTask: Task<Void, Never>?
 
     init(
         bootstrapState: AppBootstrapState = .launching,
@@ -21,13 +24,15 @@ final class AppRouter: ObservableObject {
         globalStateStore: GlobalStateStore = GlobalStateStore(persistence: InMemoryGlobalStatePersistence()),
         rootSelectionViewModel: RootSelectionViewModel? = nil,
         bookmarkResolutionResults: [BookmarkResolutionResult] = [],
-        bookmarkBootstrapSummary: BookmarkBootstrapSummary = .empty
+        bookmarkBootstrapSummary: BookmarkBootstrapSummary = .empty,
+        pipeline: ConfigurationPipeline? = nil
     ) {
         self.bootstrapState = bootstrapState
         self.sidebarState = sidebarState
         self.bookmarkStore = bookmarkStore
         self.bookmarkResolutionResults = bookmarkResolutionResults
         self.bookmarkBootstrapSummary = bookmarkBootstrapSummary
+        self.pipeline = pipeline ?? ConfigurationPipeline()
 
         if let rootSelectionViewModel {
             self.rootSelectionViewModel = rootSelectionViewModel
@@ -42,12 +47,47 @@ final class AppRouter: ObservableObject {
                 folderSelector: NoopFolderSelector()
             )
         }
+
+        // Set up pipeline observation for root changes
+        setupPipelineWiring()
+    }
+
+    private func setupPipelineWiring() {
+        // Observe root selection changes and trigger pipeline
+        pipelineObservationTask = Task {
+            // Trigger initial pipeline run if bootstrap completes
+            if bootstrapState == .ready {
+                await triggerPipeline()
+            }
+        }
+    }
+
+    private func triggerPipeline() async {
+        let globalRoot = rootSelectionViewModel.selectedGlobalRootURL
+        let projectRoots = rootSelectionViewModel.projectRegistrations
+            .filter { $0.id == rootSelectionViewModel.selectedProjectRegistrationID }
+            .map { URL(fileURLWithPath: $0.preferredPath, isDirectory: true) }
+        await pipeline.run(globalRootURL: globalRoot, projectRootURLs: projectRoots)
     }
 
     convenience init() {
-        let bookmarkStore = try? BookmarkStore.makeLiveStore()
-        let globalStateStore = (try? GlobalStateStore.makeLiveStore())
-            ?? GlobalStateStore(persistence: InMemoryGlobalStatePersistence())
+        let bookmarkStore: BookmarkStore?
+        do {
+            bookmarkStore = try BookmarkStore.makeLiveStore()
+        } catch {
+            let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "Bootstrap")
+            logger.error("Failed to create live BookmarkStore: \(String(describing: error), privacy: .public)")
+            bookmarkStore = nil
+        }
+
+        let globalStateStore: GlobalStateStore
+        do {
+            globalStateStore = try GlobalStateStore.makeLiveStore()
+        } catch {
+            let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "Bootstrap")
+            logger.error("Failed to create live GlobalStateStore, falling back to in-memory: \(String(describing: error), privacy: .public)")
+            globalStateStore = GlobalStateStore(persistence: InMemoryGlobalStatePersistence())
+        }
         let projectRegistry = ProjectRegistry(bookmarkStore: bookmarkStore, globalStateStore: globalStateStore)
         let rootSelectionViewModel = RootSelectionViewModel(
             bookmarkStore: bookmarkStore,
@@ -59,7 +99,6 @@ final class AppRouter: ObservableObject {
             bootstrapState: .launching,
             sidebarState: SidebarState(),
             bookmarkStore: bookmarkStore,
-            globalStateStore: globalStateStore,
             rootSelectionViewModel: rootSelectionViewModel
         )
     }
@@ -69,7 +108,12 @@ final class AppRouter: ObservableObject {
             bootstrapState = .ready
 
             if sidebarState.selection == nil {
-                sidebarState.selection = .managed
+                sidebarState.selection = .user
+            }
+
+            // Trigger pipeline after bootstrap completes
+            Task {
+                await triggerPipeline()
             }
         }
 
@@ -197,10 +241,7 @@ final class ProjectRegistry {
         try globalStateStore.saveState(state)
     }
 
-    func setGlobalRootOverride(folderURL: URL, now: Date = Date()) throws {
-        guard folderURL.lastPathComponent == ".claude" else {
-            throw BookmarkError.failedToCreateBookmark
-        }
+    func setGlobalRoot(folderURL: URL, source: GlobalClaudeRootSource, now: Date = Date()) throws {
         guard let bookmarkStore else {
             throw BookmarkError.failedToSaveMetadata
         }
@@ -214,17 +255,50 @@ final class ProjectRegistry {
         )
 
         var state = try globalStateStore.loadState()
-        state.globalClaudeRootSource = .overrideBookmark
+        state.globalClaudeRootSource = source
         state.globalClaudeRootBookmarkID = BookmarkStore.globalRootBookmarkID
+        state.hasCompletedInitialGlobalRootSetup = true
         try globalStateStore.saveState(state)
     }
 
-    func clearGlobalRootOverride() throws {
+    func clearGlobalRootSelection() throws {
         var state = try globalStateStore.loadState()
         state.globalClaudeRootSource = .defaultHomeClaude
         state.globalClaudeRootBookmarkID = nil
+        state.hasCompletedInitialGlobalRootSetup = true
         try globalStateStore.saveState(state)
         try bookmarkStore?.removeBookmark(id: BookmarkStore.globalRootBookmarkID)
+    }
+
+    func markInitialGlobalRootSetupCompleted() throws {
+        var state = try globalStateStore.loadState()
+        state.hasCompletedInitialGlobalRootSetup = true
+        try globalStateStore.saveState(state)
+    }
+
+    func setManagedRoot(folderURL: URL, now: Date = Date()) throws {
+        guard let bookmarkStore else {
+            throw BookmarkError.failedToSaveMetadata
+        }
+
+        _ = try bookmarkStore.upsertBookmark(
+            id: BookmarkStore.managedRootBookmarkID,
+            kind: .managedClaudeCodeRoot,
+            folderURL: folderURL,
+            displayName: "Managed ClaudeCode Root",
+            now: now
+        )
+
+        var state = try globalStateStore.loadState()
+        state.managedRootBookmarkID = BookmarkStore.managedRootBookmarkID
+        try globalStateStore.saveState(state)
+    }
+
+    func clearManagedRoot() throws {
+        var state = try globalStateStore.loadState()
+        state.managedRootBookmarkID = nil
+        try globalStateStore.saveState(state)
+        try bookmarkStore?.removeBookmark(id: BookmarkStore.managedRootBookmarkID)
     }
 
     static func normalizePath(_ path: String) -> String {
@@ -255,6 +329,9 @@ final class RootSelectionViewModel: ObservableObject {
     @Published private(set) var defaultGlobalRootURL: URL
     @Published private(set) var selectedGlobalRootURL: URL
     @Published private(set) var globalRootSource: GlobalClaudeRootSource
+    @Published private(set) var hasAuthorizedGlobalRoot: Bool
+    @Published private(set) var hasCompletedInitialGlobalRootSetup: Bool
+    @Published private(set) var hasAuthorizedManagedRoot: Bool
     @Published private(set) var projectRegistrations: [ProjectRegistration]
     @Published var selectedProjectRegistrationID: String?
     @Published var issue: RootSelectionIssue?
@@ -262,21 +339,27 @@ final class RootSelectionViewModel: ObservableObject {
     private let bookmarkStore: BookmarkStore?
     private let projectRegistry: ProjectRegistry
     private let folderSelector: FolderSelecting
+    private let accessChecker: RootDirectoryAccessChecking
 
     init(
         bookmarkStore: BookmarkStore?,
         projectRegistry: ProjectRegistry,
-        folderSelector: FolderSelecting
+        folderSelector: FolderSelecting,
+        accessChecker: RootDirectoryAccessChecking = FileSystemRootDirectoryAccessChecker()
     ) {
         self.bookmarkStore = bookmarkStore
         self.projectRegistry = projectRegistry
         self.folderSelector = folderSelector
+        self.accessChecker = accessChecker
 
-        let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
+        let defaultRoot = RealHomeDirectory.url
             .appendingPathComponent(".claude", isDirectory: true)
         self.defaultGlobalRootURL = defaultRoot
         self.selectedGlobalRootURL = defaultRoot
         self.globalRootSource = .defaultHomeClaude
+        self.hasAuthorizedGlobalRoot = false
+        self.hasCompletedInitialGlobalRootSetup = false
+        self.hasAuthorizedManagedRoot = false
         self.projectRegistrations = []
         self.selectedProjectRegistrationID = nil
 
@@ -284,68 +367,165 @@ final class RootSelectionViewModel: ObservableObject {
     }
 
     var globalRootSourceLabel: String {
+        guard hasAuthorizedGlobalRoot else {
+            return "Not Authorized"
+        }
+
         switch globalRootSource {
         case .defaultHomeClaude:
             return "Default"
         case .overrideBookmark:
-            return "Override"
+            return "Custom"
         }
+    }
+
+    var recommendedGlobalRootIsAvailable: Bool {
+        accessChecker.accessStatus(forDirectoryAt: defaultGlobalRootURL) == .accessible
+    }
+
+    var shouldPromptForInitialGlobalRootAccess: Bool {
+        !hasCompletedInitialGlobalRootSetup && !hasAuthorizedGlobalRoot
     }
 
     func refreshFromStores() {
         do {
             let state = try projectRegistry.loadState()
             globalRootSource = state.globalClaudeRootSource
+            hasCompletedInitialGlobalRootSetup = state.hasCompletedInitialGlobalRootSetup
             projectRegistrations = state.projectRegistrations
             selectedProjectRegistrationID = state.selectedProjectRegistrationID
 
-            if globalRootSource == .overrideBookmark,
-               let globalRecord = try bookmarkStore?.allRecords().first(where: {
-                   $0.id == BookmarkStore.globalRootBookmarkID
-               }) {
+            let allRecords = try bookmarkStore?.allRecords() ?? []
+
+            if let globalRecord = allRecords.first(where: {
+                $0.id == BookmarkStore.globalRootBookmarkID
+            }) {
                 selectedGlobalRootURL = URL(fileURLWithPath: globalRecord.preferredPath, isDirectory: true)
+                hasAuthorizedGlobalRoot = true
             } else {
                 selectedGlobalRootURL = defaultGlobalRootURL
+                hasAuthorizedGlobalRoot = false
             }
+
+            hasAuthorizedManagedRoot = allRecords.contains(where: {
+                $0.id == BookmarkStore.managedRootBookmarkID
+            })
         } catch {
             issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 
-    func selectGlobalRootOverride() {
+    func chooseGlobalRootFolder() {
         let candidate = folderSelector.selectFolder(
-            title: "Select Claude Root Folder",
-            message: "Choose the .claude folder that should be used for global discovery.",
-            prompt: "Use Override",
-            initialDirectory: selectedGlobalRootURL
+            title: "Choose Global Claude Folder",
+            message: "Choose the folder to inspect for global Claude configuration. The app requests read-only access.",
+            prompt: "Grant Access",
+            initialDirectory: selectedGlobalRootURL,
+            showsHiddenFiles: true
         )
         guard let candidate else {
             return
         }
 
-        guard candidate.lastPathComponent == ".claude" else {
-            issue = .invalidGlobalRoot(path: candidate.path)
+        guard accessChecker.accessStatus(forDirectoryAt: candidate) == .accessible else {
+            issue = .unreadableGlobalRoot(path: candidate.path)
             return
         }
 
+        saveGlobalRoot(candidate)
+    }
+
+    func authorizeRecommendedGlobalRoot() {
+        let candidate = folderSelector.selectFolder(
+            title: "Authorize Recommended Claude Folder",
+            message: "Select the .claude folder in your home directory to grant read-only access.",
+            prompt: "Grant Access",
+            initialDirectory: defaultGlobalRootURL.deletingLastPathComponent(),
+            showsHiddenFiles: true
+        )
+        guard let candidate else {
+            return
+        }
+
+        guard accessChecker.accessStatus(forDirectoryAt: candidate) == .accessible else {
+            issue = .unreadableGlobalRoot(path: candidate.path)
+            return
+        }
+
+        // This method is specifically for the recommended default root,
+        // so always use .defaultHomeClaude as the source.
         do {
-            try projectRegistry.setGlobalRootOverride(folderURL: candidate)
+            try projectRegistry.setGlobalRoot(folderURL: candidate, source: .defaultHomeClaude)
             issue = nil
             refreshFromStores()
-        } catch BookmarkError.failedToCreateBookmark {
-            issue = .invalidGlobalRoot(path: candidate.path)
         } catch {
             issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 
-    func useDefaultGlobalRoot() {
+    private func saveGlobalRoot(_ folderURL: URL) {
+        let normalizedCandidate = RootLocator.normalizedIdentityPath(folderURL.path)
+        let normalizedDefault = RootLocator.normalizedIdentityPath(defaultGlobalRootURL.path)
+        let source: GlobalClaudeRootSource = normalizedCandidate == normalizedDefault ? .defaultHomeClaude : .overrideBookmark
+
         do {
-            try projectRegistry.clearGlobalRootOverride()
+            try projectRegistry.setGlobalRoot(folderURL: folderURL, source: source)
             issue = nil
             refreshFromStores()
         } catch {
             issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func clearGlobalRootSelection() {
+        do {
+            try projectRegistry.clearGlobalRootSelection()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .globalRoot, details: String(describing: error))
+        }
+    }
+
+    func authorizeManagedRoot() {
+        let managedURL = URL(fileURLWithPath: ManagedSettingsLocator.managedRootPath, isDirectory: true)
+        let candidate = folderSelector.selectFolder(
+            title: "Authorize Managed Settings Folder",
+            message: "Select the ClaudeCode folder in /Library/Application Support/ to grant read-only access to managed settings.",
+            prompt: "Grant Access",
+            initialDirectory: managedURL.deletingLastPathComponent(),
+            showsHiddenFiles: false
+        )
+        guard let candidate else {
+            return
+        }
+
+        do {
+            try projectRegistry.setManagedRoot(folderURL: candidate)
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .managedRoot, details: String(describing: error))
+        }
+    }
+
+    func clearManagedRootSelection() {
+        do {
+            try projectRegistry.clearManagedRoot()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .managedRoot, details: String(describing: error))
+        }
+    }
+
+    func skipInitialGlobalRootSetup() {
+        do {
+            try projectRegistry.markInitialGlobalRootSetupCompleted()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
         }
     }
 
@@ -354,7 +534,8 @@ final class RootSelectionViewModel: ObservableObject {
             title: "Add Project Root",
             message: "Choose a project folder to register for discovery.",
             prompt: "Add Project",
-            initialDirectory: FileManager.default.homeDirectoryForCurrentUser
+            initialDirectory: RealHomeDirectory.url,
+            showsHiddenFiles: false
         )
         guard let candidate else {
             return
@@ -407,7 +588,8 @@ private struct NoopFolderSelector: FolderSelecting {
         title: String,
         message: String,
         prompt: String,
-        initialDirectory: URL?
+        initialDirectory: URL?,
+        showsHiddenFiles: Bool
     ) -> URL? {
         nil
     }

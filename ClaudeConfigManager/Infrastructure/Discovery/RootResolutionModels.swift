@@ -7,11 +7,14 @@ enum RootSourceKind: String, Equatable, Sendable {
 }
 
 enum RootResolutionScope: Equatable, Sendable {
+    case managedRoot
     case globalRoot
     case projectRoot(projectID: String)
 
     var stableIdentifier: String {
         switch self {
+        case .managedRoot:
+            return "managed"
         case .globalRoot:
             return "global"
         case .projectRoot(let projectID):
@@ -25,19 +28,21 @@ enum RootAccessStatus: Equatable, Sendable {
     case missing
     case notDirectory
     case inaccessible
+    case notAuthorized
     case requiresReauthorization(reason: BookmarkResolutionResult.ReauthorizationReason)
 
     var isUsableForDiscovery: Bool {
         switch self {
         case .accessible, .missing:
             return true
-        case .notDirectory, .inaccessible, .requiresReauthorization:
+        case .notDirectory, .inaccessible, .notAuthorized, .requiresReauthorization:
             return false
         }
     }
 }
 
 enum DiscoveryScopeKind: String, Equatable, Sendable {
+    case managed
     case user
     case project
 }
@@ -51,6 +56,10 @@ struct DiscoveryScopeIdentity: Equatable, Sendable {
     let scopeKind: DiscoveryScopeKind
     let project: ProjectScopeIdentity?
     let sourceDescriptor: String?
+
+    static func managed(sourceDescriptor: String? = nil) -> DiscoveryScopeIdentity {
+        DiscoveryScopeIdentity(scopeKind: .managed, project: nil, sourceDescriptor: sourceDescriptor)
+    }
 
     static func user(sourceDescriptor: String? = nil) -> DiscoveryScopeIdentity {
         DiscoveryScopeIdentity(scopeKind: .user, project: nil, sourceDescriptor: sourceDescriptor)
@@ -66,6 +75,11 @@ struct DiscoveryScopeIdentity: Equatable, Sendable {
 
     var stableIdentifier: String {
         switch scopeKind {
+        case .managed:
+            if let sourceDescriptor {
+                return "managed::\(sourceDescriptor)"
+            }
+            return "managed"
         case .user:
             if let sourceDescriptor {
                 return "user::\(sourceDescriptor)"
@@ -118,6 +132,7 @@ enum DiscoveryPathStatus: String, Equatable, Sendable {
 }
 
 enum DiscoveryIssueCode: String, Equatable, Sendable {
+    case globalDefaultRequiresAuthorization
     case globalOverrideMissingBookmark
     case globalOverrideRequiresReauthorization
     case globalOverrideNotDirectory
@@ -128,6 +143,10 @@ enum DiscoveryIssueCode: String, Equatable, Sendable {
     case projectRequiresReauthorization
     case projectNotDirectory
     case projectInaccessible
+    case managedSettingsRootInaccessible
+    case managedSettingsFileUnreadable
+    case managedSettingsDropInInaccessible
+    case managedSettingsDropInEnumerationFailed
     case scanDirectoryEnumerationFailed
     case scanDescendantInaccessible
 }

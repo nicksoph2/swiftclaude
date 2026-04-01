@@ -1,5 +1,35 @@
 import Foundation
 
+enum McpTransportType: String, Equatable, Sendable {
+    case stdio
+    case http
+    case sse
+    case plugin
+    case unknown
+}
+
+enum McpServerSource: Equatable, Sendable {
+    case mcpJson(path: String)
+    case claudeJson
+    case managed
+    case plugin(id: String)
+}
+
+struct McpServerConfig: Equatable, Sendable {
+    let name: String
+    let transportType: McpTransportType
+    let command: String?
+    let args: [String]?
+    let env: [String: String]?
+    let cwd: String?
+    let url: String?
+    let headers: [String: String]?
+    let pluginId: String?
+    let pluginName: String?
+    let source: McpServerSource
+    let unknownFields: [String: JSONValue]?
+}
+
 struct ParsedClaudeJsonDocument: Equatable, Sendable {
     let source: SourceFileReference
     let value: ClaudeJsonDocumentValue
@@ -10,9 +40,39 @@ struct ParsedClaudeJsonDocument: Equatable, Sendable {
 
 struct ClaudeJsonDocumentValue: Equatable, Sendable {
     let schema: String?
+    let autoConnectIde: Bool?
+    let autoInstallIdeExtension: Bool?
+    let editorMode: String?
+    let showTurnDuration: Bool?
+    let terminalProgressBarEnabled: Bool?
+    let teammateMode: String?
     let globalPreferences: ClaudeJsonGlobalPreferences?
     let mcpState: ParsedClaudeJsonMcpState?
     let trustState: ParsedTrustState?
+
+    init(
+        schema: String?,
+        autoConnectIde: Bool? = nil,
+        autoInstallIdeExtension: Bool? = nil,
+        editorMode: String? = nil,
+        showTurnDuration: Bool? = nil,
+        terminalProgressBarEnabled: Bool? = nil,
+        teammateMode: String? = nil,
+        globalPreferences: ClaudeJsonGlobalPreferences?,
+        mcpState: ParsedClaudeJsonMcpState?,
+        trustState: ParsedTrustState?
+    ) {
+        self.schema = schema
+        self.autoConnectIde = autoConnectIde
+        self.autoInstallIdeExtension = autoInstallIdeExtension
+        self.editorMode = editorMode
+        self.showTurnDuration = showTurnDuration
+        self.terminalProgressBarEnabled = terminalProgressBarEnabled
+        self.teammateMode = teammateMode
+        self.globalPreferences = globalPreferences
+        self.mcpState = mcpState
+        self.trustState = trustState
+    }
 }
 
 struct ClaudeJsonGlobalPreferences: Equatable, Sendable {
@@ -29,14 +89,42 @@ struct ParsedClaudeJsonMcpState: Equatable, Sendable {
 }
 
 struct ParsedClaudeJsonMcpServerRef: Equatable, Sendable {
+    let config: McpServerConfig
     let command: String?
     let args: [String]?
     let env: [String: String]?
+    let cwd: String?
     let url: String?
     let headers: [String: String]?
+    let pluginId: String?
+    let pluginName: String?
+    let transportType: McpTransportType
+    let serverSource: McpServerSource
     let enabled: Bool?
     let source: String?
     let rawObject: [String: JSONValue]
+
+    init(
+        config: McpServerConfig,
+        enabled: Bool?,
+        source: String?,
+        rawObject: [String: JSONValue]
+    ) {
+        self.config = config
+        self.command = config.command
+        self.args = config.args
+        self.env = config.env
+        self.cwd = config.cwd
+        self.url = config.url
+        self.headers = config.headers
+        self.pluginId = config.pluginId
+        self.pluginName = config.pluginName
+        self.transportType = config.transportType
+        self.serverSource = config.source
+        self.enabled = enabled
+        self.source = source
+        self.rawObject = rawObject
+    }
 }
 
 struct ParsedTrustState: Equatable, Sendable {
@@ -48,13 +136,24 @@ struct ParsedTrustState: Equatable, Sendable {
 struct ClaudeJsonParser {
     private static let knownTopLevelKeys: Set<String> = [
         "$schema",
+        "autoConnectIde",
+        "autoInstallIdeExtension",
+        "editorMode",
         "globalPreferences",
         "mcp",
+        "showTurnDuration",
+        "terminalProgressBarEnabled",
+        "teammateMode",
         "trust"
     ]
 
     private static let settingsJsonTopLevelKeys: Set<String> = [
         "apiKeyHelper",
+        "forceLoginMethod",
+        "forceLoginOrgUUID",
+        "otelHeadersHelper",
+        "awsAuthRefresh",
+        "awsCredentialExport",
         "autoMemoryDirectory",
         "cleanupPeriodDays",
         "companyAnnouncements",
@@ -110,8 +209,26 @@ struct ClaudeJsonParser {
         let rawTopLevel = root.mapValues { JSONValue.from(any: $0) }
 
         let schema = parseString("$schema", from: root, sourcePath: source.displayPath, issues: &issues)
+        let autoConnectIde = parseBool("autoConnectIde", from: root, sourcePath: source.displayPath, issues: &issues)
+        let autoInstallIdeExtension = parseBool("autoInstallIdeExtension", from: root, sourcePath: source.displayPath, issues: &issues)
+        let editorMode = parseEnumString(
+            "editorMode",
+            allowedValues: ["normal", "vim"],
+            from: root,
+            sourcePath: source.displayPath,
+            issues: &issues
+        )
         let globalPreferences = parseGlobalPreferences(from: root, sourcePath: source.displayPath, issues: &issues)
-        let mcpState = parseMcpState(from: root, sourcePath: source.displayPath, issues: &issues)
+        let mcpState = parseMcpState(from: root, sourceURL: sourceURL, sourcePath: source.displayPath, issues: &issues)
+        let showTurnDuration = parseBool("showTurnDuration", from: root, sourcePath: source.displayPath, issues: &issues)
+        let terminalProgressBarEnabled = parseBool("terminalProgressBarEnabled", from: root, sourcePath: source.displayPath, issues: &issues)
+        let teammateMode = parseEnumString(
+            "teammateMode",
+            allowedValues: ["auto", "in-process", "tmux"],
+            from: root,
+            sourcePath: source.displayPath,
+            issues: &issues
+        )
         let trustState = parseTrustState(from: root, sourcePath: source.displayPath, issues: &issues)
 
         var unsupportedTopLevelKeys: [String: JSONValue] = [:]
@@ -147,6 +264,12 @@ struct ClaudeJsonParser {
 
         let value = ClaudeJsonDocumentValue(
             schema: schema,
+            autoConnectIde: autoConnectIde,
+            autoInstallIdeExtension: autoInstallIdeExtension,
+            editorMode: editorMode,
+            showTurnDuration: showTurnDuration,
+            terminalProgressBarEnabled: terminalProgressBarEnabled,
+            teammateMode: teammateMode,
             globalPreferences: globalPreferences,
             mcpState: mcpState,
             trustState: trustState
@@ -159,6 +282,13 @@ struct ClaudeJsonParser {
             unsupportedTopLevelKeys: unsupportedTopLevelKeys,
             settingsFamilyTopLevelKeys: settingsFamilyTopLevelKeys
         )
+
+        // Run lightweight validation if no parse errors occurred
+        if !issues.contains(where: { $0.severity == .error }) {
+            let validator = ClaudeJsonValidator()
+            let validationIssues = validator.validate(document)
+            issues.append(contentsOf: validationIssues)
+        }
 
         return ParseResult(value: document, issues: issues)
     }
@@ -223,6 +353,7 @@ struct ClaudeJsonParser {
 
     private func parseMcpState(
         from root: [String: Any],
+        sourceURL: URL,
         sourcePath: String,
         issues: inout [SyntaxIssue]
     ) -> ParsedClaudeJsonMcpState? {
@@ -246,6 +377,7 @@ struct ClaudeJsonParser {
         let userServers = parseMcpServerCollection(
             key: "user",
             from: object,
+            sourceURL: sourceURL,
             sourcePath: sourcePath,
             parentPath: "mcp",
             issues: &issues
@@ -254,6 +386,7 @@ struct ClaudeJsonParser {
         let localServers = parseMcpServerCollection(
             key: "local",
             from: object,
+            sourceURL: sourceURL,
             sourcePath: sourcePath,
             parentPath: "mcp",
             issues: &issues
@@ -269,6 +402,7 @@ struct ClaudeJsonParser {
     private func parseMcpServerCollection(
         key: String,
         from object: [String: Any],
+        sourceURL: URL,
         sourcePath: String,
         parentPath: String,
         issues: inout [SyntaxIssue]
@@ -311,24 +445,153 @@ struct ClaudeJsonParser {
             let command = parseString("command", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let args = parseStringArray("args", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let env = parseStringMap("env", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
+            let cwd = parseString("cwd", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let url = parseString("url", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let headers = parseStringMap("headers", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
+            let pluginId = parseString("pluginId", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
+            let pluginName = parseString("pluginName", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
+            let transport = parseString("transport", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let enabled = parseBool("enabled", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
             let source = parseString("source", from: serverObject, sourcePath: sourcePath, keyPathPrefix: keyPath, issues: &issues)
+            let rawObject = serverObject.mapValues { JSONValue.from(any: $0) }
 
-            servers[serverID] = ParsedClaudeJsonMcpServerRef(
+            let transportType = detectTransportType(
+                serverObject: serverObject,
+                command: command,
+                url: url,
+                pluginId: pluginId,
+                transport: transport,
+                sourcePath: sourcePath,
+                keyPath: keyPath,
+                issues: &issues
+            )
+            let serverSource = inferMcpServerSource(
+                sourceURL: sourceURL,
+                transportType: transportType,
+                pluginId: pluginId
+            )
+            let config = McpServerConfig(
+                name: serverID,
+                transportType: transportType,
                 command: command,
                 args: args,
                 env: env,
+                cwd: cwd,
                 url: url,
                 headers: headers,
-                enabled: enabled,
-                source: source,
-                rawObject: serverObject.mapValues { JSONValue.from(any: $0) }
+                pluginId: pluginId,
+                pluginName: pluginName,
+                source: serverSource,
+                unknownFields: rawObject.filter { !Self.knownMcpServerKeys.contains($0.key) }
             )
+
+            servers[serverID] = ParsedClaudeJsonMcpServerRef(config: config, enabled: enabled, source: source, rawObject: rawObject)
         }
 
         return servers
+    }
+
+    private static let knownMcpServerKeys: Set<String> = [
+        "args",
+        "command",
+        "cwd",
+        "enabled",
+        "env",
+        "headers",
+        "pluginId",
+        "pluginName",
+        "source",
+        "transport",
+        "url"
+    ]
+
+    private func detectTransportType(
+        serverObject: [String: Any],
+        command: String?,
+        url: String?,
+        pluginId: String?,
+        transport: String?,
+        sourcePath: String,
+        keyPath: String,
+        issues: inout [SyntaxIssue]
+    ) -> McpTransportType {
+        let hasCommandKey = serverObject.keys.contains("command")
+        let hasURLKey = serverObject.keys.contains("url")
+        let hasPluginKey = serverObject.keys.contains("pluginId")
+
+        if hasPluginKey, let pluginId, !pluginId.isEmpty {
+            return .plugin
+        }
+
+        if hasCommandKey && hasURLKey {
+            issues.append(
+                SyntaxIssue(
+                    code: .ambiguousMcpTransport,
+                    severity: .warning,
+                    message: "MCP server defines both command and url transport fields; defaulting to stdio.",
+                    sourcePath: sourcePath,
+                    keyPath: keyPath
+                )
+            )
+            return .stdio
+        }
+
+        if hasCommandKey {
+            return .stdio
+        }
+
+        if hasURLKey {
+            if transport?.caseInsensitiveCompare("sse") == .orderedSame {
+                issues.append(
+                    SyntaxIssue(
+                        code: .deprecatedMcpTransport,
+                        severity: .info,
+                        message: "SSE MCP transport is deprecated; prefer streamable HTTP.",
+                        sourcePath: sourcePath,
+                        keyPath: keyPath
+                    )
+                )
+                return .sse
+            }
+
+            return .http
+        }
+
+        if hasPluginKey {
+            return .unknown
+        }
+
+        issues.append(
+            SyntaxIssue(
+                code: .missingMcpTransport,
+                severity: .warning,
+                message: "MCP server must define a supported transport.",
+                sourcePath: sourcePath,
+                keyPath: keyPath
+            )
+        )
+        return .unknown
+    }
+
+    private func inferMcpServerSource(
+        sourceURL: URL,
+        transportType: McpTransportType,
+        pluginId: String?
+    ) -> McpServerSource {
+        if transportType == .plugin, let pluginId, !pluginId.isEmpty {
+            return .plugin(id: pluginId)
+        }
+
+        switch sourceURL.lastPathComponent {
+        case ".claude.json":
+            return .claudeJson
+        case ".mcp.json":
+            return .mcpJson(path: sourceURL.path)
+        case "managed-mcp.json":
+            return .managed
+        default:
+            return .claudeJson
+        }
     }
 
     private func parseTrustState(
@@ -521,6 +784,42 @@ struct ClaudeJsonParser {
         }
 
         return output
+    }
+
+    private func parseEnumString(
+        _ key: String,
+        allowedValues: Set<String>,
+        from object: [String: Any],
+        sourcePath: String,
+        keyPathPrefix: String? = nil,
+        issues: inout [SyntaxIssue]
+    ) -> String? {
+        guard let stringValue = parseString(
+            key,
+            from: object,
+            sourcePath: sourcePath,
+            keyPathPrefix: keyPathPrefix,
+            issues: &issues
+        ) else {
+            return nil
+        }
+
+        guard allowedValues.contains(stringValue) else {
+            let keyPath = buildKeyPath(prefix: keyPathPrefix, key: key)
+            let supportedValues = allowedValues.sorted().joined(separator: ", ")
+            issues.append(
+                SyntaxIssue(
+                    code: .preservedUnknownValue,
+                    severity: .warning,
+                    message: "Unsupported value '\(stringValue)' at \(keyPath). Expected one of: \(supportedValues).",
+                    sourcePath: sourcePath,
+                    keyPath: keyPath
+                )
+            )
+            return nil
+        }
+
+        return stringValue
     }
 
     private func buildKeyPath(prefix: String?, key: String) -> String {

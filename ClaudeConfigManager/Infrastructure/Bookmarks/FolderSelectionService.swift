@@ -7,7 +7,8 @@ protocol FolderSelecting {
         title: String,
         message: String,
         prompt: String,
-        initialDirectory: URL?
+        initialDirectory: URL?,
+        showsHiddenFiles: Bool
     ) -> URL?
 }
 
@@ -17,7 +18,8 @@ final class OpenPanelFolderSelector: FolderSelecting {
         title: String,
         message: String,
         prompt: String = "Select Folder",
-        initialDirectory: URL? = nil
+        initialDirectory: URL? = nil,
+        showsHiddenFiles: Bool = false
     ) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -25,6 +27,7 @@ final class OpenPanelFolderSelector: FolderSelecting {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         panel.resolvesAliases = true
+        panel.showsHiddenFiles = showsHiddenFiles
         panel.prompt = prompt
         panel.title = title
         panel.message = message

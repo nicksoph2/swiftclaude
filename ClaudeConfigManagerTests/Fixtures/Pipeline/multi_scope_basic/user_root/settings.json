@@ -1,0 +1,7 @@
+{
+  "model": "claude-sonnet-4-5-20250514",
+  "theme": "dark",
+  "permissions": {
+    "deny": ["Bash(rm -rf /)", "WebFetch(evil.com)"]
+  }
+}

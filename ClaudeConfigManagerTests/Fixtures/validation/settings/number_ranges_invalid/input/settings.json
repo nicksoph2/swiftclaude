@@ -1,0 +1,10 @@
+{
+  "feedbackSurveyRate": 2.5,
+  "cleanupPeriodDays": -1,
+  "sandbox": {
+    "network": {
+      "httpProxyPort": 99999,
+      "socksProxyPort": 0
+    }
+  }
+}

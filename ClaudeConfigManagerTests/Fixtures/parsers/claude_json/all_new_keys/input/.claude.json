@@ -1,0 +1,8 @@
+{
+  "teammateMode": "auto",
+  "autoConnectIde": true,
+  "autoInstallIdeExtension": false,
+  "editorMode": "vim",
+  "showTurnDuration": true,
+  "terminalProgressBarEnabled": false
+}

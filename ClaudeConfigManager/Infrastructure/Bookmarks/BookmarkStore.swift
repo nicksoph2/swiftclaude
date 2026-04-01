@@ -58,6 +58,7 @@ struct URLSecurityScopeAccessor: SecurityScopedAccessing {
 
 final class BookmarkStore {
     static let globalRootBookmarkID = "global-claude-root"
+    static let managedRootBookmarkID = "managed-claude-code-root"
 
     private let persistence: BookmarkMetadataPersisting
     private let dataCoder: BookmarkDataCoding
@@ -79,6 +80,8 @@ final class BookmarkStore {
 
     static func makeLiveStore() throws -> BookmarkStore {
         let storage = try AppOwnedBookmarkStorageLocator().makeStorageDescriptor()
+        let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "BookmarkStore")
+        logger.info("BookmarkStore live store created — metadata: \(storage.metadataURL.path, privacy: .public), blobs: \(storage.bookmarkBlobDirectoryURL.path, privacy: .public)")
         let persistence = FileSystemBookmarkPersistence(storage: storage)
         return BookmarkStore(persistence: persistence)
     }

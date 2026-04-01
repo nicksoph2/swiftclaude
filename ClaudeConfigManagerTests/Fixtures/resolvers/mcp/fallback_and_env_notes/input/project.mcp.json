@@ -1,0 +1,13 @@
+{
+  "filesystem": {
+    "command": "npx",
+    "args": ["-y", "mcp-filesystem", "$HOME/projects"],
+    "env": {
+      "TOKEN": "${API_TOKEN}",
+      "BROKEN": "$()"
+    },
+    "headers": {
+      "X-Trace": "static-value"
+    }
+  }
+}

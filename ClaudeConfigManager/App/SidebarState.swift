@@ -4,7 +4,7 @@ import Foundation
 final class SidebarState: ObservableObject {
     @Published var selection: SidebarDestination?
 
-    init(selection: SidebarDestination? = .managed) {
+    init(selection: SidebarDestination? = .user) {
         self.selection = selection
     }
 }
