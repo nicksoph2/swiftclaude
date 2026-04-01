@@ -42,24 +42,6 @@
 		A10000010000000000000024 /* SkillParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000024 /* SkillParserTests.swift */; };
 		A10000010000000000000025 /* ResolverModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000025 /* ResolverModels.swift */; };
 		A10000010000000000000026 /* ResolverModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000026 /* ResolverModelsTests.swift */; };
-		A10000010000000000000027 /* SettingsKeyRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000027 /* SettingsKeyRegistry.swift */; };
-		A10000010000000000000028 /* RuntimeSessionSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000028 /* RuntimeSessionSnapshot.swift */; };
-		A10000010000000000000029 /* RuntimeSessionDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000029 /* RuntimeSessionDiscovery.swift */; };
-		A1000001000000000000002A /* RuntimeSessionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002A /* RuntimeSessionCardView.swift */; };
-		A1000001000000000000002B /* RuntimeSessionDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002B /* RuntimeSessionDiscoveryTests.swift */; };
-		A1000001000000000000002C /* SettingsDocumentValue+Accessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002C /* SettingsDocumentValue+Accessors.swift */; };
-		A1000001000000000000002D /* UsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002D /* UsageModels.swift */; };
-		A1000001000000000000002E /* UsageAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002E /* UsageAggregator.swift */; };
-		A1000001000000000000002F /* PromptHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000101000000000000002F /* PromptHistoryView.swift */; };
-		A10000010000000000000030 /* UsageDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000030 /* UsageDashboardView.swift */; };
-		A10000010000000000000031 /* UsageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000031 /* UsageDetailView.swift */; };
-		A10000010000000000000032 /* ClaudeMdParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000032 /* ClaudeMdParserTests.swift */; };
-		A10000010000000000000033 /* McpJsonParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000033 /* McpJsonParserTests.swift */; };
-		A10000010000000000000034 /* ManagedScopeInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000034 /* ManagedScopeInspectorTests.swift */; };
-		A10000010000000000000035 /* SettingsDocumentValueAccessorsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000035 /* SettingsDocumentValueAccessorsTests.swift */; };
-		A10000010000000000000036 /* SettingsFamilyClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000036 /* SettingsFamilyClassifierTests.swift */; };
-		A10000010000000000000037 /* UsageAggregatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000037 /* UsageAggregatorTests.swift */; };
-		A10000010000000000000038 /* UsageModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10001010000000000000038 /* UsageModelsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -111,24 +93,6 @@
 		A10001010000000000000024 /* SkillParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillParserTests.swift; sourceTree = "<group>"; };
 		A10001010000000000000025 /* ResolverModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolverModels.swift; sourceTree = "<group>"; };
 		A10001010000000000000026 /* ResolverModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolverModelsTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000027 /* SettingsKeyRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsKeyRegistry.swift; sourceTree = "<group>"; };
-		A10001010000000000000028 /* RuntimeSessionSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionSnapshot.swift; sourceTree = "<group>"; };
-		A10001010000000000000029 /* RuntimeSessionDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionDiscovery.swift; sourceTree = "<group>"; };
-		A1000101000000000000002A /* RuntimeSessionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionCardView.swift; sourceTree = "<group>"; };
-		A1000101000000000000002B /* RuntimeSessionDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionDiscoveryTests.swift; sourceTree = "<group>"; };
-		A1000101000000000000002C /* SettingsDocumentValue+Accessors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsDocumentValue+Accessors.swift"; sourceTree = "<group>"; };
-		A1000101000000000000002D /* UsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageModels.swift; sourceTree = "<group>"; };
-		A1000101000000000000002E /* UsageAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAggregator.swift; sourceTree = "<group>"; };
-		A1000101000000000000002F /* PromptHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHistoryView.swift; sourceTree = "<group>"; };
-		A10001010000000000000030 /* UsageDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageDashboardView.swift; sourceTree = "<group>"; };
-		A10001010000000000000031 /* UsageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageDetailView.swift; sourceTree = "<group>"; };
-		A10001010000000000000032 /* ClaudeMdParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeMdParserTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000033 /* McpJsonParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = McpJsonParserTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000034 /* ManagedScopeInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedScopeInspectorTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000035 /* SettingsDocumentValueAccessorsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDocumentValueAccessorsTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000036 /* SettingsFamilyClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFamilyClassifierTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000037 /* UsageAggregatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAggregatorTests.swift; sourceTree = "<group>"; };
-		A10001010000000000000038 /* UsageModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageModelsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,11 +178,7 @@
 		A1000006000000000000000A /* Session */ = {
 			isa = PBXGroup;
 			children = (
-				A1000101000000000000002F /* PromptHistoryView.swift */,
-				A1000101000000000000002A /* RuntimeSessionCardView.swift */,
 				A10001010000000000000009 /* SessionScopeView.swift */,
-				A10001010000000000000030 /* UsageDashboardView.swift */,
-				A10001010000000000000031 /* UsageDetailView.swift */,
 			);
 			path = Session;
 			sourceTree = "<group>";
@@ -265,10 +225,8 @@
 			children = (
 				A10000060000000000000015 /* Bookmarks */,
 				A10000060000000000000017 /* Discovery */,
-				A1000006000000000000001D /* Managed */,
 				A10000060000000000000019 /* Parsers */,
 				A1000006000000000000001B /* Resolver */,
-				A1000006000000000000001C /* Session */,
 				A10001010000000000000010 /* ClaudeConfigManagerTests.swift */,
 			);
 			path = ClaudeConfigManagerTests;
@@ -294,9 +252,7 @@
 		A10000060000000000000012 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				A10001010000000000000028 /* RuntimeSessionSnapshot.swift */,
 				A1000101000000000000000C /* ScopeScreenModel.swift */,
-				A1000101000000000000002D /* UsageModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -331,10 +287,8 @@
 		A10000060000000000000016 /* Discovery */ = {
 			isa = PBXGroup;
 			children = (
-				A10001010000000000000029 /* RuntimeSessionDiscovery.swift */,
 				A10001010000000000000019 /* RootLocator.swift */,
 				A10001010000000000000018 /* RootResolutionModels.swift */,
-				A1000101000000000000002E /* UsageAggregator.swift */,
 				A1000101000000000000001B /* WorkspaceScanner.swift */,
 			);
 			path = Discovery;
@@ -354,8 +308,6 @@
 			children = (
 				A10001010000000000000021 /* AgentParser.swift */,
 				A1000101000000000000001F /* ClaudeJsonParser.swift */,
-				A1000101000000000000002C /* SettingsDocumentValue+Accessors.swift */,
-				A10001010000000000000027 /* SettingsKeyRegistry.swift */,
 				A1000101000000000000001D /* SettingsParser.swift */,
 				A10001010000000000000023 /* SkillParser.swift */,
 			);
@@ -367,9 +319,6 @@
 			children = (
 				A10001010000000000000022 /* AgentParserTests.swift */,
 				A10001010000000000000020 /* ClaudeJsonParserTests.swift */,
-				A10001010000000000000032 /* ClaudeMdParserTests.swift */,
-				A10001010000000000000033 /* McpJsonParserTests.swift */,
-				A10001010000000000000035 /* SettingsDocumentValueAccessorsTests.swift */,
 				A1000101000000000000001E /* SettingsParserTests.swift */,
 				A10001010000000000000024 /* SkillParserTests.swift */,
 			);
@@ -390,25 +339,6 @@
 				A10001010000000000000026 /* ResolverModelsTests.swift */,
 			);
 			path = Resolver;
-			sourceTree = "<group>";
-		};
-		A1000006000000000000001C /* Session */ = {
-			isa = PBXGroup;
-			children = (
-				A1000101000000000000002B /* RuntimeSessionDiscoveryTests.swift */,
-				A10001010000000000000036 /* SettingsFamilyClassifierTests.swift */,
-				A10001010000000000000037 /* UsageAggregatorTests.swift */,
-				A10001010000000000000038 /* UsageModelsTests.swift */,
-			);
-			path = Session;
-			sourceTree = "<group>";
-		};
-		A1000006000000000000001D /* Managed */ = {
-			isa = PBXGroup;
-			children = (
-				A10001010000000000000034 /* ManagedScopeInspectorTests.swift */,
-			);
-			path = Managed;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -525,25 +455,15 @@
 				A10000010000000000000019 /* RootLocator.swift in Sources */,
 				A10000010000000000000018 /* RootResolutionModels.swift in Sources */,
 				A10000010000000000000004 /* RootSplitView.swift in Sources */,
-				A1000001000000000000002A /* RuntimeSessionCardView.swift in Sources */,
-				A10000010000000000000029 /* RuntimeSessionDiscovery.swift in Sources */,
-				A10000010000000000000028 /* RuntimeSessionSnapshot.swift in Sources */,
 				A1000001000000000000000B /* ScopePlaceholderView.swift in Sources */,
 				A1000001000000000000000C /* ScopeScreenModel.swift in Sources */,
 				A10000010000000000000009 /* SessionScopeView.swift in Sources */,
 				A10000010000000000000005 /* SidebarDestination.swift in Sources */,
 				A10000010000000000000006 /* SidebarState.swift in Sources */,
 				A1000001000000000000000A /* UserScopeView.swift in Sources */,
-				A10000010000000000000027 /* SettingsKeyRegistry.swift in Sources */,
 				A1000001000000000000001D /* SettingsParser.swift in Sources */,
 				A10000010000000000000023 /* SkillParser.swift in Sources */,
 				A10000010000000000000025 /* ResolverModels.swift in Sources */,
-				A1000001000000000000002C /* SettingsDocumentValue+Accessors.swift in Sources */,
-				A1000001000000000000002D /* UsageModels.swift in Sources */,
-				A1000001000000000000002E /* UsageAggregator.swift in Sources */,
-				A1000001000000000000002F /* PromptHistoryView.swift in Sources */,
-				A10000010000000000000030 /* UsageDashboardView.swift in Sources */,
-				A10000010000000000000031 /* UsageDetailView.swift in Sources */,
 				A1000001000000000000001B /* WorkspaceScanner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -558,17 +478,9 @@
 				A1000001000000000000000F /* ClaudeConfigManagerTests.swift in Sources */,
 				A1000001000000000000001A /* RootLocatorTests.swift in Sources */,
 				A10000010000000000000026 /* ResolverModelsTests.swift in Sources */,
-				A1000001000000000000002B /* RuntimeSessionDiscoveryTests.swift in Sources */,
 				A1000001000000000000001E /* SettingsParserTests.swift in Sources */,
 				A10000010000000000000024 /* SkillParserTests.swift in Sources */,
 				A1000001000000000000001C /* WorkspaceScannerTests.swift in Sources */,
-				A10000010000000000000032 /* ClaudeMdParserTests.swift in Sources */,
-				A10000010000000000000033 /* McpJsonParserTests.swift in Sources */,
-				A10000010000000000000034 /* ManagedScopeInspectorTests.swift in Sources */,
-				A10000010000000000000035 /* SettingsDocumentValueAccessorsTests.swift in Sources */,
-				A10000010000000000000036 /* SettingsFamilyClassifierTests.swift in Sources */,
-				A10000010000000000000037 /* UsageAggregatorTests.swift in Sources */,
-				A10000010000000000000038 /* UsageModelsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

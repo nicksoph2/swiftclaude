@@ -1,3 +1,0 @@
-{"type":"human","message":{"role":"user","content":[{"type":"text","text":"Hello"}]}}
-{"type":"some_future_record_type","data":{"key":"value"}}
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}]}}

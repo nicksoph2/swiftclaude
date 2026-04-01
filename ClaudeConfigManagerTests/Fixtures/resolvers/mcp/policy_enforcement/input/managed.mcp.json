@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "managed-server": {
-      "command": "managed-tool",
-      "args": ["--approved"]
-    }
-  }
-}

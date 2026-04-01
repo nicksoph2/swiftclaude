@@ -1,4 +1,0 @@
-{"type":"human","message":{"role":"user","content":[{"type":"text","text":"Valid line"}]}}
-This is not JSON
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Response"}]}}
-{incomplete json object

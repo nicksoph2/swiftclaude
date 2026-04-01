@@ -88,7 +88,12 @@ struct RootLocator {
         defaultRootURL: URL,
         issues: inout [DiscoveryIssue]
     ) -> ResolvedGlobalRoot {
-        if let bookmarkID = state.globalClaudeRootBookmarkID {
+        let defaultStatus = accessChecker.accessStatus(forDirectoryAt: defaultRootURL)
+
+        let wantsOverride = state.globalClaudeRootSource == .overrideBookmark
+
+        if wantsOverride,
+           let bookmarkID = state.globalClaudeRootBookmarkID {
             if let overrideResult = try? bookmarkResolver?.resolveBookmark(id: bookmarkID) {
                 switch overrideResult.status {
                 case .accessible(let overrideURL):
@@ -97,13 +102,11 @@ struct RootLocator {
 
                     if overrideStatus.isUsableForDiscovery {
                         return ResolvedGlobalRoot(
-                            source: state.globalClaudeRootSource == .defaultHomeClaude ? .defaultHomeClaude : .overrideBookmark,
+                            source: .overrideBookmark,
                             rootURL: normalizedOverrideURL,
                             normalizedPath: Self.normalizedIdentityPath(normalizedOverrideURL.path),
                             accessStatus: overrideStatus,
-                            explanation: state.globalClaudeRootSource == .defaultHomeClaude
-                                ? "Using the user-authorized default Claude folder."
-                                : "Using the user-selected global root folder."
+                            explanation: "Using the user-selected global root override bookmark."
                         )
                     }
 
@@ -111,7 +114,7 @@ struct RootLocator {
                         DiscoveryIssue(
                             kind: overrideStatus == .notDirectory ? .globalOverrideNotDirectory : .globalOverrideInaccessible,
                             scope: .globalRoot,
-                            message: "The selected global Claude folder is not usable. Reauthorize the folder or choose a different one.",
+                            message: "The selected global root override is not usable. Falling back to the default ~/.claude location when possible.",
                             path: normalizedOverrideURL.path
                         )
                     )
@@ -120,7 +123,7 @@ struct RootLocator {
                         DiscoveryIssue(
                             kind: .globalOverrideRequiresReauthorization,
                             scope: .globalRoot,
-                            message: "The selected global Claude folder needs folder access to be reauthorized.",
+                            message: "The selected global root override needs folder access to be reauthorized.",
                             path: resolvedURL?.path ?? overrideResult.record.preferredPath
                         )
                     )
@@ -134,19 +137,45 @@ struct RootLocator {
                     DiscoveryIssue(
                         kind: .globalOverrideMissingBookmark,
                         scope: .globalRoot,
-                        message: "The selected global Claude folder no longer has valid saved access.",
+                        message: "A global root override is configured but it could not be resolved safely.",
                         path: nil
                     )
                 )
             }
         }
 
+        if defaultStatus.isUsableForDiscovery {
+            let explanation: String
+            if wantsOverride {
+                explanation = "Falling back to default ~/.claude because the selected override was unavailable."
+            } else {
+                explanation = "Using default global root at ~/.claude."
+            }
+
+            return ResolvedGlobalRoot(
+                source: .defaultHomeClaude,
+                rootURL: defaultRootURL,
+                normalizedPath: Self.normalizedIdentityPath(defaultRootURL.path),
+                accessStatus: defaultStatus,
+                explanation: explanation
+            )
+        }
+
+        issues.append(
+            DiscoveryIssue(
+                kind: defaultStatus == .notDirectory ? .defaultRootNotDirectory : .defaultRootInaccessible,
+                scope: .globalRoot,
+                message: "The default global root ~/.claude is not usable.",
+                path: defaultRootURL.path
+            )
+        )
+
         return ResolvedGlobalRoot(
-            source: .defaultHomeClaude,
+            source: .unresolved,
             rootURL: nil,
             normalizedPath: nil,
-            accessStatus: .notAuthorized,
-            explanation: "Authorize the recommended Claude folder or choose a custom folder to enable global discovery."
+            accessStatus: defaultStatus,
+            explanation: "No usable global Claude root was found."
         )
     }
 
@@ -158,7 +187,7 @@ struct RootLocator {
         let normalizedPreferredURL = Self.normalizedDirectoryURL(preferredURL)
 
         var resolvedURL = normalizedPreferredURL
-        var status: RootAccessStatus = .requiresReauthorization(reason: .missingBookmarkData)
+        var status = accessChecker.accessStatus(forDirectoryAt: normalizedPreferredURL)
 
         if let bookmarkResult = try? bookmarkResolver?.resolveBookmark(id: registration.id) {
             switch bookmarkResult.status {
@@ -177,12 +206,11 @@ struct RootLocator {
                 )
             }
         } else {
-            status = .requiresReauthorization(reason: .missingBookmarkData)
             issues.append(
                 DiscoveryIssue(
                     kind: .projectMissingBookmark,
                     scope: .projectRoot(projectID: registration.id),
-                    message: "Project root access needs to be granted again before discovery can read this folder.",
+                    message: "Project root bookmark is missing; using the stored path reference.",
                     path: registration.preferredPath
                 )
             )
@@ -208,7 +236,7 @@ struct RootLocator {
                         path: resolvedURL.path
                     )
                 )
-            case .notAuthorized, .requiresReauthorization, .accessible, .missing:
+            case .requiresReauthorization, .accessible, .missing:
                 break
             }
         }

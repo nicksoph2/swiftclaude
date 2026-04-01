@@ -80,48 +80,6 @@ final class AgentParserTests: XCTestCase {
         XCTAssertEqual(frontmatter.tools.map(\.rawValue), ["Read", "Bash(git status)"])
         XCTAssertEqual(document.promptBody, "Prompt line one.\r\nPrompt line two.")
     }
-
-    func testParseFixtureValidBasicFromCanonicalParserLayout() throws {
-        let loader = FixtureLoader.shared
-        let markdown = try loader.loadString(
-            familyPath: "parsers/agent",
-            caseID: "valid_basic",
-            section: "input",
-            fileName: "agent.md"
-        )
-
-        let result = parser.parse(markdownString: markdown, sourceURL: sourceURL)
-        let document = try XCTUnwrap(result.value)
-        let frontmatter = try XCTUnwrap(document.frontmatter)
-
-        XCTAssertFalse(result.hasErrors)
-        XCTAssertEqual(frontmatter.name, "reviewer")
-        XCTAssertEqual(frontmatter.tools.map(\.rawValue), ["Read", "Bash(git status)"])
-        XCTAssertEqual(frontmatter.unknownFields["owner"], .string("platform"))
-    }
-
-    func testParseFixtureTypeMismatchContainsExpectedIssueCode() throws {
-        let loader = FixtureLoader.shared
-        let markdown = try loader.loadString(
-            familyPath: "parsers/agent",
-            caseID: "type_mismatch_fields",
-            section: "input",
-            fileName: "agent.md"
-        )
-        let expected = try loader.loadExpectedIssueSet(
-            familyPath: "parsers/agent",
-            caseID: "type_mismatch_fields",
-            fileName: "parser_issues.json"
-        )
-
-        let result = parser.parse(markdownString: markdown, sourceURL: sourceURL)
-        let issueCodes = Set(result.issues.map(\.code.rawValue))
-        XCTAssertTrue(result.hasErrors)
-        for code in expected.codes {
-            XCTAssertTrue(issueCodes.contains(code))
-        }
-        XCTAssertEqual(result.issues.first?.sourcePath, sourceURL.path)
-    }
 }
 
 private enum AgentParserFixtures {

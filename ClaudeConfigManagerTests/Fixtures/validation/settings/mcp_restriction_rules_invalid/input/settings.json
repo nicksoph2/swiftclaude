@@ -1,6 +1,0 @@
-{
-  "allowedMcpServers": [
-    {},
-    { "serverName": "github", "serverCommand": ["npx"] }
-  ]
-}

@@ -1,7 +1,0 @@
-{
-  "allowManagedMcpServersOnly": true,
-  "deniedMcpServers": [
-    { "serverName": "evil-server" }
-  ],
-  "disabledMcpjsonServers": ["disabled-one"]
-}
