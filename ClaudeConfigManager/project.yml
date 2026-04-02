@@ -23,10 +23,19 @@ targets:
       - path: Features
       - path: Infrastructure
       - path: Resources
+        excludes:
+          - "ClaudeConfigManager.help/**"
+      - path: Resources/ClaudeConfigManager.help
+        buildPhase: resources
+        type: folder
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleHelpBookFolder: ClaudeConfigManager.help
+        CFBundleHelpBookName: com.example.ClaudeConfigManager.help
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.ClaudeConfigManager
-        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: Resources/ClaudeConfigManager.entitlements
 
   ClaudeConfigManagerTests:
@@ -47,12 +56,26 @@ targets:
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/ClaudeConfigManager.app/Contents/MacOS/ClaudeConfigManager
 
+  ClaudeConfigManagerUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: ../ClaudeConfigManagerUITests
+    dependencies:
+      - target: ClaudeConfigManager
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ClaudeConfigManager
+
 schemes:
   ClaudeConfigManager:
     build:
       targets:
         ClaudeConfigManager: all
         ClaudeConfigManagerTests: [test]
+        ClaudeConfigManagerUITests: [test]
     run:
       config: Debug
     test:

@@ -155,7 +155,7 @@ struct SimplifiedScopePicker: View {
 }
 
 #Preview {
-    @State var selected: ResolutionScope = .user
+    @Previewable @State var selected: ResolutionScope = .user
     return SimplifiedScopePicker(
         selectedScope: $selected,
         availableScopes: [.user, .project, .projectLocal],

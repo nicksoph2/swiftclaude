@@ -261,7 +261,7 @@ struct PreSavePreviewView: View {
                 .disabled(isSaving)
 
                 if isSaving {
-                    ProgressView()
+                    ProgressView("Saving…")
                         .controlSize(.small)
                 }
             }

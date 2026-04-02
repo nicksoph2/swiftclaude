@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Pipeline View — the 8-stage configuration assembly pipeline">
+    <meta name="keywords" content="pipeline, discovery, parsing, hooks, MCP, prompt, tools, context, resolution, stages">
+    <title>Pipeline View</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Pipeline View</div>
+
+    <h1>Pipeline View</h1>
+    <p>The Pipeline View is the heart of Claude Config Manager. It visualises the eight stages Claude Code
+       goes through when assembling your active configuration — from discovering files on disk through to
+       the final resolved state. Open it from the sidebar or press <kbd>⌘</kbd><kbd>5</kbd>.</p>
+
+    <img src="../images/pipeline-view.png" alt="Pipeline View in simplified mode showing Your Files, The Rules, and What Claude Sees" class="screenshot">
+
+    <h2>Simplified vs. Advanced Mode</h2>
+    <p>The pipeline has two display modes, toggled via the toolbar:</p>
+    <ul>
+        <li><strong>Simplified</strong> (default) — Groups the eight stages into three composite nodes.
+            Ideal for getting an overview without detail overload.</li>
+        <li><strong>Advanced</strong> — Shows all eight stages individually with full control flow
+            visualisation. Use this when you need to trace a specific setting's journey.</li>
+    </ul>
+
+    <h2>The Eight Stages</h2>
+
+    <h3>1. Discovery</h3>
+    <p>Scans the file system for configuration files across all authorised scopes. Shows a file tree
+       grouped by scope, with status badges (found, missing, error) and file detail popovers.</p>
+
+    <h3>2. Parsing</h3>
+    <p>Each discovered file is parsed into a typed model. This stage shows parsed file summary cards,
+       key extraction results, and any parse issues (syntax errors, invalid types, unknown fields).</p>
+
+    <h3>3. Hooks Lifecycle</h3>
+    <p>Displays hook registrations grouped by event type — pre-parse, post-parse, pre-send, post-response,
+       and others. Shows which hooks fire at each lifecycle point.</p>
+
+    <h3>4. MCP Servers</h3>
+    <p>Lists all discovered MCP (Model Context Protocol) servers with connection health status and the
+       tool catalog each server provides. Servers can be healthy, warning, or errored.</p>
+
+    <h3>5. Prompt Assembly</h3>
+    <p>Shows how Claude Code assembles the system prompt — which instruction layers are included,
+       where <code>CLAUDE.md</code> content is injected, and how multiple sources merge together.</p>
+
+    <h3>6. Tool Execution</h3>
+    <p>Displays tool definitions and their availability by scope. Shows which permission rules gate
+       each tool and what execution prerequisites apply.</p>
+
+    <h3>7. Context Budget</h3>
+    <p>Estimates token usage across the context window. Shows how the budget is allocated between
+       system prompt, instructions, conversation history, and tool definitions.</p>
+
+    <h3>8. Resolution</h3>
+    <p>The final merge step. For each setting key, shows which scope provided the winning value,
+       the full precedence evaluation, and a waterfall diagram of the merge order. Every resolved
+       value includes a provenance trace back to its source file and line.</p>
+
+    <h2>Navigation</h2>
+    <p>A breadcrumb strip at the top shows your position in the pipeline. Click any stage node to zoom
+       in. Scroll between stages, or use the breadcrumb to jump directly. Transitions animate with
+       a brief layout delay for smooth visual flow.</p>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> In Advanced mode, click a specific setting in the Resolution stage to see its
+        complete journey — which scopes contributed values and which one won.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

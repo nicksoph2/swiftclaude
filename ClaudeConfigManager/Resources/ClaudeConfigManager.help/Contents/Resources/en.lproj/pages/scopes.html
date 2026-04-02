@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Configuration scopes — Managed, User, Project, Session, CLI">
+    <meta name="keywords" content="scopes, managed, user, project, session, CLI, precedence, resolution">
+    <title>Configuration Scopes</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Configuration Scopes</div>
+
+    <h1>Configuration Scopes</h1>
+    <p>Claude Code reads configuration from six layered scopes. When the same setting appears in multiple
+       scopes, the higher-precedence scope wins. Claude Config Manager shows you this layering so you can
+       trace exactly where each active value comes from.</p>
+
+    <img src="../images/dashboard.png" alt="Dashboard showing scope overview with colour-coded dots and file counts" class="screenshot">
+
+    <h2>Precedence Order</h2>
+    <p>Scopes are evaluated from highest to lowest precedence:</p>
+
+    <div class="precedence-stack">
+        <div class="precedence-row">
+            <span class="rank">1</span>
+            <span class="scope-badge scope-managed">Managed</span>
+            Enterprise / MDM policies — highest priority
+        </div>
+        <div class="precedence-arrow">↓ overrides</div>
+        <div class="precedence-row">
+            <span class="rank">2</span>
+            <span class="scope-badge scope-user">User</span>
+            Global user config in <code>~/.claude</code>
+        </div>
+        <div class="precedence-arrow">↓ overrides</div>
+        <div class="precedence-row">
+            <span class="rank">3</span>
+            <span class="scope-badge scope-project">Project</span>
+            Shared project config (committed to git)
+        </div>
+        <div class="precedence-arrow">↓ overrides</div>
+        <div class="precedence-row">
+            <span class="rank">4</span>
+            <span class="scope-badge scope-project">Project-Local</span>
+            Personal project config (not committed)
+        </div>
+        <div class="precedence-arrow">↓ overrides</div>
+        <div class="precedence-row">
+            <span class="rank">5</span>
+            <span class="scope-badge scope-session">Session</span>
+            Live session state (resolved/merged)
+        </div>
+        <div class="precedence-arrow">↓ overrides</div>
+        <div class="precedence-row">
+            <span class="rank">6</span>
+            <span class="scope-badge scope-cli">CLI</span>
+            Command-line argument overrides
+        </div>
+    </div>
+
+    <h2>Managed Scope</h2>
+    <p>The Managed scope contains enterprise-level policies that cannot be overridden by lower scopes.
+       These come from three possible tiers:</p>
+    <ul>
+        <li><strong>Server-managed</strong> — policies pushed from a central server</li>
+        <li><strong>MDM</strong> — macOS Mobile Device Management profile domains</li>
+        <li><strong>File-based</strong> — a managed <code>settings.json</code> at a system path</li>
+    </ul>
+    <p>The active tier is shown in the Managed scope view. If no managed configuration is detected,
+       this scope appears inactive.</p>
+
+    <h2>User Scope</h2>
+    <p>Your global Claude configuration lives at <code>~/.claude</code> (or a custom path you've authorised).
+       This scope typically contains:</p>
+    <ul>
+        <li><code>settings.json</code> — global settings like default model, theme, API keys</li>
+        <li><code>CLAUDE.md</code> — global instructions appended to every session</li>
+        <li><code>.claude.json</code> — MCP servers and agent definitions</li>
+    </ul>
+    <p>You can change which folder the app reads by clicking <strong>Choose Different Folder</strong>
+       in the User scope view or in Settings → Global Root.</p>
+
+    <h2>Project Scope</h2>
+    <p>Project configuration lives in the root of a project directory. These files are typically committed
+       to version control so your entire team shares the same Claude Code setup:</p>
+    <ul>
+        <li><code>.claude/settings.json</code> — project-level settings</li>
+        <li><code>CLAUDE.md</code> — project-specific instructions</li>
+        <li><code>.claude.json</code> — project MCP servers</li>
+    </ul>
+
+    <h2>Project-Local Scope</h2>
+    <p>Project-Local files are personal overrides that live alongside project config but are not committed.
+       They use <code>.local</code> variants:</p>
+    <ul>
+        <li><code>.claude/settings.local.json</code></li>
+        <li><code>CLAUDE.local.md</code></li>
+    </ul>
+    <p>Use these for personal preferences that shouldn't affect teammates.</p>
+
+    <h2>Session Scope</h2>
+    <p>The Session scope shows the live merged state during an active Claude Code session. It includes
+       the final resolved settings, merged instructions, active hooks, and MCP server connections.</p>
+
+    <h2>CLI Scope</h2>
+    <p>Command-line arguments passed when launching Claude Code (e.g., <code>--model</code>)
+       act as the lowest-precedence overrides. This scope is placeholder when no CLI session is active.</p>
+
+    <div class="callout callout-note">
+        <strong>Note:</strong> The sidebar shows a colour dot next to each scope and a badge with the number
+        of discovered files. Scopes with no files display as "inactive".
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

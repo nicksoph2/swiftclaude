@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="App settings — root selection, project management, schema updates">
+    <meta name="keywords" content="settings, preferences, root, projects, schema, configuration">
+    <title>Settings</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Settings</div>
+
+    <h1>Settings</h1>
+    <p>Open Settings from the menu bar (<strong>Claude Config Manager → Settings</strong> or
+       <kbd>⌘</kbd><kbd>,</kbd>). The Settings window has three tabs.</p>
+
+    <img src="../images/user-scope.png" alt="Settings — Global Root tab showing folder path and authorisation buttons" class="screenshot">
+
+    <h2>Global Root</h2>
+    <p>Manages access to your global Claude folder (<code>~/.claude</code>). Shows the current
+       authorised path and its source (Default or Custom). You can:</p>
+    <ul>
+        <li><strong>Use Recommended Folder</strong> — switch back to the default <code>~/.claude</code> path</li>
+        <li><strong>Choose Different Folder</strong> — authorise a custom location via the file picker</li>
+    </ul>
+    <p>Folder access uses macOS security-scoped bookmarks, so the app remembers your choice across launches.</p>
+
+    <h2>Projects</h2>
+    <p>Lists all registered project roots. Each project shows its display name, preferred path, and
+       created/updated timestamps. You can:</p>
+    <ul>
+        <li><strong>Add Project</strong> — register a new project directory</li>
+        <li><strong>Remove</strong> — unregister a project (does not delete any files)</li>
+        <li><strong>Select</strong> — switch to a different project for pipeline resolution</li>
+    </ul>
+
+    <h2>Schema</h2>
+    <p>Controls automatic schema updates from the Claude Code settings schema endpoint:</p>
+    <ul>
+        <li><strong>Toggle auto-update</strong> — enable or disable remote schema fetching</li>
+        <li><strong>Last updated</strong> — when the schema was last successfully fetched</li>
+        <li><strong>Refresh Now</strong> — manually trigger a schema fetch</li>
+        <li><strong>Status indicator</strong> — shows success, failure, or idle state</li>
+    </ul>
+    <p>When enabled, the app checks for newly added settings keys from the server. The schema is cached
+       locally so the app works fully offline.</p>
+
+    <div class="callout callout-note">
+        <strong>Note:</strong> Schema updates only add awareness of new configuration keys. They don't
+        change any of your actual configuration files.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

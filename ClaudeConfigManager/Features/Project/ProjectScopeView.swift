@@ -52,7 +52,7 @@ struct ProjectScopeView: View {
                     .font(.headline)
                 Spacer()
                 Button("Add Project…") {
-                    rootSelection.addProjectRoot()
+                    Task { await rootSelection.addProjectRoot() }
                 }
             }
 

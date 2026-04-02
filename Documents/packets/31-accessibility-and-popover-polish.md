@@ -1,5 +1,7 @@
 # Packet 31 — Accessibility Pass and Popover Polish
 
+this has not been completed the app will be built and tested and then accesibility will be added
+
 ## Context
 
 With all major features in place, this packet performs a complete accessibility audit: VoiceOver labels, keyboard navigation, and adaptive popover sizing. It also ensures all values in the app are selectable and copyable. These are often the last things addressed but are non-negotiable for a quality macOS app.
@@ -19,6 +21,7 @@ Systematically open every view in the app with VoiceOver enabled (System Setting
 **Required labels** (apply throughout all views encountered):
 
 **Pipeline diagram nodes**:
+
 ```swift
 .accessibilityLabel("[Stage name] stage")
 .accessibilityValue("[Health]: [metric]")
@@ -26,12 +29,14 @@ Systematically open every view in the app with VoiceOver enabled (System Setting
 ```
 
 **Scope badges / coloured pills**:
+
 ```swift
 .accessibilityLabel("[Scope name] scope")
 // Remove default colour announcement — colour alone is not accessible
 ```
 
 **Resolution waterfall rows**:
+
 ```swift
 .accessibilityLabel("[Key name]")
 .accessibilityValue("[value], [Scope name] scope [participation: winning/overridden/merged]")
@@ -39,30 +44,35 @@ Systematically open every view in the app with VoiceOver enabled (System Setting
 ```
 
 **Health indicator dots**:
+
 ```swift
 .accessibilityLabel("[Stage name]: [N] [warnings/errors]")
 // or "healthy" if no issues
 ```
 
 **Scope contribution dots** (the small circles in diagram nodes):
+
 ```swift
 .accessibilityElement(children: .combine)
 .accessibilityLabel("Contributions from [list of scope names]")
 ```
 
 **Sidebar scope rows**:
+
 ```swift
 .accessibilityLabel("[Scope name] scope")
 .accessibilityValue("[N] files, [N] issues")
 ```
 
 **Edit affordance (pencil icon)**:
+
 ```swift
 .accessibilityLabel("Edit [key name]")
 .accessibilityHint("Double-tap to open setting editor")
 ```
 
 **Lock icon**:
+
 ```swift
 .accessibilityLabel("[Key name], locked by managed policy")
 .accessibilityHint("Double-tap for details")
@@ -75,6 +85,7 @@ For compound rows (e.g. a setting row with key name, value, scope badge, and con
 ### 3. Responsive popover sizing (N3)
 
 Audit all popover presentations in the app. For every popover that could appear on a narrow window:
+
 - Measure the popover's minimum width
 - If the host window is narrower than `popoverMinWidth + 40pt`, switch to `.sheet` presentation
 
@@ -100,6 +111,7 @@ struct AdaptivePresentation: ViewModifier {
 ```
 
 Apply to:
+
 - File detail popovers in the Discovery stage
 - Resolution Trace panel
 - Editor popover from Edit Mode
@@ -120,6 +132,7 @@ Text(value)
 ```
 
 For longer values that don't fit in `Text`, add a context menu:
+
 ```swift
 .contextMenu {
     Button("Copy") {
@@ -134,6 +147,7 @@ Use Xcode's search to find all `.font(.system(.body, design: .monospaced))` usag
 ### 5. Keyboard focus chain
 
 Verify the Tab-key navigation order is logical in every form and list:
+
 - Editor popover: field → scope picker → Preview button → Save button → Cancel button
 - Settings list: rows navigate with arrow keys; Tab exits the list to the toolbar
 - Search overlay: search field is auto-focused on open; Escape dismisses
@@ -163,6 +177,7 @@ xcodebuild test -project ClaudeConfigManager.xcodeproj -scheme ClaudeConfigManag
 ```
 
 **Done criteria:**
+
 - Manual VoiceOver checklist above is fully completed
 - All popovers adapt to sheets on narrow windows
 - All monospace values are copyable via context menu or `.textSelection`

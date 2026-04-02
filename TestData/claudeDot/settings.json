@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "model": "claude-sonnet-4-6",
+  "effortLevel": "medium",
+  "alwaysThinkingEnabled": false,
+  "fastModePerSessionOptIn": false,
+  "availableModels": ["sonnet", "haiku", "opus"],
+
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix)",
+      "Bash(npm run test *)",
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(npm run typecheck)",
+      "Bash(npm ci)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git pull)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Read(~/.zshrc)",
+      "Read(~/.gitconfig)",
+      "Read(~/.npmrc)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:developer.mozilla.org)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:npmjs.com)",
+      "WebFetch(domain:registry.npmjs.org)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(npm publish *)",
+      "Bash(npm uninstall *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/credentials)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)"
+    ],
+    "additionalDirectories": [
+      "~/Documents/shared-docs/"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/log-command.sh",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/auto-format.sh",
+            "timeout": 30,
+            "statusMessage": "Formatting file..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/load-env.sh",
+            "timeout": 15,
+            "statusMessage": "Loading user environment..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Briefly summarise what was accomplished in this session in 2-3 sentences. Input: $ARGUMENTS",
+            "model": "claude-haiku-4-5-20251001",
+            "timeout": 45,
+            "statusMessage": "Generating session summary..."
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": ".envrc",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "direnv allow",
+            "timeout": 10,
+            "statusMessage": "Reloading direnv..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/log-command.sh --event pre-compact",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1
+  },
+
+  "attribution": {
+    "commit": "🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+    "pr": "AI-assisted with Claude Code"
+  },
+
+  "env": {
+    "EDITOR": "nvim",
+    "NODE_ENV": "development"
+  },
+
+  "language": "english",
+  "outputStyle": "Concise",
+  "defaultShell": "zsh",
+  "includeGitInstructions": true,
+  "respectGitignore": true,
+  "cleanupPeriodDays": 30,
+  "autoUpdatesChannel": "latest",
+  "spinnerTipsEnabled": true,
+  "spinnerVerbs": {
+    "mode": "append",
+    "verbs": ["Pondering", "Crafting", "Reasoning"]
+  },
+  "showThinkingSummaries": false,
+  "prefersReducedMotion": false,
+  "feedbackSurveyRate": 0,
+  "voiceEnabled": false,
+
+  "enableAllProjectMcpServers": false,
+  "enabledMcpjsonServers": ["github", "memory"],
+  "disabledMcpjsonServers": [],
+
+  "worktree": {
+    "symlinkDirectories": ["node_modules", ".cache"],
+    "sparsePaths": []
+  },
+
+  "autoMode": {
+    "environment": [
+      "Personal development environment. Primarily web and backend development.",
+      "Source control: github.com/nicksophocleous and all repos under it",
+      "Trusted domains: *.sophocleous.co.uk, localhost, 127.0.0.1"
+    ]
+  },
+
+  "plansDirectory": "~/.claude/plans",
+  "useAutoModeDuringPlan": true,
+  "showClearContextOnPlanAccept": false
+}

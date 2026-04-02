@@ -44,6 +44,9 @@ struct TreeHooksLifecycleView: View {
 
     private var noDataPlaceholder: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "arrow.triangle.capsulepath")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
             Text("No hooks lifecycle data available")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)

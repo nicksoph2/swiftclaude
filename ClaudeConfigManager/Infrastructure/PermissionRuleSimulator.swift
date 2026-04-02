@@ -285,7 +285,7 @@ struct PermissionRuleSimulator {
         toolInvocation: String
     ) -> Bool {
         // Check if the raw hooks value contains a matcher
-        guard let effectiveValue = event.hooks.effectiveValue else { return false }
+        guard event.hooks.effectiveValue != nil else { return false }
 
         // The hooks are stored as an array of handler objects.
         // The matcher is at the event level, not handler level.

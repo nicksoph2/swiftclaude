@@ -285,7 +285,7 @@ struct SettingEditorPopover: View {
 }
 
 #Preview {
-    @State var showPopover = true
+    @Previewable @State var showPopover = true
     return VStack {
         if showPopover {
             SettingEditorPopover(

@@ -70,10 +70,10 @@ struct UserScopeView: View {
 
             HStack(spacing: 10) {
                 Button("Choose Folder…") {
-                    rootSelection.chooseGlobalRootFolder()
+                    Task { await rootSelection.chooseGlobalRootFolder() }
                 }
                 Button("Use Recommended Default") {
-                    rootSelection.authorizeRecommendedGlobalRoot()
+                    Task { await rootSelection.authorizeRecommendedGlobalRoot() }
                 }
                 .disabled(!rootSelection.recommendedGlobalRootIsAvailable)
                 Button("Clear Selection") {

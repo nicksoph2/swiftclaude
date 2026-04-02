@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Getting started with Claude Config Manager">
+    <meta name="keywords" content="getting started, setup, authorisation, first launch">
+    <title>Getting Started</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Getting Started</div>
+
+    <h1>Getting Started</h1>
+    <p>Claude Config Manager needs read access to the folders where Claude Code stores its configuration.
+       On first launch, the app guides you through authorising these locations.</p>
+
+    <h2>First Launch</h2>
+    <p>When you open the app for the first time, two things happen:</p>
+    <ol>
+        <li><strong>Pipeline Introduction</strong> — An animated walkthrough explains how Claude Code
+            assembles configuration. You can replay this any time from <strong>Help → How Claude Code Works</strong>.</li>
+        <li><strong>Folder Authorisation</strong> — A sheet asks you to grant access to your global Claude
+            folder (usually <code>~/.claude</code>). This is required for App Store compliance — the app
+            only reads files you explicitly authorise.</li>
+    </ol>
+
+    <img src="../images/user-scope.png" alt="First launch — Global Claude Root folder authorisation" class="screenshot">
+
+    <h2>Authorising Your Global Root</h2>
+    <p>The authorisation sheet gives you three options:</p>
+    <ul>
+        <li><strong>Use Recommended Folder</strong> — Grants access to the standard <code>~/.claude</code>
+            path. This is the right choice for most users.</li>
+        <li><strong>Choose Different Folder</strong> — Opens a file picker so you can select a custom
+            Claude root directory if yours is in a non-standard location.</li>
+        <li><strong>Skip for Now</strong> — Dismisses the sheet. The User scope will show as inaccessible
+            until you authorise a folder later via the User sidebar tab or Settings.</li>
+    </ul>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> If you're unsure which folder to pick, the recommended path is almost always correct.
+        Claude Code uses <code>~/.claude</code> by default.
+    </div>
+
+    <h2>Adding Project Roots</h2>
+    <p>To inspect project-level configuration, navigate to the <strong>Project</strong> scope in the sidebar
+       and click <strong>Add Project</strong>. Select the root directory of any project that contains
+       <code>.claude.json</code>, <code>CLAUDE.md</code>, or <code>.claude/</code> config files.</p>
+    <p>You can register multiple projects. Switch between them in the Project scope view, and the pipeline
+       will re-resolve using that project's files.</p>
+
+    <h2>The Sidebar</h2>
+    <p>The sidebar is your primary navigation. It is organised into three sections:</p>
+    <ul>
+        <li><strong>Dashboard</strong> — top-level overview (always visible at the top)</li>
+        <li><strong>Scope Stack</strong> — the six configuration scopes in precedence order, with file and issue counts</li>
+        <li><strong>Output &amp; Views</strong> — Resolved Config, Pipeline View, Permissions, Issues, Transcripts, and Usage Analytics</li>
+    </ul>
+    <p>Colour dots next to each scope indicate its identity. Scopes with no discovered files show as "inactive".</p>
+
+    <div class="callout callout-note">
+        <strong>Note:</strong> The app is read-only. It inspects your Claude Code configuration but does not modify
+        any files on disk.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

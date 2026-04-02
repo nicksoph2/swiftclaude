@@ -326,7 +326,7 @@ private final class MockFolderSelector: FolderSelecting {
         prompt: String,
         initialDirectory: URL?,
         showsHiddenFiles: Bool
-    ) -> URL? {
+    ) async -> URL? {
         nextURL
     }
 }

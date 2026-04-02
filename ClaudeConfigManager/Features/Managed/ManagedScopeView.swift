@@ -65,8 +65,10 @@ struct ManagedScopeView: View {
 
             if case .sandboxRestricted = outcome {
                 Button {
-                    rootSelection.authorizeManagedRoot()
-                    inspectionGeneration += 1
+                    Task {
+                        await rootSelection.authorizeManagedRoot()
+                        inspectionGeneration += 1
+                    }
                 } label: {
                     Label("Grant Access", systemImage: "lock.open")
                 }

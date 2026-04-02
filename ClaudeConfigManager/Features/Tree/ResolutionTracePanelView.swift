@@ -154,7 +154,7 @@ struct ResolutionTracePanelView: View {
                 }
 
             case .array(let items):
-                VStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         HStack(alignment: .top, spacing: 6) {
                             Circle()
@@ -169,7 +169,7 @@ struct ResolutionTracePanelView: View {
                 }
 
             case .object(let dict):
-                VStack(alignment: .leading, spacing: 3) {
+                LazyVStack(alignment: .leading, spacing: 3) {
                     ForEach(dict.keys.sorted(), id: \.self) { key in
                         HStack(alignment: .top, spacing: 4) {
                             Text(key + ":")
@@ -299,7 +299,7 @@ struct ResolutionTracePanelView: View {
                 .foregroundStyle(.secondary)
 
             if case .array(let items) = resolved.effectiveValue {
-                VStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         HStack(spacing: 6) {
                             Circle()

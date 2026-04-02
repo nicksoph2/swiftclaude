@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Resolved Config — the final merged configuration state">
+    <meta name="keywords" content="resolved, merged, final, configuration, settings, instructions, hooks, MCP">
+    <title>Resolved Config</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Resolved Config</div>
+
+    <h1>Resolved Config</h1>
+    <p>The Resolved Config view shows the final, merged result after all scopes have been layered together.
+       This is what Claude Code actually uses when it runs. Open it from the Output section in the sidebar
+       or press <kbd>⌘</kbd><kbd>2</kbd>.</p>
+
+    <img src="../images/resolved-config.png" alt="Resolved Config view showing session settings with scope contributions" class="screenshot">
+
+    <h2>Tabs</h2>
+    <p>The resolved view is organised into tabs:</p>
+    <ul>
+        <li><strong>Settings</strong> — All resolved setting keys with their final values</li>
+        <li><strong>Instructions</strong> — The merged <code>CLAUDE.md</code> content from all scopes</li>
+        <li><strong>Hooks</strong> — Active hook lifecycle registrations</li>
+        <li><strong>MCP</strong> — Active MCP server definitions and their connection state</li>
+        <li><strong>Agents &amp; Skills</strong> — Registered agents and skills</li>
+    </ul>
+
+    <h2>Provenance Tracking</h2>
+    <p>Each resolved value shows which scope provided it. When a setting is overridden by a higher-precedence
+       scope, the lower scope's value is still visible but shown as superseded. This makes it easy to
+       understand why a setting has a particular value.</p>
+
+    <div class="callout callout-note">
+        <strong>Note:</strong> If no live session is running, the resolved view shows sample data to illustrate
+        the layout. Connect to a running Claude Code session to see real values.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

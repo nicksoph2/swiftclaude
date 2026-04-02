@@ -6,7 +6,11 @@ struct RootSplitView: View {
     @EnvironmentObject private var rootSelection: RootSelectionViewModel
 
     @StateObject private var searchViewModel = GlobalSearchViewModel()
+    @StateObject private var helpSearchViewModel = HelpSearchViewModel()
     @Namespace private var diagramNamespace
+
+    @AppStorage("hasSeenIntro") private var hasSeenIntro: Bool = false
+    @State private var showIntroAnimation: Bool = false
 
     var body: some View {
         NavigationSplitView {
@@ -36,6 +40,22 @@ struct RootSplitView: View {
                         }
                     )
                 }
+
+                // Help search overlay
+                if helpSearchViewModel.isPresented {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            helpSearchViewModel.dismiss()
+                        }
+
+                    HelpSearchView(
+                        viewModel: helpSearchViewModel,
+                        onNavigate: { destination in
+                            router.sidebarState.selection = destination
+                        }
+                    )
+                }
             }
         }
         .sheet(isPresented: Binding(
@@ -48,8 +68,16 @@ struct RootSplitView: View {
         )) {
             InitialGlobalRootAccessView()
         }
+        .sheet(isPresented: $showIntroAnimation) {
+            PipelineIntroAnimationView(onDismiss: {
+                showIntroAnimation = false
+            })
+        }
         .onAppear {
             searchViewModel.pipeline = router.pipeline
+            if !hasSeenIntro {
+                showIntroAnimation = true
+            }
         }
         // Global keyboard shortcuts
         .keyboardShortcut(for: .search) {
@@ -72,6 +100,12 @@ struct RootSplitView: View {
         }
         .keyboardShortcut(for: .pipelineView) {
             router.sidebarState.selection = .tree
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showPipelineIntro)) { _ in
+            showIntroAnimation = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showHelpSearch)) { _ in
+            helpSearchViewModel.open()
         }
     }
 
@@ -218,7 +252,9 @@ struct ScopeStackSidebar: View {
             debugMonitor.recordSelection(router.sidebarState.selection)
         }
         .onChange(of: router.sidebarState.selection) { _, newValue in
-            debugMonitor.recordSelection(newValue)
+            DispatchQueue.main.async {
+                debugMonitor.recordSelection(newValue)
+            }
         }
     }
 
@@ -400,12 +436,12 @@ private struct InitialGlobalRootAccessView: View {
 
             HStack(spacing: 10) {
                 Button("Use Recommended Folder") {
-                    rootSelection.authorizeRecommendedGlobalRoot()
+                    Task { await rootSelection.authorizeRecommendedGlobalRoot() }
                 }
                 .buttonStyle(.borderedProminent)
 
                 Button("Choose Different Folder") {
-                    rootSelection.chooseGlobalRootFolder()
+                    Task { await rootSelection.chooseGlobalRootFolder() }
                 }
 
                 Button("Skip for Now") {

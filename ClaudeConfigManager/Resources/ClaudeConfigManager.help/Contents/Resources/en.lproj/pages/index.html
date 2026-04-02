@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Claude Config Manager Help — main index">
+    <meta name="keywords" content="Claude Config Manager, help, configuration, Claude Code">
+    <title>Claude Config Manager Help</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <h1>Claude Config Manager Help</h1>
+    <p>Claude Config Manager visualises how Claude Code assembles your configuration from multiple file sources.
+       It reads your config files, parses them, and shows you the resolved result — so you always know
+       exactly which settings are active and where they come from.</p>
+
+    <div class="topic-grid">
+        <a href="getting-started.html" class="topic-card">
+            <div class="card-icon">🚀</div>
+            <span class="card-title">Getting Started</span>
+            <span class="card-desc">First launch, folder authorisation, and initial setup</span>
+        </a>
+        <a href="dashboard.html" class="topic-card">
+            <div class="card-icon">📊</div>
+            <span class="card-title">Dashboard</span>
+            <span class="card-desc">Configuration health overview and statistics</span>
+        </a>
+        <a href="scopes.html" class="topic-card">
+            <div class="card-icon">📚</div>
+            <span class="card-title">Configuration Scopes</span>
+            <span class="card-desc">Managed, User, Project, Session, and CLI scopes</span>
+        </a>
+        <a href="pipeline.html" class="topic-card">
+            <div class="card-icon">🔀</div>
+            <span class="card-title">Pipeline View</span>
+            <span class="card-desc">The 8-stage assembly pipeline from discovery to resolution</span>
+        </a>
+        <a href="resolved-config.html" class="topic-card">
+            <div class="card-icon">✅</div>
+            <span class="card-title">Resolved Config</span>
+            <span class="card-desc">The final merged result of all scopes</span>
+        </a>
+        <a href="permissions.html" class="topic-card">
+            <div class="card-icon">🔐</div>
+            <span class="card-title">Permissions Inspector</span>
+            <span class="card-desc">Permission rules, evaluation order, and What-If testing</span>
+        </a>
+        <a href="issues.html" class="topic-card">
+            <div class="card-icon">⚠️</div>
+            <span class="card-title">Issues</span>
+            <span class="card-desc">Configuration validation and diagnostics</span>
+        </a>
+        <a href="search.html" class="topic-card">
+            <div class="card-icon">🔍</div>
+            <span class="card-title">Global Search</span>
+            <span class="card-desc">Quick navigation across all configuration</span>
+        </a>
+        <a href="transcripts.html" class="topic-card">
+            <div class="card-icon">💬</div>
+            <span class="card-title">Transcripts</span>
+            <span class="card-desc">Browse and search Claude Code session transcripts</span>
+        </a>
+        <a href="usage-analytics.html" class="topic-card">
+            <div class="card-icon">📈</div>
+            <span class="card-title">Usage Analytics</span>
+            <span class="card-desc">Token usage, costs, and trends across sessions</span>
+        </a>
+        <a href="shortcuts.html" class="topic-card">
+            <div class="card-icon">⌨️</div>
+            <span class="card-title">Keyboard Shortcuts</span>
+            <span class="card-desc">All available keyboard shortcuts</span>
+        </a>
+        <a href="settings.html" class="topic-card">
+            <div class="card-icon">⚙️</div>
+            <span class="card-title">Settings</span>
+            <span class="card-desc">App preferences, root selection, and schema updates</span>
+        </a>
+    </div>
+
+    <h2>What This App Does</h2>
+    <p>When Claude Code runs, it reads configuration from several locations on disk — enterprise-managed
+       policies, your global <code>~/.claude</code> folder, project-level files, and session state.
+       These sources are layered together with a strict precedence order to produce the final active configuration.</p>
+    <p>Claude Config Manager makes this entire process visible. It scans those same files, parses them,
+       and walks you through each stage of assembly so you can see exactly why a particular setting has
+       the value it does.</p>
+
+    <h2>Need More Help?</h2>
+    <p>Use <kbd>⌘</kbd><kbd>F</kbd> inside the app to search across all configuration keys, files, and servers.
+       You can also access the pipeline intro animation from the Help menu at any time.</p>
+
+    <div class="help-footer">
+        Claude Config Manager v1.0 &middot; Help Book
+    </div>
+</body>
+</html>

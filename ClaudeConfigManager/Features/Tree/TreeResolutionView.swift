@@ -28,6 +28,13 @@ struct TreeResolutionView: View {
     /// Persisted "show conflicts only" filter state.
     @SceneStorage("showConflictsOnly") private var showConflictsOnly: Bool = false
 
+    /// Persisted card vs table view style.
+    @AppStorage("settingsViewStyle") private var viewStyleRaw: String = SettingsViewStyle.card.rawValue
+
+    private var viewStyle: SettingsViewStyle {
+        SettingsViewStyle(rawValue: viewStyleRaw) ?? .card
+    }
+
     /// Optional cross-stage navigation callback.
     var onNavigate: ((TreeNavigationTarget) -> Void)?
 
@@ -141,6 +148,15 @@ struct TreeResolutionView: View {
             }
             .font(.caption.weight(.medium))
 
+            // View style toggle
+            HStack {
+                Spacer()
+                SettingsViewStyleToggle(style: Binding(
+                    get: { viewStyle },
+                    set: { viewStyleRaw = $0.rawValue }
+                ))
+            }
+
             // Entry list
             let filtered = viewModel.filteredEntries
             if filtered.isEmpty {
@@ -149,10 +165,28 @@ struct TreeResolutionView: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(filtered) { entry in
-                        entryRow(for: entry)
-                            .id("resolution-\(entry.keyPath)")
+                switch viewStyle {
+                case .card:
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(filtered) { entry in
+                            entryRow(for: entry)
+                                .id("resolution-\(entry.keyPath)")
+                        }
+                    }
+                case .table:
+                    LazyVStack(alignment: .leading, spacing: 1) {
+                        ForEach(filtered) { entry in
+                            SettingsTableRow(
+                                keyPath: entry.keyPath,
+                                value: entry.effectiveValueString,
+                                scope: entry.winningScope,
+                                hasConflict: entry.hasConflict,
+                                onTap: { selectedEntry = entry }
+                            )
+                            .id("resolution-table-\(entry.keyPath)")
+
+                            Divider()
+                        }
                     }
                 }
             }

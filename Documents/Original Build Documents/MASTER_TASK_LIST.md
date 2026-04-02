@@ -139,17 +139,31 @@ Must complete before significant UI work begins. Parser completeness determines 
 
 ### B. Managed Settings Tier
 
-**B1** `P1 · A · ⬜`
+**B1** `P1 · A · ✅ Done`
 **Implement Managed File Discovery.**
 
-- Discover `/Library/Application Support/ClaudeCode/managed-settings.json`
-- Discover `/Library/Application Support/ClaudeCode/managed-settings.d/*.json` — merge lexicographically
-- Discover `/Library/Application Support/ClaudeCode/managed-mcp.json`
-- Discover `/Library/Application Support/ClaudeCode/CLAUDE.md`
-- Missing paths → silent (normal absence); inaccessible paths → `DiscoveryIssue` with `.inaccessible` severity
-- Handle App Store sandbox restrictions gracefully (catch entitlement errors, surface as info issues)
-- Integrate into `WorkspaceScanner` and add to `ScanResult`
-- Add `WorkspaceScannerTests` fixtures for managed discovery paths
+- ✅ Discover `/Library/Application Support/ClaudeCode/managed-settings.json`
+- ✅ Discover `/Library/Application Support/ClaudeCode/managed-settings.d/*.json` — merge lexicographically
+- ✅ Discover `/Library/Application Support/ClaudeCode/managed-mcp.json`
+- ✅ Discover `/Library/Application Support/ClaudeCode/CLAUDE.md`
+- ✅ Missing paths → silent (normal absence); inaccessible paths → `DiscoveryIssue` with `.inaccessible` severity
+- ✅ Handle App Store sandbox restrictions gracefully (catch entitlement errors, surface as info issues)
+- ✅ Integrate into `WorkspaceScanner` and add to `ScanResult`
+- ✅ Add `WorkspaceScannerTests` fixtures for managed discovery paths
+
+**B1a** `P1 · A · ✅ Done (packet 30a)`
+**Extend managed discovery to `/etc/claude-code/` and `rules/*.md`.**
+
+- ✅ Add security-scoped bookmark for `~/.claude.json` (file-level, independent of `~/.claude/` directory bookmark)
+- ✅ Add security-scoped bookmark for `/etc/claude-code/` directory
+- ✅ Add `BookmarkKind.userClaudeJson` and `BookmarkKind.etcClaudeCodeRoot` with registry methods and ViewModel controls
+- ✅ Discover `/etc/claude-code/managed-settings.json`, `/etc/claude-code/CLAUDE.md`, `/etc/claude-code/rules/*.md`
+- ✅ Discover `rules/*.md` in the primary managed root (`/Library/Application Support/ClaudeCode/rules/`)
+- ✅ Add `DiscoveredFileKind.managedRuleMarkdown`, `DiscoveredDirectoryKind.managedRulesRoot`, `DiscoveredDirectoryKind.etcManagedRoot`
+- ✅ Parse `managedRuleMarkdown` files as CLAUDE.md via `ClaudeMdParser`
+- ✅ Merge `/etc/claude-code/` results into the managed workspace (primary root files first)
+- ✅ All existing tests pass; new tests in `BookmarkExpansionTests.swift` and `EtcManagedScanTests.swift`
+- ⬜ Follow-up: wire authorize/clear buttons into SwiftUI views
 
 **B2** `P2 · A · ⬜`
 **MDM/Plist reading.**
@@ -925,7 +939,7 @@ A6 (sandbox parsing)                                                   │
          └─► M2 (semantic validation)                                  │
                 └─► M3 (issues aggregation view)                       │
                                                                        ▼
-B1 (managed discovery) ─► B3 (managed tier resolution) ──► B4 (managed UI)
+B1 ✅ (managed discovery) ─► B1a ✅ (/etc + rules) ─► B3 (managed tier resolution) ──► B4 (managed UI)
   └─► B2 (MDM plist reading)                                           │
                                                                        │
 All of above ──────────────────────────────────────────────────────────►

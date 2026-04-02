@@ -1,0 +1,92 @@
+{
+  "editorMode": "normal",
+  "autoConnectIde": true,
+  "autoInstallIdeExtension": true,
+  "showTurnDuration": true,
+  "terminalProgressBarEnabled": true,
+  "teammateMode": "auto",
+
+  "mcpServers": {
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"
+      }
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "fetch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/nick/Projects",
+        "/Users/nick/Documents"
+      ]
+    }
+  },
+
+  "projects": {
+    "/Users/nick/Projects/acme-api": {
+      "allowedTools": [
+        "Bash(npm run *)",
+        "Bash(git status)",
+        "Bash(git diff *)",
+        "Bash(git add *)",
+        "Bash(git commit *)",
+        "Read",
+        "Edit",
+        "Write",
+        "Glob",
+        "Grep"
+      ],
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesAcceptedOnce": true,
+      "mcpServers": {
+        "postgres-dev": {
+          "type": "stdio",
+          "command": "npx",
+          "args": [
+            "-y",
+            "@modelcontextprotocol/server-postgres",
+            "postgresql://localhost:5432/acme_dev"
+          ]
+        }
+      }
+    },
+    "/Users/nick/Projects/personal-site": {
+      "allowedTools": [
+        "Bash(npm run *)",
+        "Bash(git *)",
+        "Read",
+        "Edit",
+        "Write",
+        "Glob",
+        "Grep"
+      ],
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesAcceptedOnce": true
+    },
+    "/Users/nick/Projects/old-php-app": {
+      "allowedTools": ["Read", "Glob", "Grep"],
+      "hasTrustDialogAccepted": false,
+      "hasClaudeMdExternalIncludesAcceptedOnce": false
+    }
+  }
+}

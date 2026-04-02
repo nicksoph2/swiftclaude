@@ -492,8 +492,8 @@ final class RootSelectionViewModel: ObservableObject {
         }
     }
 
-    func chooseGlobalRootFolder() {
-        let candidate = folderSelector.selectFolder(
+    func chooseGlobalRootFolder() async {
+        let candidate = await folderSelector.selectFolder(
             title: "Choose Global Claude Folder",
             message: "Choose the folder to inspect for global Claude configuration. The app requests read-only access.",
             prompt: "Grant Access",
@@ -512,8 +512,8 @@ final class RootSelectionViewModel: ObservableObject {
         saveGlobalRoot(candidate)
     }
 
-    func authorizeRecommendedGlobalRoot() {
-        let candidate = folderSelector.selectFolder(
+    func authorizeRecommendedGlobalRoot() async {
+        let candidate = await folderSelector.selectFolder(
             title: "Authorize Recommended Claude Folder",
             message: "Select the .claude folder in your home directory to grant read-only access.",
             prompt: "Grant Access",
@@ -564,9 +564,9 @@ final class RootSelectionViewModel: ObservableObject {
         }
     }
 
-    func authorizeManagedRoot() {
+    func authorizeManagedRoot() async {
         let managedURL = URL(fileURLWithPath: ManagedSettingsLocator.managedRootPath, isDirectory: true)
-        let candidate = folderSelector.selectFolder(
+        let candidate = await folderSelector.selectFolder(
             title: "Authorize Managed Settings Folder",
             message: "Select the ClaudeCode folder in /Library/Application Support/ to grant read-only access to managed settings.",
             prompt: "Grant Access",
@@ -596,8 +596,8 @@ final class RootSelectionViewModel: ObservableObject {
         }
     }
 
-    func authorizeUserClaudeJson() {
-        let candidate = folderSelector.selectFolder(
+    func authorizeUserClaudeJson() async {
+        let candidate = await folderSelector.selectFolder(
             title: "Authorize .claude.json",
             message: "Select the .claude.json file in your home directory to grant read access.",
             prompt: "Grant Access",
@@ -627,9 +627,9 @@ final class RootSelectionViewModel: ObservableObject {
         }
     }
 
-    func authorizeEtcClaudeCodeRoot() {
+    func authorizeEtcClaudeCodeRoot() async {
         let etcURL = URL(fileURLWithPath: "/etc/", isDirectory: true)
-        let candidate = folderSelector.selectFolder(
+        let candidate = await folderSelector.selectFolder(
             title: "Authorize /etc/claude-code",
             message: "Select the claude-code folder in /etc/ to grant read access to system-level managed settings.",
             prompt: "Grant Access",
@@ -669,8 +669,8 @@ final class RootSelectionViewModel: ObservableObject {
         }
     }
 
-    func addProjectRoot() {
-        let candidate = folderSelector.selectFolder(
+    func addProjectRoot() async {
+        let candidate = await folderSelector.selectFolder(
             title: "Add Project Root",
             message: "Choose a project folder to register for discovery.",
             prompt: "Add Project",
@@ -730,7 +730,7 @@ private struct NoopFolderSelector: FolderSelecting {
         prompt: String,
         initialDirectory: URL?,
         showsHiddenFiles: Bool
-    ) -> URL? {
+    ) async -> URL? {
         nil
     }
 }

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Global Search — quick navigation across all configuration">
+    <meta name="keywords" content="search, find, navigate, settings, files, servers, hooks">
+    <title>Global Search</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Global Search</div>
+
+    <h1>Global Search</h1>
+    <p>Global Search lets you quickly find anything in your configuration. Press <kbd>⌘</kbd><kbd>F</kbd>
+       from anywhere in the app to open the search overlay.</p>
+
+    <img src="../images/user-scope-with-search.png" alt="Global Search overlay showing search field with suggested searches" class="screenshot">
+
+    <h2>What You Can Search</h2>
+    <ul>
+        <li><strong>Settings keys and values</strong> — find any resolved or per-scope setting</li>
+        <li><strong>Files</strong> — search by file name or path</li>
+        <li><strong>MCP servers</strong> — find servers by name</li>
+        <li><strong>Hook event types</strong> — search for lifecycle hook registrations</li>
+        <li><strong>Scope members</strong> — find configuration that belongs to a particular scope</li>
+    </ul>
+
+    <h2>Using Search</h2>
+    <p>The search overlay appears as a modal window (580 × 400 pixels). Start typing to filter results.
+       When the search field is empty, suggested searches are shown to help you get started.</p>
+    <p>Results include type badges so you can tell whether a match is a setting, file, server, or hook.
+       Click a result to navigate directly to its location in the app. Press <kbd>Esc</kbd> to dismiss.</p>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> Search is case-insensitive and matches partial strings. Typing "model" will
+        find settings like <code>preferredModel</code>, <code>defaultModel</code>, and any MCP server
+        with "model" in its name.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

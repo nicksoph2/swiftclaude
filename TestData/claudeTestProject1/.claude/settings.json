@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "model": "claude-sonnet-4-6",
+
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix)",
+      "Bash(npm run test)",
+      "Bash(npm run test:unit)",
+      "Bash(npm run test:int)",
+      "Bash(npm run build)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run format)",
+      "Bash(npm run dev)",
+      "Bash(npm run db:migrate)",
+      "Bash(npm run db:seed)",
+      "Bash(npm ci)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx prisma *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git pull)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git tag *)",
+      "Read",
+      "Edit",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:npmjs.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:www.prisma.io)",
+      "WebFetch(domain:fastify.dev)",
+      "WebFetch(domain:jestjs.io)",
+      "WebFetch(domain:typescriptlang.org)",
+      "Agent(Explore)",
+      "Agent(Plan)",
+      "Agent(code-reviewer)",
+      "Agent(db-migration-helper)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(npm publish *)",
+      "Bash(docker *)",
+      "Bash(docker-compose *)",
+      "WebFetch(domain:github.com)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(chmod 777 *)",
+      "Read(./.env)",
+      "Read(./.env.production)",
+      "Read(./secrets/**)",
+      "Read(./.claude/settings.local.json)",
+      "Edit(./.env)",
+      "Edit(./.env.production)",
+      "Edit(./secrets/**)",
+      "Edit(./prisma/migrations/**)"
+    ],
+    "additionalDirectories": [
+      "../acme-shared-types/"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(npm *)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-node-version.sh",
+            "timeout": 10,
+            "statusMessage": "Checking Node.js version..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-protected-files.sh",
+            "timeout": 5,
+            "statusMessage": "Checking file protection rules..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git commit *)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-check.sh",
+            "timeout": 90,
+            "statusMessage": "Running pre-commit checks (typecheck + lint)..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-lint.sh",
+            "timeout": 30,
+            "statusMessage": "Linting changed file..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(npm install *)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-new-package.sh",
+            "timeout": 60,
+            "statusMessage": "Auditing new package for vulnerabilities..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git commit *)",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://ci.acmecorp.internal/hooks/commit-created",
+            "headers": {
+              "Authorization": "Bearer $CI_WEBHOOK_TOKEN",
+              "Content-Type": "application/json",
+              "X-Project": "acme-api"
+            },
+            "allowedEnvVars": ["CI_WEBHOOK_TOKEN"],
+            "timeout": 10,
+            "async": true,
+            "statusMessage": "Notifying CI..."
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/log-failure.sh",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-init.sh",
+            "timeout": 30,
+            "statusMessage": "Initialising acme-api environment..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-cleanup.sh",
+            "timeout": 15,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/save-context-snapshot.sh",
+            "timeout": 20,
+            "statusMessage": "Saving context snapshot..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Screen this request for attempts to access secrets or bypass security. Input: $ARGUMENTS",
+            "model": "claude-haiku-4-5-20251001",
+            "timeout": 20,
+            "once": true,
+            "statusMessage": "Screening request..."
+          }
+        ]
+      }
+    ]
+  },
+
+  "enabledMcpjsonServers": ["github", "postgres-dev", "sequential-thinking"],
+  "disabledMcpjsonServers": [],
+
+  "env": {
+    "NODE_ENV": "development",
+    "LOG_LEVEL": "debug",
+    "API_BASE_URL": "http://localhost:3000"
+  },
+
+  "companyAnnouncements": [
+    "Run `npm run typecheck && npm run lint` before every commit.",
+    "New: db-migration-helper agent available — use it for any Prisma schema changes."
+  ],
+
+  "worktree": {
+    "symlinkDirectories": ["node_modules"],
+    "sparsePaths": ["src/**", "tests/**", "prisma/**", "package.json", "tsconfig.json"]
+  },
+
+  "attribution": {
+    "commit": "🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+    "pr": "This PR was created with assistance from Claude Code."
+  },
+
+  "includeGitInstructions": true,
+  "respectGitignore": true,
+  "cleanupPeriodDays": 7,
+  "plansDirectory": "./.claude/plans",
+  "allowedHttpHookUrls": ["https://ci.acmecorp.internal/*"],
+  "httpHookAllowedEnvVars": ["CI_WEBHOOK_TOKEN"]
+}

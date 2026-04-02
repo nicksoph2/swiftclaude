@@ -9,7 +9,7 @@ protocol FolderSelecting {
         prompt: String,
         initialDirectory: URL?,
         showsHiddenFiles: Bool
-    ) -> URL?
+    ) async -> URL?
 }
 
 @MainActor
@@ -20,7 +20,7 @@ final class OpenPanelFolderSelector: FolderSelecting {
         prompt: String = "Select Folder",
         initialDirectory: URL? = nil,
         showsHiddenFiles: Bool = false
-    ) -> URL? {
+    ) async -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -33,11 +33,10 @@ final class OpenPanelFolderSelector: FolderSelecting {
         panel.message = message
         panel.directoryURL = initialDirectory
 
-        let response = panel.runModal()
-        guard response == .OK else {
-            return nil
+        return await withCheckedContinuation { continuation in
+            panel.begin { response in
+                continuation.resume(returning: response == .OK ? panel.url : nil)
+            }
         }
-
-        return panel.url
     }
 }

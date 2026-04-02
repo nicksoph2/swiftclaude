@@ -39,6 +39,9 @@ struct TreeParsingView: View {
     @ViewBuilder
     private var noDataPlaceholder: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
             Text("No parsed files available")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Issues view — configuration validation and diagnostics">
+    <meta name="keywords" content="issues, errors, warnings, validation, diagnostics, syntax">
+    <title>Issues</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Issues</div>
+
+    <h1>Issues</h1>
+    <p>The Issues view collects all validation problems found during configuration parsing and resolution.
+       Open it from the sidebar or press <kbd>⌘</kbd><kbd>4</kbd>.</p>
+
+    <img src="../images/issues.png" alt="Issues view showing clean configuration with no issues found" class="screenshot">
+
+    <h2>Severity Levels</h2>
+    <ul>
+        <li><strong style="color: #ef4444;">Errors</strong> — Problems that may prevent Claude Code from
+            using a configuration file correctly. Examples: JSON syntax errors, missing required fields,
+            inaccessible files.</li>
+        <li><strong style="color: #f59e0b;">Warnings</strong> — Non-critical issues that deserve attention.
+            Examples: invalid field types (wrong type but parseable), duplicate definitions, deprecated keys.</li>
+        <li><strong style="color: #3b82f6;">Info</strong> — Informational notices. Examples: unknown fields
+            preserved for forward compatibility, unresolved references.</li>
+    </ul>
+
+    <h2>Filtering</h2>
+    <p>Use the severity filter buttons at the top to show only errors, only warnings, or only info-level
+       issues. The summary header shows counts for each level.</p>
+
+    <h2>Sidebar Badges</h2>
+    <p>The sidebar shows issue counts in two places:</p>
+    <ul>
+        <li>Per-scope badges (orange) on each scope row — showing how many issues originated from that scope's files</li>
+        <li>A total badge on the Issues row — red if any errors exist, orange for warnings only</li>
+    </ul>
+
+    <div class="callout callout-note">
+        <strong>Note:</strong> An empty Issues view means your configuration is clean — no problems were
+        detected during parsing or resolution.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

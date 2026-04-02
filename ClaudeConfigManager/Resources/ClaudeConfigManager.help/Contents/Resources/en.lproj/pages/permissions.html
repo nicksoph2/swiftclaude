@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Permissions Inspector — rule evaluation and What-If testing">
+    <meta name="keywords" content="permissions, rules, allow, deny, prompt, what-if, inspector, evaluation">
+    <title>Permissions Inspector</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Permissions Inspector</div>
+
+    <h1>Permissions Inspector</h1>
+    <p>The Permissions Inspector shows how Claude Code decides whether to allow, deny, or prompt for
+       each tool invocation. Open it from the Views section in the sidebar or press
+       <kbd>⌘</kbd><kbd>3</kbd>.</p>
+
+    <img src="../images/permissions-inspector.png" alt="Permissions Inspector showing deny, ask, and allow rule evaluation order" class="screenshot">
+
+    <h2>Sections</h2>
+
+    <h3>Evaluation Order Diagram</h3>
+    <p>A visual diagram showing the precedence of rule types. Rules are evaluated in a specific order —
+       explicit denials take priority over allows, and higher scopes override lower ones.</p>
+
+    <h3>Effective Rules Table</h3>
+    <p>A complete table of all merged permission rules with source tracking. Each rule shows:</p>
+    <ul>
+        <li>The tool or pattern it applies to (e.g., <code>bash</code>, <code>mcp:*</code>)</li>
+        <li>The action (<span class="scope-badge scope-project">allow</span>,
+            <span class="scope-badge scope-managed">deny</span>, or
+            <span class="scope-badge scope-session">prompt</span>)</li>
+        <li>Which scope defined it</li>
+    </ul>
+
+    <h3>Permission Inheritance Tree</h3>
+    <p>Shows how rules cascade through scopes. You can see where a particular tool's permission is
+       first defined and whether higher scopes override it.</p>
+
+    <h3>Conflicts</h3>
+    <p>Lists rules that override each other across scopes — for example, when a project allows a tool
+       but the Managed scope denies it.</p>
+
+    <h2>Edit Mode</h2>
+    <p>Toggle Edit Mode (pencil icon in the toolbar) to add or remove permission rules. You can select
+       the rule type (allow, deny, prompt) and the scope where it should be defined.</p>
+
+    <h2>What-If Inspector</h2>
+    <p>The What-If Inspector lets you test permission decisions without actually running Claude Code.
+       Enter a tool invocation (like <code>bash("ls -la")</code> or <code>mcp:filesystem.read</code>)
+       and the inspector immediately shows whether it would be allowed, denied, or prompted — and which
+       rule made that decision.</p>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> The What-If Inspector cycles through example invocations as placeholder text.
+        These examples cover common patterns like bash, file read/write, and MCP tool calls.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

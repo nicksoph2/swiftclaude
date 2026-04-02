@@ -1,0 +1,276 @@
+/* Claude Config Manager Help Book — Stylesheet */
+
+:root {
+    --bg: #ffffff;
+    --fg: #1d1d1f;
+    --muted: #6e6e73;
+    --accent: #d97706;
+    --accent-bg: #fffbeb;
+    --border: #d2d2d7;
+    --code-bg: #f5f5f7;
+    --sidebar-bg: #f9fafb;
+    --card-bg: #ffffff;
+    --card-shadow: rgba(0, 0, 0, 0.06);
+    --kbd-bg: #e8e8ed;
+    --kbd-border: #c7c7cc;
+    --link: #0066cc;
+    --scope-managed: #ef4444;
+    --scope-user: #3b82f6;
+    --scope-project: #22c55e;
+    --scope-session: #a855f7;
+    --scope-cli: #6b7280;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1d1d1f;
+        --fg: #f5f5f7;
+        --muted: #a1a1a6;
+        --accent: #f59e0b;
+        --accent-bg: #292524;
+        --border: #424245;
+        --code-bg: #2c2c2e;
+        --sidebar-bg: #28282a;
+        --card-bg: #2c2c2e;
+        --card-shadow: rgba(0, 0, 0, 0.3);
+        --kbd-bg: #3a3a3c;
+        --kbd-border: #545456;
+        --link: #4da3ff;
+    }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg);
+    background: var(--bg);
+    padding: 20px 24px 40px;
+    max-width: 720px;
+}
+
+h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+}
+
+h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 28px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 6px;
+}
+
+p { margin-bottom: 12px; }
+
+a {
+    color: var(--link);
+    text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+code {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--code-bg);
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 12px;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+
+kbd {
+    display: inline-block;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    padding: 2px 6px;
+    background: var(--kbd-bg);
+    border: 1px solid var(--kbd-border);
+    border-radius: 4px;
+    box-shadow: 0 1px 0 var(--kbd-border);
+}
+
+/* Topic cards on index page */
+.topic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.topic-card {
+    display: block;
+    padding: 14px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px var(--card-shadow);
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+.topic-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px var(--card-shadow);
+    text-decoration: none;
+}
+.topic-card .card-icon { font-size: 22px; margin-bottom: 6px; }
+.topic-card .card-title { font-weight: 600; font-size: 14px; display: block; }
+.topic-card .card-desc { font-size: 12px; color: var(--muted); display: block; margin-top: 2px; }
+
+/* Scope badge */
+.scope-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #fff;
+    vertical-align: middle;
+}
+.scope-managed  { background: var(--scope-managed); }
+.scope-user     { background: var(--scope-user); }
+.scope-project  { background: var(--scope-project); }
+.scope-session  { background: var(--scope-session); }
+.scope-cli      { background: var(--scope-cli); }
+
+/* Precedence diagram */
+.precedence-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 16px 0;
+    max-width: 340px;
+}
+.precedence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+}
+.precedence-row .rank {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 18px;
+}
+.precedence-arrow {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+/* Keyboard shortcut table */
+table.shortcuts {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+}
+table.shortcuts th,
+table.shortcuts td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+table.shortcuts th {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Screenshot placeholder */
+.screenshot-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--code-bg);
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 40px 20px;
+    margin: 16px 0;
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.screenshot {
+    display: block;
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin: 16px 0;
+    box-shadow: 0 2px 8px var(--card-shadow);
+}
+
+/* Callout boxes */
+.callout {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 14px 0;
+    font-size: 13px;
+}
+.callout-tip {
+    background: #ecfdf5;
+    border-left: 4px solid #10b981;
+}
+.callout-note {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+}
+.callout-warning {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+}
+@media (prefers-color-scheme: dark) {
+    .callout-tip     { background: #064e36; }
+    .callout-note    { background: #1e3a5f; }
+    .callout-warning { background: #422006; }
+}
+
+/* Breadcrumb navigation */
+.breadcrumb {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+.breadcrumb a { color: var(--muted); }
+.breadcrumb a:hover { color: var(--link); }
+
+/* Footer */
+.help-footer {
+    margin-top: 32px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+}
+
+ul, ol { margin: 8px 0 12px 20px; }
+li { margin-bottom: 4px; }

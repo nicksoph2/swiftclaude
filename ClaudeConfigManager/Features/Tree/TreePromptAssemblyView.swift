@@ -46,6 +46,9 @@ struct TreePromptAssemblyView: View {
 
     private var noDataPlaceholder: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "square.stack.3d.up")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
             Text("No prompt assembly data available")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)

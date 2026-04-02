@@ -61,7 +61,7 @@ struct ClaudeMdEditorView: View {
                 ToolbarItem(placement: .automatic) {
                     HStack(spacing: 12) {
                         if isSaving {
-                            ProgressView()
+                            ProgressView("Saving…")
                                 .controlSize(.small)
                         }
                         Button("Save") {

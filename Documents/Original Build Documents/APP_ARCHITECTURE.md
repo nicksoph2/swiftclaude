@@ -218,10 +218,24 @@ Merge priority (highest wins): **Managed > User > Project > Session > CLI flag**
 | `RootLocator` | Finds Claude root directories (`~/.claude`, project `.claude/`, etc.) |
 | `WorkspaceScanner` | Walks directory tree, enumerates config files by type |
 
+The `WorkspaceScanner` discovers files across three managed-scope locations: the primary macOS path (`/Library/Application Support/ClaudeCode/`), the cross-platform path (`/etc/claude-code/`), and MDM policy domains. Both managed locations support `managed-settings.json`, `CLAUDE.md`, and `rules/*.md` discovery. The `ManagedSettingsLocator` holds path constants for both roots.
+
 ### 6e. Bookmarks
 `Infrastructure/Bookmarks/BookmarkStore.swift`
 
 macOS security-scoped bookmarks for persistent cross-launch folder access. Required because the app is sandboxed.
+
+The bookmark system manages five kinds of access:
+
+| BookmarkKind | ID Constant | Purpose |
+|---|---|---|
+| `globalClaudeRoot` | `global-claude-root` | `~/.claude/` directory |
+| `managedClaudeCodeRoot` | `managed-claude-code-root` | `/Library/Application Support/ClaudeCode/` |
+| `userClaudeJson` | `user-claude-json` | `~/.claude.json` file (sibling to `~/.claude/`, needs its own bookmark) |
+| `etcClaudeCodeRoot` | `etc-claude-code-root` | `/etc/claude-code/` directory |
+| `projectRoot` | `project-<hash>` | Per-project root directories |
+
+`RootSelectionViewModel` exposes authorize/clear actions and published boolean flags (`hasAuthorizedUserClaudeJson`, `hasAuthorizedEtcClaudeCodeRoot`) for each bookmark kind, following the same pattern as the global and managed root bookmarks.
 
 ### 6f. Full Pipeline (5 phases)
 `Infrastructure/Pipeline/ConfigurationPipeline.swift` (541 lines — to be registered)
@@ -339,9 +353,11 @@ ClaudeConfigManagerTests/
 │   └── …
 ├── Discovery/
 │   ├── WorkspaceScannerTests.swift
+│   ├── EtcManagedScanTests.swift    ← /etc/claude-code and rules/*.md discovery
 │   └── RootLocatorTests.swift
 ├── Bookmarks/
-│   └── BookmarkStoreTests.swift
+│   ├── BookmarkStoreTests.swift
+│   └── BookmarkExpansionTests.swift  ← userClaudeJson and etcClaudeCodeRoot bookmarks
 └── Fixtures/
     └── <parser>/
         └── <case_name>/
@@ -380,6 +396,9 @@ These are known gaps between the current codebase and the final vision:
 | 7 | No OTel / telemetry integration (orphaned files may exist) | Cleanup |
 | 8 | `TokenEstimator` exists but context budget stage not fully wired into Tree | — |
 | 9 | No managed-scope lock indicators in the UI | F2-7 |
+| 10 | ✅ ~~`~/.claude.json` had no bookmark~~ — resolved in packet 30a (bookmark infrastructure added) |
+| 11 | ✅ ~~`/etc/claude-code/` was a blind spot~~ — resolved in packet 30a (discovery + bookmark added) |
+| 12 | No SwiftUI views yet for the new `userClaudeJson` / `etcClaudeCodeRoot` authorize buttons | 30a follow-up |
 
 ---
 

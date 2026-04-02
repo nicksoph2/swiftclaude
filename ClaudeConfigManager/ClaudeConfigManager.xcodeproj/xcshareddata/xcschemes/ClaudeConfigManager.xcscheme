@@ -35,6 +35,20 @@
                ReferencedContainer = "container:ClaudeConfigManager.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2B59BCB7EA6B5463B6FDAEE1"
+               BuildableName = "ClaudeConfigManagerUITests.xctest"
+               BlueprintName = "ClaudeConfigManagerUITests"
+               ReferencedContainer = "container:ClaudeConfigManager.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

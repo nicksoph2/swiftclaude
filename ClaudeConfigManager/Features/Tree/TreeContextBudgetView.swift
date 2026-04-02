@@ -72,6 +72,9 @@ struct TreeContextBudgetView: View {
 
     private var noDataPlaceholder: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "chart.bar")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
             Text("No context budget data available")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)

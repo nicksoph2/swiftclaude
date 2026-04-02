@@ -1,5 +1,10 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let showPipelineIntro = Notification.Name("showPipelineIntro")
+    static let showHelpSearch = Notification.Name("showHelpSearch")
+}
+
 @main
 struct ClaudeConfigManagerApp: App {
     @StateObject private var router = AppRouter()
@@ -37,9 +42,36 @@ struct ClaudeConfigManagerApp: App {
         .windowResizability(.contentSize)
         .defaultSize(width: 1200, height: 760)
 
+        .commands {
+            CommandGroup(replacing: .help) {
+                Button("Claude Config Manager Help") {
+                    NSApplication.shared.showHelp(nil)
+                }
+                .keyboardShortcut("?", modifiers: .command)
+
+                Button("Search Help…") {
+                    NotificationCenter.default.post(
+                        name: .showHelpSearch,
+                        object: nil
+                    )
+                }
+                .keyboardShortcut("/", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("How Claude Code Works") {
+                    NotificationCenter.default.post(
+                        name: .showPipelineIntro,
+                        object: nil
+                    )
+                }
+            }
+        }
+
         Settings {
             RootPickerSettingsView(schemaFetcherService: schemaFetcherService)
                 .environmentObject(router.rootSelectionViewModel)
+                .environmentObject(router.pipeline)
                 .frame(width: 620, height: 500)
         }
     }

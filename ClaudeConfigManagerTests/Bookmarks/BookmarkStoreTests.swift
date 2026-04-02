@@ -178,7 +178,7 @@ final class BookmarkStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testRootSelectionViewModelRejectsUnreadableGlobalRootFolder() {
+    func testRootSelectionViewModelRejectsUnreadableGlobalRootFolder() async {
         let persistence = InMemoryBookmarkPersistence()
         let dataCoder = MockBookmarkDataCoder(dataByURL: [:], resolvedByData: [:])
         let access = MockSecurityScopeAccessManager()
@@ -196,7 +196,7 @@ final class BookmarkStoreTests: XCTestCase {
             accessChecker: MockAccessChecker(statusesByPath: [:])
         )
 
-        viewModel.chooseGlobalRootFolder()
+        await viewModel.chooseGlobalRootFolder()
 
         guard case .unreadableGlobalRoot(let path) = viewModel.issue else {
             return XCTFail("Expected unreadable global root issue")
@@ -207,7 +207,7 @@ final class BookmarkStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testRootSelectionViewModelAuthorizesRecommendedGlobalRoot() throws {
+    func testRootSelectionViewModelAuthorizesRecommendedGlobalRoot() async throws {
         let recommendedRoot = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude", isDirectory: true)
         let persistence = InMemoryBookmarkPersistence()
@@ -230,7 +230,7 @@ final class BookmarkStoreTests: XCTestCase {
             )
         )
 
-        viewModel.authorizeRecommendedGlobalRoot()
+        await viewModel.authorizeRecommendedGlobalRoot()
 
         XCTAssertTrue(viewModel.hasAuthorizedGlobalRoot)
         XCTAssertEqual(viewModel.globalRootSource, GlobalClaudeRootSource.defaultHomeClaude)
@@ -324,7 +324,7 @@ private final class MockFolderSelector: FolderSelecting {
         prompt: String,
         initialDirectory: URL?,
         showsHiddenFiles: Bool
-    ) -> URL? {
+    ) async -> URL? {
         nextURL
     }
 }

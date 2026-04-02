@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Dashboard — configuration health overview">
+    <meta name="keywords" content="dashboard, overview, health, statistics, file count">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Dashboard</div>
+
+    <h1>Dashboard</h1>
+    <p>The Dashboard is your at-a-glance view of configuration health. Open it by clicking
+       <strong>Dashboard</strong> at the top of the sidebar, or press <kbd>⌘</kbd><kbd>1</kbd>.</p>
+
+    <img src="../images/dashboard.png" alt="Dashboard showing configuration health, scope overview, and quick links" class="screenshot">
+
+    <h2>What You See</h2>
+    <p>The Dashboard surfaces key metrics drawn from all scopes:</p>
+    <ul>
+        <li><strong>Total file count</strong> — how many configuration files were discovered across all scopes</li>
+        <li><strong>Files per scope</strong> — a breakdown showing Managed, User, and Project file counts</li>
+        <li><strong>Issue counts</strong> — errors and warnings grouped by scope, with severity indicators</li>
+        <li><strong>Accessibility status</strong> — which files are readable and which require authorisation</li>
+        <li><strong>Recently modified keys</strong> — settings that have changed since the last scan</li>
+        <li><strong>Most-contested settings</strong> — keys where multiple scopes provide different values</li>
+    </ul>
+
+    <h2>Health Summary</h2>
+    <p>At a glance, the Dashboard tells you whether your configuration is clean (no issues),
+       has warnings (non-critical problems), or has errors (things that may affect Claude Code behaviour).
+       Red badges indicate errors; orange indicates warnings.</p>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> If you see contested settings, navigate to <a href="resolved-config.html">Resolved Config</a>
+        to see which scope's value wins and why.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

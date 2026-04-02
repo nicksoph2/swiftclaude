@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Transcripts — browse and search Claude Code session transcripts">
+    <meta name="keywords" content="transcripts, session, conversation, turns, search, export, tokens">
+    <title>Transcripts</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Transcripts</div>
+
+    <h1>Transcripts</h1>
+    <p>The Transcripts view lets you browse recorded Claude Code sessions. Each transcript shows the
+       full conversation between you and Claude, including tool calls and their results.</p>
+
+    <img src="../images/transcripts.png" alt="Transcripts view — session transcripts appear here once Claude Code sessions are discovered" class="screenshot">
+
+    <h2>Transcript Header</h2>
+    <p>Every transcript displays key metadata:</p>
+    <ul>
+        <li><strong>Session ID</strong> — unique identifier for the session</li>
+        <li><strong>Model</strong> — which Claude model was used</li>
+        <li><strong>Turn count</strong> — total conversation turns</li>
+        <li><strong>Token count</strong> — total input + output tokens consumed</li>
+        <li><strong>Estimated cost</strong> — approximate USD cost based on token usage</li>
+        <li><strong>Date</strong> — when the session occurred</li>
+    </ul>
+
+    <h2>Browsing and Searching</h2>
+    <p>Transcripts display in a chat-style layout. For long sessions, turns load incrementally
+       (100 at a time) to keep the interface responsive.</p>
+    <p>The toolbar provides:</p>
+    <ul>
+        <li><strong>Full-text search</strong> — find specific content within a transcript, with match
+            navigation (previous/next) and highlighted results</li>
+        <li><strong>Jump to turn</strong> — enter a turn number to scroll directly to it</li>
+        <li><strong>Export</strong> — save the transcript as JSON or plain text</li>
+    </ul>
+
+    <h2>Data Source</h2>
+    <p>Transcripts are read from local <code>.jsonl</code> files stored by Claude Code. No network
+       access is required — all data stays on your machine.</p>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>

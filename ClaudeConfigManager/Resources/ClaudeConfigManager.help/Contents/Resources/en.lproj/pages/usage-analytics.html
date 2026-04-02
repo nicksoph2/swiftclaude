@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Usage Analytics — token usage, costs, and trends">
+    <meta name="keywords" content="usage, analytics, tokens, cost, trends, charts, sessions, projects">
+    <title>Usage Analytics</title>
+    <link rel="stylesheet" href="../css/help.css">
+</head>
+<body>
+    <div class="breadcrumb"><a href="index.html">Help</a> &rsaquo; Usage Analytics</div>
+
+    <h1>Usage Analytics</h1>
+    <p>The Usage Analytics dashboard gives you insight into how you use Claude Code over time — token
+       consumption, costs, and which projects and models drive the most usage.</p>
+
+    <img src="../images/usage-analytics.png" alt="Usage Analytics dashboard with time window picker and metric cards" class="screenshot">
+
+    <h2>Time Windows</h2>
+    <p>Use the time picker at the top to filter data:</p>
+    <ul>
+        <li><strong>7 days</strong> — last week of activity</li>
+        <li><strong>30 days</strong> — last month</li>
+        <li><strong>90 days</strong> — last quarter</li>
+        <li><strong>All time</strong> — everything on disk</li>
+    </ul>
+
+    <h2>Metrics Cards</h2>
+    <p>Summary cards show headline numbers:</p>
+    <ul>
+        <li>Total input tokens</li>
+        <li>Total output tokens</li>
+        <li>Number of sessions</li>
+        <li>Number of projects</li>
+        <li>Estimated total cost (USD)</li>
+    </ul>
+
+    <h2>Charts</h2>
+    <p>The dashboard includes several visualisations built with Swift Charts:</p>
+    <ul>
+        <li><strong>Tokens per day</strong> — line or bar chart showing daily token consumption</li>
+        <li><strong>Top projects</strong> — stacked chart of usage by project</li>
+        <li><strong>Model distribution</strong> — donut chart showing which Claude models you use most</li>
+        <li><strong>Top tools</strong> — table of most-invoked tools with counts and token usage</li>
+    </ul>
+
+    <h2>Data Source</h2>
+    <p>All analytics are computed locally from your <code>.jsonl</code> transcript files. No data is
+       sent anywhere — everything stays on your machine.</p>
+
+    <div class="callout callout-tip">
+        <strong>Tip:</strong> If you notice unexpectedly high token usage, check the Top Tools table to see
+        whether a particular tool (like bash or file reads) is consuming the bulk of your context window.
+    </div>
+
+    <div class="help-footer">
+        <a href="index.html">← Back to Help Index</a>
+    </div>
+</body>
+</html>
