@@ -34,7 +34,7 @@ struct TreeContextBudgetView: View {
             }
         }
         .onAppear {
-            viewModel.bind(to: pipeline)
+            Task { @MainActor in viewModel.bind(to: pipeline) }
         }
     }
 

@@ -118,24 +118,26 @@ struct SessionScopeView: View {
                 await transcriptScanner.scanTranscripts()
                 await usageAggregator.refreshAll()
             }
-            debugMonitor.recordDetail(
-                title: "Session",
-                subtitle: "Read-only effective settings, instructions, hooks, and MCP state with provenance.",
-                debugNotes: [
-                    "Projection-driven settings view (F1).",
-                    "Projection-driven instructions view (F2).",
-                    "Projection-driven hooks view (F3).",
-                    "Projection-driven MCP view (F4).",
-                    "Settings availability: \(projection.familyStates.first(where: { $0.family == .settings })?.availability.rawValue ?? "unknown")",
-                    "Instructions availability: \(projection.familyStates.first(where: { $0.family == .instructions })?.availability.rawValue ?? "unknown")",
-                    "Hooks availability: \(projection.familyStates.first(where: { $0.family == .hooks })?.availability.rawValue ?? "unknown")",
-                    "MCP availability: \(projection.familyStates.first(where: { $0.family == .mcp })?.availability.rawValue ?? "unknown")",
-                    "Agents availability: \(projection.familyStates.first(where: { $0.family == .agents })?.availability.rawValue ?? "unknown")",
-                    "Skills availability: \(projection.familyStates.first(where: { $0.family == .skills })?.availability.rawValue ?? "unknown")",
-                    "Runtime session source: \(runtimeSessionDiscovery.dataSource.displayName)",
-                    "Total projection issues: \(projection.issueSummary.totalIssues)"
-                ]
-            )
+            Task { @MainActor in
+                debugMonitor.recordDetail(
+                    title: "Session",
+                    subtitle: "Read-only effective settings, instructions, hooks, and MCP state with provenance.",
+                    debugNotes: [
+                        "Projection-driven settings view (F1).",
+                        "Projection-driven instructions view (F2).",
+                        "Projection-driven hooks view (F3).",
+                        "Projection-driven MCP view (F4).",
+                        "Settings availability: \(projection.familyStates.first(where: { $0.family == .settings })?.availability.rawValue ?? "unknown")",
+                        "Instructions availability: \(projection.familyStates.first(where: { $0.family == .instructions })?.availability.rawValue ?? "unknown")",
+                        "Hooks availability: \(projection.familyStates.first(where: { $0.family == .hooks })?.availability.rawValue ?? "unknown")",
+                        "MCP availability: \(projection.familyStates.first(where: { $0.family == .mcp })?.availability.rawValue ?? "unknown")",
+                        "Agents availability: \(projection.familyStates.first(where: { $0.family == .agents })?.availability.rawValue ?? "unknown")",
+                        "Skills availability: \(projection.familyStates.first(where: { $0.family == .skills })?.availability.rawValue ?? "unknown")",
+                        "Runtime session source: \(runtimeSessionDiscovery.dataSource.displayName)",
+                        "Total projection issues: \(projection.issueSummary.totalIssues)"
+                    ]
+                )
+            }
         }
         .onChange(of: rootSelection.selectedGlobalRootURL) { _, newValue in
             runtimeSessionDiscovery.updateClaudeRootURL(newValue)

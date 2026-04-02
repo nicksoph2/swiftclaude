@@ -8,8 +8,12 @@ final class AppRouter: ObservableObject {
     @Published private(set) var bootstrapState: AppBootstrapState
     @Published private(set) var bookmarkResolutionResults: [BookmarkResolutionResult]
     @Published private(set) var bookmarkBootstrapSummary: BookmarkBootstrapSummary
-    @Published private(set) var rootSelectionViewModel: RootSelectionViewModel
-    @Published private(set) var pipeline: ConfigurationPipeline
+    /// Not `@Published` — these are their own `ObservableObject`s injected into the
+    /// view tree as separate `@EnvironmentObject`s.  Marking them `@Published` here
+    /// would double-fire `objectWillChange` (once from their own publisher, once from
+    /// `AppRouter`), triggering "Publishing changes from within view updates" warnings.
+    private(set) var rootSelectionViewModel: RootSelectionViewModel
+    private(set) var pipeline: ConfigurationPipeline
 
     @Published var sidebarState: SidebarState
 

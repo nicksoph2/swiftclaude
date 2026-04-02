@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Config Manager — Content-Aware UI Concepts v2</title>
+<style>
+  :root {
+    --bg: #1a1210;
+    --surface: #231c19;
+    --surface2: #2d2420;
+    --surface3: #382e28;
+    --surface4: #443830;
+    --border: #443830;
+    --border-light: #554840;
+    --text: #e8ddd5;
+    --text-dim: #9a8b80;
+    --text-faint: #6a5d55;
+    --managed: #ff4d4d;
+    --user: #4d8bff;
+    --project: #4dcc6d;
+    --project-local: #4dd9c0;
+    --session: #ff9f43;
+    --cli: #a66dff;
+    --auto-memory: #6d6dff;
+    --accent: #d4956a;
+    --accent2: #7ab5e0;
+    --winner: #4dcc6d;
+    --overridden: #ff4d4d;
+    --shared: #d4956a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Mono', sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position:sticky; top:0; z-index:100;
+    display:flex; align-items:center; gap:0;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:0 24px;
+  }
+  .nav h1 {
+    font-size:12px; font-weight:600; letter-spacing:0.6px;
+    text-transform:uppercase; color:var(--text-faint); margin-right:28px;
+    padding:14px 0; white-space:nowrap;
+  }
+  .nav button {
+    background:none; border:none; color:var(--text-dim);
+    font-size:13px; font-weight:500; padding:14px 16px;
+    cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s;
+  }
+  .nav button:hover { color:var(--text); }
+  .nav button.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  /* ── SECTION HEADERS ── */
+  .concept-intro {
+    padding:40px 44px 28px; max-width:1200px;
+  }
+  .concept-intro h2 {
+    font-size:24px; font-weight:700; margin-bottom:6px;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .concept-intro p {
+    font-size:14px; color:var(--text-dim); line-height:1.6; max-width:760px;
+  }
+  .concept-intro .key-idea {
+    margin-top:14px; padding:10px 14px;
+    background:rgba(212,149,106,0.08); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; font-size:12px; color:var(--accent); font-style:italic;
+  }
+
+  /* ── MOCK WINDOW ── */
+  .mock {
+    margin:0 44px 44px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px;
+    overflow:hidden; max-width:1200px;
+  }
+  .mock-bar {
+    display:flex; align-items:center; gap:8px;
+    padding:10px 14px; background:var(--surface2);
+    border-bottom:1px solid var(--border);
+  }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .dot.r { background:#ff5f57; } .dot.y { background:#febc2e; } .dot.g { background:#28c840; }
+  .mock-bar span { font-size:11px; color:var(--text-faint); margin-left:8px; }
+  .mock-body { display:flex; min-height:620px; }
+
+  /* ── SIDEBAR ── */
+  .sb {
+    width:170px; min-width:170px; background:var(--surface2);
+    border-right:1px solid var(--border); padding:10px 0; font-size:11px;
+  }
+  .sb .lbl {
+    padding:8px 12px 3px; font-size:9px; text-transform:uppercase;
+    letter-spacing:0.8px; color:var(--text-faint); font-weight:700;
+  }
+  .sb .it {
+    display:flex; align-items:center; gap:7px;
+    padding:5px 12px; cursor:pointer; transition:background 0.12s;
+  }
+  .sb .it:hover { background:var(--surface3); }
+  .sb .it.act { background:var(--accent); color:#111; border-radius:0; }
+  .sb .sd { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+  .main { flex:1; overflow:auto; background:var(--bg); }
+
+  /* ══════════════════════════════════════
+     CONCEPT A: SCOPE COLUMNS — CONTENT GRID
+     ══════════════════════════════════════ */
+
+  .grid-header {
+    display:grid;
+    grid-template-columns: 190px 1fr 1fr 1fr 1fr;
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10; background:var(--surface2);
+  }
+  .grid-header .gh {
+    padding:10px 14px; font-size:10px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.7px;
+    border-right:1px solid var(--border);
+    display:flex; align-items:center; gap:6px;
+  }
+  .grid-header .gh:first-child { color:var(--text-faint); }
+  .grid-header .gh:last-child { border-right:none; }
+
+  .grid-section-title {
+    grid-column: 1 / -1;
+    padding:12px 14px 6px;
+    font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.6px; color:var(--accent);
+    background:var(--surface); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:8px; cursor:pointer;
+  }
+  .grid-section-title .arrow { transition:transform 0.2s; font-size:9px; }
+  .grid-section-title.collapsed .arrow { transform:rotate(-90deg); }
+
+  .grid-row {
+    display:grid;
+    grid-template-columns: 190px 1fr 1fr 1fr 1fr;
+    border-bottom:1px solid rgba(68,56,48,0.4);
+    transition:background 0.12s;
+  }
+  .grid-row:hover { background:rgba(212,149,106,0.03); }
+
+  .grid-key {
+    padding:7px 14px; font-size:11px;
+    border-right:1px solid var(--border);
+    display:flex; align-items:flex-start; gap:6px;
+    color:var(--text-dim);
+  }
+  .grid-key .k-name { font-family:'SF Mono',Menlo,monospace; font-size:10px; color:var(--text); }
+  .grid-key .k-type { font-size:9px; color:var(--text-faint); margin-top:1px; }
+
+  .grid-cell {
+    padding:6px 12px; font-size:10px;
+    border-right:1px solid rgba(68,56,48,0.3);
+    position:relative; min-height:32px;
+    display:flex; align-items:center;
+  }
+  .grid-cell:last-child { border-right:none; }
+
+  .cell-empty { color:var(--text-faint); font-style:italic; opacity:0.4; }
+  .cell-val {
+    font-family:'SF Mono',Menlo,monospace; font-size:10px;
+    padding:2px 6px; border-radius:4px; max-width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .cell-val.winner {
+    background:rgba(77,204,109,0.1); border:1px solid rgba(77,204,109,0.25);
+    color:var(--winner);
+  }
+  .cell-val.overridden {
+    background:rgba(255,77,77,0.06); border:1px solid rgba(255,77,77,0.15);
+    color:var(--text-faint); text-decoration:line-through; opacity:0.6;
+  }
+  .cell-val.contributor {
+    background:rgba(212,149,106,0.08); border:1px solid rgba(212,149,106,0.2);
+    color:var(--shared);
+  }
+  .cell-val.same {
+    background:rgba(77,139,255,0.06); border:1px solid rgba(77,139,255,0.15);
+    color:var(--accent2);
+  }
+
+  /* Expand indicator on rows */
+  .grid-row .expand-hint {
+    font-size:8px; color:var(--text-faint); cursor:pointer; margin-left:auto;
+    opacity:0; transition:opacity 0.15s;
+  }
+  .grid-row:hover .expand-hint { opacity:1; }
+
+  .grid-detail {
+    grid-column:1 / -1;
+    padding:8px 14px 12px 204px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    font-size:11px; color:var(--text-dim); line-height:1.6;
+    display:none;
+  }
+  .grid-detail.open { display:block; }
+  .grid-detail code {
+    font-family:'SF Mono',Menlo,monospace; font-size:10px;
+    background:var(--surface2); padding:1px 5px; border-radius:3px;
+    color:var(--text);
+  }
+
+  /* Resolved column highlight */
+  .grid-header .gh.resolved-col {
+    background:rgba(212,149,106,0.08);
+    color:var(--accent);
+  }
+
+  /* ══════════════════════════════════════
+     CONCEPT B: LAYERED CONTENT CARDS
+     ══════════════════════════════════════ */
+
+  .layers-container {
+    padding:16px;
+  }
+
+  .content-layer {
+    margin-bottom:2px;
+    border-radius:10px;
+    overflow:hidden;
+    transition:all 0.3s;
+  }
+  .content-layer.expanded { margin-bottom:12px; }
+
+  .layer-header {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 16px;
+    cursor:pointer;
+    transition:background 0.15s;
+  }
+  .layer-header:hover { background:var(--surface3); }
+  .layer-header .spine {
+    width:3px; height:28px; border-radius:1.5px; flex-shrink:0;
+  }
+  .layer-header .lh-title {
+    font-size:12px; font-weight:600; flex:1;
+  }
+  .layer-header .lh-badge {
+    font-size:9px; padding:2px 8px; border-radius:10px;
+    font-weight:600;
+  }
+  .layer-header .lh-count {
+    font-size:10px; color:var(--text-faint);
+  }
+  .layer-header .lh-arrow {
+    font-size:10px; color:var(--text-faint);
+    transition:transform 0.2s;
+  }
+  .content-layer.expanded .lh-arrow { transform:rotate(90deg); }
+
+  .layer-body {
+    max-height:0; overflow:hidden; transition:max-height 0.3s;
+    background:var(--surface);
+  }
+  .content-layer.expanded .layer-body {
+    max-height:800px;
+  }
+
+  .layer-content-grid {
+    padding:0 16px 12px 29px;
+  }
+
+  .content-item {
+    display:flex; align-items:stretch;
+    border-bottom:1px solid rgba(68,56,48,0.3);
+    min-height:36px;
+  }
+  .content-item:last-child { border-bottom:none; }
+
+  .ci-name {
+    width:180px; flex-shrink:0;
+    font-family:'SF Mono',Menlo,monospace; font-size:10px;
+    padding:8px 12px 8px 0;
+    display:flex; align-items:center; gap:6px;
+    color:var(--text);
+  }
+  .ci-scopes {
+    flex:1; display:flex; gap:3px; align-items:center;
+    padding:6px 0;
+    flex-wrap:wrap;
+  }
+  .ci-scope-chip {
+    font-size:9px; font-weight:600; padding:2px 8px;
+    border-radius:4px; border:1px solid;
+    white-space:nowrap;
+  }
+  .ci-scope-chip.wins {
+    font-weight:700;
+    box-shadow:0 0 6px rgba(255,255,255,0.05);
+  }
+  .ci-scope-chip.loses {
+    opacity:0.35; text-decoration:line-through;
+  }
+  .ci-value {
+    width:200px; flex-shrink:0;
+    font-family:'SF Mono',Menlo,monospace; font-size:10px;
+    padding:8px 0;
+    color:var(--winner);
+    display:flex; align-items:center;
+  }
+  .ci-value .resolved-label {
+    font-size:8px; color:var(--text-faint); font-family:-apple-system,sans-serif;
+    margin-right:6px; text-transform:uppercase; letter-spacing:0.5px;
+  }
+
+  /* ══════════════════════════════════════
+     CONCEPT C: FLOW CONTENT STRIP
+     ══════════════════════════════════════ */
+
+  .flow-container {
+    display:flex; flex-direction:column;
+    height:100%; overflow:auto;
+  }
+
+  .flow-phase {
+    border-bottom:1px solid var(--border);
+  }
+  .flow-phase-header {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 16px;
+    background:var(--surface2);
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+  }
+  .flow-phase-header .ph-num {
+    width:22px; height:22px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700;
+    border:1.5px solid;
+  }
+  .flow-phase-header .ph-title {
+    font-size:12px; font-weight:600; flex:1;
+  }
+  .flow-phase-header .ph-summary {
+    font-size:10px; color:var(--text-faint);
+  }
+
+  .flow-phase-body {
+    padding:0;
+  }
+
+  /* Source cards within a phase */
+  .source-strip {
+    display:flex; overflow-x:auto; gap:12px;
+    padding:12px 16px;
+    scrollbar-width:thin;
+  }
+
+  .source-card {
+    min-width:220px; max-width:280px; flex-shrink:0;
+    background:var(--surface2); border-radius:10px;
+    border:1px solid var(--border);
+    overflow:hidden; transition:all 0.2s;
+    cursor:pointer;
+  }
+  .source-card:hover {
+    border-color:var(--border-light);
+    transform:translateY(-2px);
+    box-shadow:0 4px 16px rgba(0,0,0,0.3);
+  }
+  .source-card .sc-header {
+    padding:10px 14px;
+    display:flex; align-items:center; gap:8px;
+    border-bottom:1px solid var(--border);
+  }
+  .source-card .sc-dot {
+    width:8px; height:8px; border-radius:50%; flex-shrink:0;
+  }
+  .source-card .sc-title {
+    font-size:11px; font-weight:600; flex:1;
+  }
+  .source-card .sc-scope {
+    font-size:8px; padding:2px 6px; border-radius:8px;
+    font-weight:600; border:1px solid;
+  }
+
+  .source-card .sc-body {
+    padding:8px 14px 10px;
+  }
+  .source-card .sc-entry {
+    display:flex; align-items:center; gap:6px;
+    padding:3px 0; font-size:10px;
+    border-bottom:1px solid rgba(68,56,48,0.25);
+  }
+  .source-card .sc-entry:last-child { border-bottom:none; }
+  .source-card .sc-entry-key {
+    font-family:'SF Mono',Menlo,monospace; font-size:9px;
+    color:var(--text); flex:1;
+  }
+  .source-card .sc-entry-val {
+    font-family:'SF Mono',Menlo,monospace; font-size:9px;
+    color:var(--text-dim); text-align:right;
+    max-width:100px; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .source-card .sc-entry-status {
+    font-size:8px; font-weight:700; padding:1px 5px;
+    border-radius:3px;
+  }
+
+  /* Merge arrow between source cards and resolved output */
+  .merge-strip {
+    display:flex; align-items:center; gap:8px;
+    padding:8px 16px;
+    background:var(--surface);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+  }
+  .merge-arrow {
+    font-size:10px; color:var(--accent); font-weight:600;
+    display:flex; align-items:center; gap:4px;
+  }
+  .merge-method {
+    font-size:9px; color:var(--text-faint);
+    font-family:'SF Mono',Menlo,monospace;
+    padding:2px 6px; background:var(--surface2);
+    border-radius:3px;
+  }
+  .resolved-output {
+    flex:1; display:flex; gap:6px; flex-wrap:wrap;
+  }
+  .resolved-chip {
+    font-size:9px; padding:3px 8px; border-radius:5px;
+    font-family:'SF Mono',Menlo,monospace;
+    background:rgba(77,204,109,0.08); border:1px solid rgba(77,204,109,0.2);
+    color:var(--winner);
+  }
+
+  /* ══════════════════════════════════════
+     ANNOTATIONS
+     ══════════════════════════════════════ */
+  .note {
+    margin:0 44px 44px; max-width:1200px;
+    padding:20px 24px; background:var(--surface);
+    border:1px solid var(--border); border-radius:10px;
+  }
+  .note h3 { font-size:13px; font-weight:700; color:var(--accent); margin-bottom:10px; }
+  .note p { font-size:12px; color:var(--text-dim); line-height:1.7; margin-bottom:6px; }
+  .note p:last-child { margin-bottom:0; }
+  .note-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
+  .note-card {
+    padding:10px 14px; background:var(--surface2);
+    border-radius:8px; border:1px solid var(--border);
+  }
+  .note-card .nc-label { font-size:10px; font-weight:700; color:var(--text); margin-bottom:3px; }
+  .note-card .nc-desc { font-size:10px; color:var(--text-dim); line-height:1.5; }
+
+  /* ══════════════════════════════════════
+     LEGEND / FOOTER
+     ══════════════════════════════════════ */
+  .legend {
+    display:flex; gap:16px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--surface2);
+    border-top:1px solid var(--border); font-size:9px;
+  }
+  .legend .li { display:flex; align-items:center; gap:4px; }
+  .legend .ld { width:6px; height:6px; border-radius:50%; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <h1>v2 — Content-Aware</h1>
+  <button class="active" onclick="show('a')">A: Scope Grid</button>
+  <button onclick="show('b')">B: Layered Content</button>
+  <button onclick="show('c')">C: Flow Strip</button>
+  <button onclick="show('compare')">Principles</button>
+</nav>
+
+<!-- ══════════════════════════════════════
+     CONCEPT A: SCOPE COLUMNS — CONTENT GRID
+     Shows every setting key as a row, with one
+     column per scope showing what each scope defines.
+     ══════════════════════════════════════ -->
+<div id="p-a" class="panel active">
+  <div class="concept-intro">
+    <h2>A — Scope Grid: Settings as Rows, Scopes as Columns</h2>
+    <p>Every config key gets a row. Each scope gets a column. You instantly see which scopes define a value, who wins, and where they agree or diverge. Expandable rows reveal the full value, merge method, and resolution trace.</p>
+    <div class="key-idea">Think of it like a spreadsheet diff: one row per setting, one column per scope, colour-coded to show winner/overridden/shared.</div>
+  </div>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span>Scope Grid — Settings Resolution</span>
+    </div>
+    <div class="mock-body">
+      <div class="sb">
+        <div class="lbl">Focus</div>
+        <div class="it act">⊞ All Settings</div>
+        <div class="it">📄 Instructions</div>
+        <div class="it">🔧 Tools & MCP</div>
+        <div class="it">🔒 Permissions</div>
+        <div class="it">⚡ Hooks</div>
+        <div class="lbl" style="margin-top:10px">Filter</div>
+        <div class="it">Conflicts only</div>
+        <div class="it">Shared only</div>
+        <div class="it">Defined in 2+</div>
+      </div>
+      <div class="main" style="overflow:auto">
+
+        <!-- Column headers -->
+        <div class="grid-header">
+          <div class="gh">Setting Key</div>
+          <div class="gh"><div class="sd" style="background:var(--managed);width:6px;height:6px;border-radius:50%"></div> Managed</div>
+          <div class="gh"><div class="sd" style="background:var(--user);width:6px;height:6px;border-radius:50%"></div> User</div>
+          <div class="gh"><div class="sd" style="background:var(--project);width:6px;height:6px;border-radius:50%"></div> Project</div>
+          <div class="gh resolved-col">→ Resolved</div>
+        </div>
+
+        <!-- ── Section: Model & Reasoning ── -->
+        <div class="grid-section-title" onclick="this.classList.toggle('collapsed');this.nextElementSibling.style.display=this.classList.contains('collapsed')?'none':'contents'">
+          <span class="arrow">▼</span> Model & Reasoning <span style="font-weight:400;color:var(--text-faint);font-size:10px;margin-left:8px">4 keys, 1 conflict</span>
+        </div>
+        <div style="display:contents">
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">model</div><div class="k-type">string</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val overridden">claude-sonnet-4-6</span></div>
+            <div class="grid-cell"><span class="cell-val winner">claude-opus-4-6</span></div>
+            <div class="grid-cell"><span class="cell-val winner">claude-opus-4-6</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Merge:</strong> <code>selectHighestPrecedence</code> — Project wins over User.<br/>
+            User set <code>claude-sonnet-4-6</code> globally, but this project overrides to <code>claude-opus-4-6</code>.<br/>
+            <strong>Key info:</strong> Controls which model Claude Code uses. Affects cost, speed, and capability.
+          </div>
+
+          <div class="grid-row">
+            <div class="grid-key"><div><div class="k-name">effortLevel</div><div class="k-type">string</div></div></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val same">high</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val same">high</span></div>
+          </div>
+
+          <div class="grid-row">
+            <div class="grid-key"><div><div class="k-name">reasoning</div><div class="k-type">bool</div></div></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val same">true</span></div>
+            <div class="grid-cell"><span class="cell-val same">true</span></div>
+            <div class="grid-cell"><span class="cell-val same">true</span></div>
+          </div>
+
+          <div class="grid-row">
+            <div class="grid-key"><div><div class="k-name">availableModels</div><div class="k-type">string[]</div></div></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">[opus, sonnet]</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">[opus, sonnet]</span></div>
+          </div>
+        </div>
+
+        <!-- ── Section: Permissions ── -->
+        <div class="grid-section-title" onclick="this.classList.toggle('collapsed');this.nextElementSibling.style.display=this.classList.contains('collapsed')?'none':'contents'">
+          <span class="arrow">▼</span> Permissions <span style="font-weight:400;color:var(--text-faint);font-size:10px;margin-left:8px">3 keys, 2 merged</span>
+        </div>
+        <div style="display:contents">
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">permissions.deny</div><div class="k-type">string[]</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Bash(rm -rf *)</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Bash(sudo *)</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Bash(docker *)</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">3 rules ⊕</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Merge:</strong> <code>appendUnique</code> — all deny rules from all scopes are combined (union).<br/>
+            <strong>Effective deny list:</strong><br/>
+            &nbsp;&nbsp;· <code>Bash(rm -rf *)</code> <span style="color:var(--managed)">← managed</span><br/>
+            &nbsp;&nbsp;· <code>Bash(sudo *)</code> <span style="color:var(--user)">← user</span><br/>
+            &nbsp;&nbsp;· <code>Bash(docker *)</code> <span style="color:var(--project)">← project</span><br/>
+            Deny rules are additive — no scope can remove another scope's denials.
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">permissions.allow</div><div class="k-type">string[]</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Read(**)</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Bash(npm *)</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">2 rules ⊕</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Merge:</strong> <code>appendUnique</code><br/>
+            <strong>Effective allow list:</strong><br/>
+            &nbsp;&nbsp;· <code>Read(**)</code> <span style="color:var(--user)">← user</span><br/>
+            &nbsp;&nbsp;· <code>Bash(npm *)</code> <span style="color:var(--project)">← project</span>
+          </div>
+
+          <div class="grid-row">
+            <div class="grid-key"><div><div class="k-name">defaultMode</div><div class="k-type">string</div></div></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val overridden">default</span></div>
+            <div class="grid-cell"><span class="cell-val winner">acceptEdits</span></div>
+            <div class="grid-cell"><span class="cell-val winner">acceptEdits</span></div>
+          </div>
+        </div>
+
+        <!-- ── Section: MCP Servers ── -->
+        <div class="grid-section-title" onclick="this.classList.toggle('collapsed');this.nextElementSibling.style.display=this.classList.contains('collapsed')?'none':'contents'">
+          <span class="arrow">▼</span> MCP Servers <span style="font-weight:400;color:var(--text-faint);font-size:10px;margin-left:8px">3 servers, deep-merged</span>
+        </div>
+        <div style="display:contents">
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">mcpServers.github</div><div class="k-type">object</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val same" style="font-size:9px">stdio · gh-mcp</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val same" style="font-size:9px">stdio · gh-mcp</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Server:</strong> <code>github</code> — defined in User scope only.<br/>
+            <strong>Transport:</strong> stdio<br/>
+            <strong>Command:</strong> <code>gh-mcp</code><br/>
+            <strong>Tools (12):</strong> create_issue, list_issues, create_pr, merge_pr, get_repo, search_repos, create_branch, list_branches, get_file, create_comment, list_comments, get_workflow_runs<br/>
+            <strong>Status:</strong> Connected · healthy
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">mcpServers.postgres</div><div class="k-type">object</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">stdio · pg-mcp</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">stdio · pg-mcp</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Server:</strong> <code>postgres</code> — defined in Project scope only.<br/>
+            <strong>Transport:</strong> stdio<br/>
+            <strong>Command:</strong> <code>npx pg-mcp</code> with <code>--connection $DATABASE_URL</code><br/>
+            <strong>Tools (5):</strong> query, list_tables, describe_table, list_schemas, explain_query<br/>
+            <strong>Env:</strong> <code>DATABASE_URL</code> from project <code>.env</code>
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">mcpServers.slack</div><div class="k-type">object</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val overridden" style="font-size:9px">http · personal</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">http · team-bot</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">http · team-bot</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Conflict!</strong> Both User and Project define <code>slack</code>.<br/>
+            <strong>Merge:</strong> <code>deepMergeObject</code> — Project keys override User keys for same server name.<br/>
+            User configured <code>slack</code> with personal token → overridden by Project's <code>team-bot</code> URL.<br/>
+            <strong>Project config wins:</strong> <code>url: https://slack-mcp.team.io</code><br/>
+            <strong>Tools (8):</strong> send_message, read_channel, list_channels, search_messages, add_reaction, create_channel, set_topic, upload_file
+          </div>
+        </div>
+
+        <!-- ── Section: Instructions (CLAUDE.md) ── -->
+        <div class="grid-section-title" onclick="this.classList.toggle('collapsed');this.nextElementSibling.style.display=this.classList.contains('collapsed')?'none':'contents'">
+          <span class="arrow">▼</span> Instructions (CLAUDE.md) <span style="font-weight:400;color:var(--text-faint);font-size:10px;margin-left:8px">3 sources, appended</span>
+        </div>
+        <div style="display:contents">
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">~/.claude/CLAUDE.md</div><div class="k-type">markdown</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell">
+              <span class="cell-val contributor" style="font-size:9px">12 lines · 340 tok</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Layer 1 of 3</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Headings in this file:</strong><br/>
+            &nbsp;&nbsp;· <code># My Defaults</code><br/>
+            &nbsp;&nbsp;· <code>## Code Style</code> — "Always use TypeScript strict mode"<br/>
+            &nbsp;&nbsp;· <code>## Git</code> — "Use conventional commits"<br/>
+            &nbsp;&nbsp;· <code>## Testing</code> — "Run tests before committing"<br/>
+            <strong>Merge:</strong> <code>append</code> — loaded before project instructions, lower priority for conflicts.
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">./CLAUDE.md</div><div class="k-type">markdown</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell">
+              <span class="cell-val contributor" style="font-size:9px">48 lines · 1.2K tok</span>
+            </div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Layer 2 of 3</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Headings in this file:</strong><br/>
+            &nbsp;&nbsp;· <code># Claude Config Manager</code><br/>
+            &nbsp;&nbsp;· <code>## Start here</code> — "Read AGENT_CONTEXT.md before doing anything"<br/>
+            &nbsp;&nbsp;· <code>## Build and test</code> — xcodebuild command<br/>
+            &nbsp;&nbsp;· <code>## Critical rules</code> — 10 rules including "Never edit project.pbxproj"<br/>
+            &nbsp;&nbsp;· <code>## Communication style</code> — "Minimal output, no preamble"<br/>
+            <strong>Note:</strong> This file's "Code Style" section does NOT conflict with the global one — they cover different languages.
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">.claude/MEMORY.md</div><div class="k-type">auto</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell">
+              <span class="cell-val contributor" style="font-size:9px;border-color:rgba(109,109,255,0.3);background:rgba(109,109,255,0.08);color:var(--auto-memory)">8 lines · 180 tok</span>
+            </div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">Layer 3 of 3</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Auto-learned entries:</strong><br/>
+            &nbsp;&nbsp;· "User prefers XcodeGen over manual pbxproj edits"<br/>
+            &nbsp;&nbsp;· "Run xcodegen generate after adding new .swift files"<br/>
+            &nbsp;&nbsp;· "AtomicFileWriter pattern: temp → fsync → rename"<br/>
+            <strong>Loaded:</strong> first 200 lines or 25KB, appended after CLAUDE.md layers.
+          </div>
+        </div>
+
+        <!-- ── Section: Hooks ── -->
+        <div class="grid-section-title" onclick="this.classList.toggle('collapsed');this.nextElementSibling.style.display=this.classList.contains('collapsed')?'none':'contents'">
+          <span class="arrow">▼</span> Hooks <span style="font-weight:400;color:var(--text-faint);font-size:10px;margin-left:8px">2 events configured</span>
+        </div>
+        <div style="display:contents">
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">hooks.preToolUse</div><div class="k-type">handler[]</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">1 handler</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">command</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Event:</strong> <code>preToolUse</code> — fires before every tool call, <em>blocking</em><br/>
+            <strong>Handler:</strong> type <code>command</code><br/>
+            &nbsp;&nbsp;<code>command: "./scripts/check-tool.sh"</code><br/>
+            &nbsp;&nbsp;<code>timeout: 5000</code><br/>
+            <strong>Supports:</strong> context injection ✓ · prompt erasure ✗
+          </div>
+
+          <div class="grid-row" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="grid-key">
+              <div><div class="k-name">hooks.postToolUse</div><div class="k-type">handler[]</div></div>
+              <span class="expand-hint">▸ detail</span>
+            </div>
+            <div class="grid-cell"><span class="cell-empty">—</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">1 handler</span></div>
+            <div class="grid-cell"><span class="cell-val contributor" style="font-size:9px">1 handler</span></div>
+            <div class="grid-cell"><span class="cell-val winner" style="font-size:9px">2 handlers ⊕</span></div>
+          </div>
+          <div class="grid-detail">
+            <strong>Event:</strong> <code>postToolUse</code> — fires after every tool completes, <em>blocking</em><br/>
+            <strong>Handler 1</strong> <span style="color:var(--user)">← user</span>: type <code>http</code><br/>
+            &nbsp;&nbsp;<code>url: "https://logs.internal/hook"</code> (telemetry)<br/>
+            <strong>Handler 2</strong> <span style="color:var(--project)">← project</span>: type <code>command</code><br/>
+            &nbsp;&nbsp;<code>command: "./scripts/post-tool-log.sh"</code><br/>
+            <strong>Merge:</strong> <code>append</code> — both handlers run in sequence.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>Why this works for studying Claude</h3>
+    <div class="note-grid">
+      <div class="note-card">
+        <div class="nc-label">You see the actual values</div>
+        <div class="nc-desc">Not just "User defines model" but <code>claude-sonnet-4-6</code> with a strikethrough showing it lost to <code>claude-opus-4-6</code> from Project. Every cell shows real data.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Overlap is immediately visible</div>
+        <div class="nc-desc">When User and Project both set <code>reasoning: true</code>, both cells show the same blue "same" colour. When they diverge, the winner is green and the loser is struck through red.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Merge logic is exposed on expand</div>
+        <div class="nc-desc">Click any row to see the merge method (<code>selectHighestPrecedence</code>, <code>appendUnique</code>, <code>deepMergeObject</code>), the full resolution trace, and a plain-English explanation.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Sections map to your pipeline stages</div>
+        <div class="nc-desc">Model & Reasoning, Permissions, MCP, Instructions, Hooks — these are natural groupings that correspond to your existing 8-stage pipeline, but with content visible at every level.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CONCEPT B: LAYERED CONTENT CARDS
+     Each scope is a collapsible layer showing
+     its real contents, with scope chips on each
+     key showing who else defines it.
+     ══════════════════════════════════════ -->
+<div id="p-b" class="panel">
+  <div class="concept-intro">
+    <h2>B — Layered Content Cards: Scope-First with Cross-References</h2>
+    <p>Navigate by scope (Managed → User → Project), but each key shows chips for every scope that touches it — so you always see the full picture even when focused on one layer. The "wins/loses" annotations expose the resolution without leaving the scope view.</p>
+    <div class="key-idea">Like reading one person's config file, but with annotations showing where they agree, conflict, or get overridden by other scopes.</div>
+  </div>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span>Layered Content — Scope-First View</span>
+    </div>
+    <div class="mock-body">
+      <div class="sb">
+        <div class="lbl">Scopes</div>
+        <div class="it"><div class="sd" style="background:var(--managed)"></div> Managed</div>
+        <div class="it"><div class="sd" style="background:var(--user)"></div> User</div>
+        <div class="it act"><div class="sd" style="background:var(--project)"></div> Project</div>
+        <div class="it"><div class="sd" style="background:var(--project-local)"></div> Local</div>
+        <div class="lbl" style="margin-top:10px">Show</div>
+        <div class="it">All keys</div>
+        <div class="it">Conflicts</div>
+        <div class="it">Unique to scope</div>
+      </div>
+      <div class="main">
+        <div class="layers-container">
+
+          <!-- Layer: settings.json -->
+          <div class="content-layer expanded">
+            <div class="layer-header" style="background:var(--surface2)" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="spine" style="background:var(--project)"></div>
+              <div class="lh-title" style="color:var(--project)">.claude/settings.json</div>
+              <div class="lh-badge" style="background:rgba(77,204,109,0.1);color:var(--project);border:1px solid rgba(77,204,109,0.25)">Project</div>
+              <div class="lh-count">8 keys defined</div>
+              <div class="lh-arrow">▸</div>
+            </div>
+            <div class="layer-body" style="max-height:800px">
+              <div class="layer-content-grid">
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">⚙</span> model</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip loses" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User: sonnet-4-6</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: opus-4-6 ✓</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">→</span> claude-opus-4-6</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">⚙</span> defaultMode</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip loses" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User: default</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: acceptEdits ✓</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">→</span> acceptEdits</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">🔒</span> permissions.deny</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip" style="color:var(--managed);border-color:rgba(255,77,77,0.3);background:rgba(255,77,77,0.05)">Managed: rm -rf *</div>
+                    <div class="ci-scope-chip" style="color:var(--user);border-color:rgba(77,139,255,0.3);background:rgba(77,139,255,0.05)">User: sudo *</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: docker *</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">⊕</span> 3 rules merged</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">🔒</span> permissions.allow</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip" style="color:var(--user);border-color:rgba(77,139,255,0.3);background:rgba(77,139,255,0.05)">User: Read(**)</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: Bash(npm *)</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">⊕</span> 2 rules merged</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">🔌</span> mcpServers.postgres</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project only</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">→</span> stdio · pg-mcp</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">🔌</span> mcpServers.slack</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip loses" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User: personal</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: team-bot ✓</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">→</span> http · team-bot</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">⚡</span> hooks.preToolUse</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project only</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">→</span> check-tool.sh</div>
+                </div>
+
+                <div class="content-item">
+                  <div class="ci-name"><span style="color:var(--text-faint);font-size:8px;margin-right:2px">⚡</span> hooks.postToolUse</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip" style="color:var(--user);border-color:rgba(77,139,255,0.3);background:rgba(77,139,255,0.05)">User: http logger</div>
+                    <div class="ci-scope-chip wins" style="color:var(--project);border-color:var(--project);background:rgba(77,204,109,0.08)">Project: post-tool-log.sh</div>
+                  </div>
+                  <div class="ci-value"><span class="resolved-label">⊕</span> 2 handlers</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer: CLAUDE.md -->
+          <div class="content-layer expanded">
+            <div class="layer-header" style="background:var(--surface2)" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="spine" style="background:var(--project)"></div>
+              <div class="lh-title" style="color:var(--project)">CLAUDE.md</div>
+              <div class="lh-badge" style="background:rgba(77,204,109,0.1);color:var(--project);border:1px solid rgba(77,204,109,0.25)">Project</div>
+              <div class="lh-count">5 sections · 48 lines · 1.2K tokens</div>
+              <div class="lh-arrow">▸</div>
+            </div>
+            <div class="layer-body" style="max-height:800px">
+              <div class="layer-content-grid">
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;font-weight:600"># Claude Config Mgr</div>
+                  <div class="ci-scopes">
+                    <div class="ci-scope-chip" style="color:var(--project);border-color:rgba(77,204,109,0.3);background:rgba(77,204,109,0.05)">project only</div>
+                  </div>
+                  <div class="ci-value" style="color:var(--text-dim);font-family:-apple-system,sans-serif;font-size:10px">top-level heading</div>
+                </div>
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;font-weight:500;padding-left:12px">## Start here</div>
+                  <div class="ci-scopes"><span style="font-size:10px;color:var(--text-dim)">"Read AGENT_CONTEXT.md before doing anything"</span></div>
+                  <div class="ci-value"></div>
+                </div>
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;font-weight:500;padding-left:12px">## Build and test</div>
+                  <div class="ci-scopes"><span style="font-size:10px;color:var(--text-dim)">xcodebuild test -project ... -quiet</span></div>
+                  <div class="ci-value"></div>
+                </div>
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;font-weight:500;padding-left:12px">## Critical rules</div>
+                  <div class="ci-scopes">
+                    <span style="font-size:10px;color:var(--text-dim)">10 rules</span>
+                    <div class="ci-scope-chip" style="color:var(--user);border-color:rgba(77,139,255,0.3);background:rgba(77,139,255,0.05);font-size:8px">User also has ## Testing</div>
+                  </div>
+                  <div class="ci-value" style="color:var(--text-dim);font-family:-apple-system,sans-serif;font-size:9px">no conflict — different topics</div>
+                </div>
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;font-weight:500;padding-left:12px">## Communication style</div>
+                  <div class="ci-scopes"><span style="font-size:10px;color:var(--text-dim)">"Minimal output, no preamble"</span></div>
+                  <div class="ci-value"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer: MEMORY.md -->
+          <div class="content-layer">
+            <div class="layer-header" style="background:var(--surface2)" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="spine" style="background:var(--auto-memory)"></div>
+              <div class="lh-title" style="color:var(--auto-memory)">.claude/MEMORY.md</div>
+              <div class="lh-badge" style="background:rgba(109,109,255,0.1);color:var(--auto-memory);border:1px solid rgba(109,109,255,0.25)">Auto</div>
+              <div class="lh-count">8 lines · 180 tokens</div>
+              <div class="lh-arrow">▸</div>
+            </div>
+            <div class="layer-body">
+              <div class="layer-content-grid">
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;">Learned: XcodeGen</div>
+                  <div class="ci-scopes"><span style="font-size:10px;color:var(--text-dim)">"User prefers XcodeGen over manual pbxproj edits"</span></div>
+                </div>
+                <div class="content-item">
+                  <div class="ci-name" style="font-family:-apple-system,sans-serif;">Learned: Atomic writes</div>
+                  <div class="ci-scopes"><span style="font-size:10px;color:var(--text-dim)">"AtomicFileWriter pattern: temp → fsync → rename"</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>Why this works for studying Claude</h3>
+    <div class="note-grid">
+      <div class="note-card">
+        <div class="nc-label">Scope chips show the full picture inline</div>
+        <div class="nc-desc">Even when focused on the Project scope, you see that User also defines <code>model</code>, and that it loses. The chips are the cross-reference — they answer "who else touches this?" without leaving the current view.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">CLAUDE.md sections are visible as content</div>
+        <div class="nc-desc">Not just "48 lines" but the actual heading structure with a summary of each section. The "User also has ## Testing" chip on the Critical Rules section shows where topics overlap across scopes.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Merge semantics visible without clicking</div>
+        <div class="nc-desc">The ✓ on winning chips, strikethrough on losers, and ⊕ on merged arrays all communicate the resolution at a glance. The resolved column confirms the final value.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Matches your existing scope view architecture</div>
+        <div class="nc-desc">This is essentially your current scope view (Managed/User/Project sidebar) but with the content enriched to show cross-references and real values. Minimal architectural change needed.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CONCEPT C: FLOW STRIP WITH CONTENT
+     Vertical flow showing each phase with its
+     real content, sources side-by-side, then
+     the merge result.
+     ══════════════════════════════════════ -->
+<div id="p-c" class="panel">
+  <div class="concept-intro">
+    <h2>C — Flow Strip: Phase-by-Phase with Live Content</h2>
+    <p>Walk through the exchange phase by phase, top to bottom. Each phase shows the actual source cards side by side — you can read the real content, see the merge arrow, and see the resolved output. It tells the story of how config becomes behaviour.</p>
+    <div class="key-idea">Like a storyboard: each frame shows what happens at that phase, with the real data visible inside each card. Scroll down = move forward through the exchange.</div>
+  </div>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span>Flow Strip — Phase-by-Phase Content</span>
+    </div>
+    <div class="mock-body">
+      <div class="sb">
+        <div class="lbl">Phases</div>
+        <div class="it act">① Discovery</div>
+        <div class="it">② Settings</div>
+        <div class="it">③ Instructions</div>
+        <div class="it">④ Tools & MCP</div>
+        <div class="it">⑤ Permissions</div>
+        <div class="it">⑥ Assembly</div>
+        <div class="it">⑦ Agentic Loop</div>
+        <div class="lbl" style="margin-top:10px">Detail</div>
+        <div class="it">Summary</div>
+        <div class="it">Full content</div>
+      </div>
+      <div class="main">
+        <div class="flow-container">
+
+          <!-- Phase 1: Discovery -->
+          <div class="flow-phase">
+            <div class="flow-phase-header">
+              <div class="ph-num" style="color:var(--accent);border-color:var(--accent)">1</div>
+              <div class="ph-title">Discovery — Find all config files</div>
+              <div class="ph-summary">8 files across 2 active scopes</div>
+            </div>
+            <div class="flow-phase-body">
+              <div class="source-strip">
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--user)"></div>
+                    <div class="sc-title">~/.claude/</div>
+                    <div class="sc-scope" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key">settings.json</div><div class="sc-entry-status" style="background:rgba(77,204,109,0.1);color:var(--winner)">found</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">CLAUDE.md</div><div class="sc-entry-status" style="background:rgba(77,204,109,0.1);color:var(--winner)">found</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">claude.json</div><div class="sc-entry-status" style="background:rgba(77,204,109,0.1);color:var(--winner)">found</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">commands/</div><div class="sc-entry-status" style="background:rgba(68,56,48,0.5);color:var(--text-faint)">empty</div></div>
+                  </div>
+                </div>
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--project)"></div>
+                    <div class="sc-title">.claude/</div>
+                    <div class="sc-scope" style="color:var(--project);border-color:rgba(77,204,109,0.3)">Project</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key">settings.json</div><div class="sc-entry-status" style="background:rgba(77,204,109,0.1);color:var(--winner)">found</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">CLAUDE.md</div><div class="sc-entry-status" style="background:rgba(77,204,109,0.1);color:var(--winner)">found</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">MEMORY.md</div><div class="sc-entry-status" style="background:rgba(109,109,255,0.1);color:var(--auto-memory)">auto</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">settings.local.json</div><div class="sc-entry-status" style="background:rgba(68,56,48,0.5);color:var(--text-faint)">absent</div></div>
+                  </div>
+                </div>
+                <div class="source-card" style="opacity:0.35">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--managed)"></div>
+                    <div class="sc-title">Managed</div>
+                    <div class="sc-scope" style="color:var(--managed);border-color:rgba(255,77,77,0.3)">Managed</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key">managed-settings.json</div><div class="sc-entry-status" style="background:rgba(68,56,48,0.5);color:var(--text-faint)">n/a</div></div>
+                    <div class="sc-entry" style="padding:6px 0"><span style="font-size:9px;color:var(--text-faint);font-style:italic">No managed scope configured</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2: Settings Resolution -->
+          <div class="flow-phase">
+            <div class="flow-phase-header">
+              <div class="ph-num" style="color:var(--user);border-color:var(--user)">2</div>
+              <div class="ph-title">Settings — Parse & resolve settings.json</div>
+              <div class="ph-summary">1 conflict (model), 2 merged arrays</div>
+            </div>
+            <div class="flow-phase-body">
+              <div class="source-strip">
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--user)"></div>
+                    <div class="sc-title">User settings.json</div>
+                    <div class="sc-scope" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key">model</div><div class="sc-entry-val">claude-sonnet-4-6</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">defaultMode</div><div class="sc-entry-val">default</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">reasoning</div><div class="sc-entry-val">true</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">effortLevel</div><div class="sc-entry-val">high</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">permissions.deny</div><div class="sc-entry-val">[sudo *]</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">permissions.allow</div><div class="sc-entry-val">[Read(**)]</div></div>
+                  </div>
+                </div>
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--project)"></div>
+                    <div class="sc-title">Project settings.json</div>
+                    <div class="sc-scope" style="color:var(--project);border-color:rgba(77,204,109,0.3)">Project</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key">model</div><div class="sc-entry-val" style="color:var(--winner)">claude-opus-4-6</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">defaultMode</div><div class="sc-entry-val" style="color:var(--winner)">acceptEdits</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">reasoning</div><div class="sc-entry-val">true</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">permissions.deny</div><div class="sc-entry-val">[docker *]</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">permissions.allow</div><div class="sc-entry-val">[Bash(npm *)]</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">mcpServers.postgres</div><div class="sc-entry-val" style="color:var(--winner)">stdio</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key">mcpServers.slack</div><div class="sc-entry-val" style="color:var(--winner)">team-bot</div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="merge-strip">
+                <div class="merge-arrow">⟱ Resolve</div>
+                <div class="merge-method">selectHighestPrecedence + appendUnique + deepMerge</div>
+                <div class="resolved-output">
+                  <div class="resolved-chip">model: opus-4-6</div>
+                  <div class="resolved-chip">mode: acceptEdits</div>
+                  <div class="resolved-chip">deny: 2 rules</div>
+                  <div class="resolved-chip">allow: 2 rules</div>
+                  <div class="resolved-chip">mcp: 2 servers</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3: Instructions -->
+          <div class="flow-phase">
+            <div class="flow-phase-header">
+              <div class="ph-num" style="color:var(--project);border-color:var(--project)">3</div>
+              <div class="ph-title">Instructions — Layer CLAUDE.md files</div>
+              <div class="ph-summary">3 layers appended → ~1,720 tokens</div>
+            </div>
+            <div class="flow-phase-body">
+              <div class="source-strip">
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--user)"></div>
+                    <div class="sc-title">~/.claude/CLAUDE.md</div>
+                    <div class="sc-scope" style="color:var(--user);border-color:rgba(77,139,255,0.3)">User</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;font-weight:600"># My Defaults</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Code Style</div><div class="sc-entry-val">TS strict</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Git</div><div class="sc-entry-val">conventional</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Testing</div><div class="sc-entry-val">test before commit</div></div>
+                    <div class="sc-entry" style="border:none"><div class="sc-entry-key" style="color:var(--text-faint);font-style:italic">12 lines · 340 tokens</div></div>
+                  </div>
+                </div>
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--project)"></div>
+                    <div class="sc-title">./CLAUDE.md</div>
+                    <div class="sc-scope" style="color:var(--project);border-color:rgba(77,204,109,0.3)">Project</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;font-weight:600"># Claude Config Manager</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Start here</div><div class="sc-entry-val">read context</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Build and test</div><div class="sc-entry-val">xcodebuild…</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Critical rules</div><div class="sc-entry-val">10 rules</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif;padding-left:8px">## Communication</div><div class="sc-entry-val">minimal</div></div>
+                    <div class="sc-entry" style="border:none"><div class="sc-entry-key" style="color:var(--text-faint);font-style:italic">48 lines · 1,200 tokens</div></div>
+                  </div>
+                </div>
+                <div class="source-card">
+                  <div class="sc-header">
+                    <div class="sc-dot" style="background:var(--auto-memory)"></div>
+                    <div class="sc-title">.claude/MEMORY.md</div>
+                    <div class="sc-scope" style="color:var(--auto-memory);border-color:rgba(109,109,255,0.3)">Auto</div>
+                  </div>
+                  <div class="sc-body">
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif">🧠 XcodeGen preference</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif">🧠 xcodegen after new .swift</div></div>
+                    <div class="sc-entry"><div class="sc-entry-key" style="font-family:-apple-system,sans-serif">🧠 AtomicFileWriter pattern</div></div>
+                    <div class="sc-entry" style="border:none"><div class="sc-entry-key" style="color:var(--text-faint);font-style:italic">8 lines · 180 tokens</div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="merge-strip">
+                <div class="merge-arrow">⟱ Append in order</div>
+                <div class="merge-method">User CLAUDE.md → Project CLAUDE.md → MEMORY.md</div>
+                <div class="resolved-output">
+                  <div class="resolved-chip">Total: 1,720 tokens in system prompt</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 4: Prompt Assembly (summary) -->
+          <div class="flow-phase">
+            <div class="flow-phase-header" style="background:rgba(212,149,106,0.06)">
+              <div class="ph-num" style="color:var(--accent);border-color:var(--accent)">6</div>
+              <div class="ph-title" style="color:var(--accent)">Assembly — Build the API request</div>
+              <div class="ph-summary">4 segments → 200K context window</div>
+            </div>
+            <div class="flow-phase-body">
+              <div style="padding:16px;display:flex;gap:8px;flex-wrap:wrap">
+                <!-- Context budget bar -->
+                <div style="width:100%;height:36px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);overflow:hidden;display:flex;position:relative">
+                  <div style="width:1.25%;background:rgba(212,149,106,0.35);display:flex;align-items:center;justify-content:center" title="System prompt">
+                  </div>
+                  <div style="width:0.86%;background:rgba(77,139,255,0.25)" title="Instructions (CLAUDE.md)">
+                  </div>
+                  <div style="width:7.75%;background:rgba(77,204,109,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-dim)" title="Tool definitions">
+                    Tools
+                  </div>
+                  <div style="width:2%;background:rgba(255,159,67,0.2)" title="Conversation history">
+                  </div>
+                  <div style="flex:1;display:flex;align-items:center;padding-left:12px;font-size:9px;color:var(--text-faint)">
+                    Available: ~176K tokens
+                  </div>
+                  <div style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--accent)">Sys 2.5K</div>
+                  <div style="position:absolute;top:2px;left:calc(1.25% + 4px);font-size:8px;color:var(--user)">Instr 1.7K</div>
+                </div>
+                <div style="font-size:10px;color:var(--text-dim);padding:4px 0">
+                  System prompt (2,500 tok) + Instructions (1,720 tok) + Tool defs (15,500 tok) + History (4,000 tok) = <strong style="color:var(--accent)">23,720 tok used</strong> of 200K window
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>Why this works for studying Claude</h3>
+    <div class="note-grid">
+      <div class="note-card">
+        <div class="nc-label">Source cards show real file contents</div>
+        <div class="nc-desc">Each card shows the actual keys, headings, and values from that file. For CLAUDE.md you see the heading tree. For settings.json you see every key-value pair. Not labels — content.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Side-by-side comparison at every phase</div>
+        <div class="nc-desc">Sources sit next to each other horizontally so you can scan across and spot what's shared (same key, same value) vs. what diverges (same key, different value). Then the merge strip below shows the resolution.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">The story unfolds top-to-bottom</div>
+        <div class="nc-desc">Scroll = progress through the exchange. Discovery → Parse → Resolve → Assemble → Loop. Each phase builds on the previous. The context budget at the end shows how all the pieces fit into the 200K window.</div>
+      </div>
+      <div class="note-card">
+        <div class="nc-label">Expandable by design</div>
+        <div class="nc-desc">The summary shows key names and short values. Click to expand and see the full JSON, the complete CLAUDE.md text, or every tool a server provides. Three levels: glanceable → scannable → full content.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PRINCIPLES PANEL
+     ══════════════════════════════════════ -->
+<div id="p-compare" class="panel">
+  <div class="concept-intro">
+    <h2>Shared Principles Across All Three</h2>
+    <p>Regardless of which layout you choose, these principles should govern how content is shown.</p>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <h3>1. Three levels of detail everywhere</h3>
+    <p><strong>Glance:</strong> A chip or badge showing the key name, scope colour, and win/lose status. Visible without clicking anything.</p>
+    <p><strong>Scan:</strong> The actual value (or heading, or tool name) visible in the row/card. Enough to understand without expanding.</p>
+    <p><strong>Full:</strong> Click to expand and see the complete JSON, full CLAUDE.md text, all MCP tool names, the merge trace, and a plain-English explanation.</p>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <h3>2. Scope overlap is always annotated</h3>
+    <p>When two scopes define the same key, <em>both</em> must be visible regardless of which view you're in. This means:</p>
+    <p>In the <strong>Scope Grid</strong> (A): both cells are filled — winner is green, loser is struck-through red.</p>
+    <p>In the <strong>Layered Cards</strong> (B): scope chips on each key show every scope that touches it, even scopes not currently in focus.</p>
+    <p>In the <strong>Flow Strip</strong> (C): source cards sit side-by-side so you physically see the same key in two cards.</p>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <h3>3. Merge semantics are visible, not hidden</h3>
+    <p>Every resolved value should show <em>how</em> it was resolved:</p>
+    <p><code>selectHighestPrecedence</code> → one scope wins, others are struck through.</p>
+    <p><code>appendUnique</code> / <code>setUnion</code> → all contributors are shown with ⊕ icon, resolved shows the combined list.</p>
+    <p><code>deepMergeObject</code> → both contribute, but individual keys within the object may win or lose.</p>
+    <p>This makes the resolution logic learnable by observation.</p>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <h3>4. Content types get type-appropriate rendering</h3>
+    <p><strong>settings.json keys:</strong> Monospace key-value pairs with type badges (string, bool, string[]). Arrays expand inline.</p>
+    <p><strong>CLAUDE.md:</strong> Heading tree (# → ## → ###) with first-line summaries. Full markdown preview on expand.</p>
+    <p><strong>MCP servers:</strong> Server name + transport + tool count at glance level. Full tool catalog on expand.</p>
+    <p><strong>Hooks:</strong> Event type + handler type at glance. Full command/URL/timeout on expand.</p>
+    <p><strong>Permissions:</strong> Pattern + scope at glance. Evaluation order + wildcard explanation on expand.</p>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <h3>5. The context budget is the frame</h3>
+    <p>Every piece of content should show its token cost. This transforms the abstract "200K context window" into something tangible — you can see that your 48-line CLAUDE.md costs 1,200 tokens, and the 12 built-in tools cost 15,500. The budget bar appears in every view as a constant reminder that this is a finite resource being allocated.</p>
+  </div>
+
+  <div class="note">
+    <h3>Which concept to pick?</h3>
+    <p><strong>A (Scope Grid)</strong> is best if the primary question is "for this specific key, what does each scope say?" It's the most information-dense and the most natural for comparing settings side-by-side.</p>
+    <p><strong>B (Layered Cards)</strong> is best if users navigate scope-first ("show me what my project defines") and want cross-references as annotations. It's closest to your existing UI and easiest to build.</p>
+    <p><strong>C (Flow Strip)</strong> is best if the primary question is "how does my config become Claude's behaviour?" — it tells the story from files-on-disk to API request. Best for learning.</p>
+    <p>My recommendation: use <strong>B as the scope-detail view</strong> (it enhances what you already have) and <strong>C as the pipeline view</strong> (it replaces the current "Your Files / The Rules / What Claude Sees" cards with actual content). A could be a "comparison mode" toggle on the resolved-config view.</p>
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('p-' + id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

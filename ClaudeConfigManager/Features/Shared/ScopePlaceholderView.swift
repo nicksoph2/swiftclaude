@@ -81,10 +81,12 @@ struct ScopePlaceholderView: View {
     }
 
     private func pushDebugState() {
-        debugMonitor.recordDetail(
-            title: destination.title,
-            subtitle: destination.subtitle,
-            debugNotes: debugNotes
-        )
+        Task { @MainActor in
+            debugMonitor.recordDetail(
+                title: destination.title,
+                subtitle: destination.subtitle,
+                debugNotes: debugNotes
+            )
+        }
     }
 }

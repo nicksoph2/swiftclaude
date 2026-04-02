@@ -4,7 +4,8 @@
 > **Read this file first.** It is a complete, self-contained briefing.
 > All older design and handoff documents are archived in `Documents/Original Build Documents/`.
 > Packet implementation specs are in `Documents/packets/`.
-> Last updated: April 2, 2026.
+> Next-agent handoff for session capture and what-if: `Documents/NEXT-AGENT-HANDOFF.md`.
+> Last updated: 3 April 2026.
 
 ---
 
@@ -122,6 +123,15 @@ ClaudeConfigManager/                    ← All Swift source
 │   ├── WhatIf/                         ← WhatIfInspectorView, SettingsChangeImpactView
 │   ├── Issues/                         ← IssuesView
 │   ├── Help/                           ← HelpSearchView
+│   ├── ConfigGrid/                     ← Config Grid view (function-grouped settings × scope columns)
+│   │   ├── ConfigGridView.swift
+│   │   ├── ConfigGridViewModel.swift
+│   │   └── FunctionalGroupDefinitions.swift
+│   ├── FlowStrip/                      ← Flow Strip + Session Timeline views
+│   │   ├── FlowStripView.swift         ← Phase-by-phase pipeline view
+│   │   ├── FlowStripViewModel.swift
+│   │   ├── SessionTimelineView.swift   ← Chronological exchange narrative (5 acts)
+│   │   └── SessionTimelineViewModel.swift
 │   ├── Onboarding/                     ← PipelineIntroAnimationView (first-launch animated intro)
 │   ├── Preferences/                    ← (folder exists, currently empty)
 │   └── Shared/                         ← Reusable components:
@@ -129,7 +139,8 @@ ClaudeConfigManager/                    ← All Swift source
 │                                          SettingEditorPopover, SettingsViewStyleToggle,
 │                                          SimplifiedScopePicker, ScopeContributionSummaryView,
 │                                          ScopePlaceholderView, ProjectSettingsEditorSheet,
-│                                          UserSettingsEditorSheet
+│                                          UserSettingsEditorSheet,
+│                                          ScopeChipView, ValueCellView, OriginBreadcrumbView
 │
 └── Infrastructure/
     ├── Pipeline/ConfigurationPipeline.swift  ← ✅ Full 5-phase impl (sole pipeline file)
@@ -251,6 +262,11 @@ Pipeline phases (in `Infrastructure/Pipeline/ConfigurationPipeline.swift`):
 - First-launch animated pipeline intro (PipelineIntroAnimationView)
 - Diagram view work underway (DiagramLayout, DiagramEdgeFlow, PipelineZoomedView, PipelineSimplifiedView)
 
+- Config Grid (⌘6) — function-grouped settings table with scope columns, override visibility
+- Flow Strip (⌘7) — phase-by-phase view of pipeline with source cards, merge strips, budget bar
+- Session Timeline (⌘8) — chronological 5-act narrative of a Claude exchange
+- Shared components: ScopeChipView, ValueCellView, OriginBreadcrumbView
+
 **Known gaps:**
 - `TreePipelineOverviewStrip` is a basic placeholder — target for replacement by the
   Unified Interactive Diagram (see §9 below)
@@ -259,6 +275,8 @@ Pipeline phases (in `Infrastructure/Pipeline/ConfigurationPipeline.swift`):
 - Accessibility pass incomplete on some popover sizing at <500pt window width
 - `Features/Preferences/` folder exists but is empty — no preferences UI yet
 - Live Claude session binding (UI exists, backend stub only)
+- Session capture/replay not yet implemented (see `Documents/NEXT-AGENT-HANDOFF.md`)
+- What-If simulator views exist but may be stubs (see `Documents/NEXT-AGENT-HANDOFF.md`)
 
 ---
 
@@ -291,6 +309,8 @@ Spec: `Documents/packets/11-diagram-static-layout.md` through `15-resolution-tra
 ```
 Documents/
 ├── AGENT_CONTEXT.md                  ← This file — read first
+├── NEXT-AGENT-HANDOFF.md             ← Session capture & what-if handoff for next agent
+├── UI-REDESIGN-SPEC.md               ← Spec for Config Grid, Flow Strip, Session Timeline
 ├── packets/                          ← Per-feature implementation specs (01–32)
 │   └── NN-<name>.md                  ← Read the relevant packet before implementing
 ├── Screenshots/                      ← App screenshots (dashboard, pipeline, etc.)

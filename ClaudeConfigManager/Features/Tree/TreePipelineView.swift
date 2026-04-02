@@ -101,7 +101,7 @@ struct TreePipelineView: View {
             }
         }
         .onAppear {
-            viewModel.bind(to: pipeline)
+            Task { @MainActor in viewModel.bind(to: pipeline) }
         }
         // Escape key returns to overview when a stage is zoomed
         .onKeyPress(.escape) {

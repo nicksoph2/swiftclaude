@@ -101,6 +101,15 @@ struct RootSplitView: View {
         .keyboardShortcut(for: .pipelineView) {
             router.sidebarState.selection = .tree
         }
+        .keyboardShortcut(for: .configGrid) {
+            router.sidebarState.selection = .configGrid
+        }
+        .keyboardShortcut(for: .flowStrip) {
+            router.sidebarState.selection = .flowStrip
+        }
+        .keyboardShortcut(for: .sessionTimeline) {
+            router.sidebarState.selection = .sessionTimeline
+        }
         .onReceive(NotificationCenter.default.publisher(for: .showPipelineIntro)) { _ in
             showIntroAnimation = true
         }
@@ -161,6 +170,15 @@ struct RootSplitView: View {
                 aggregator: router.usageAggregatorForAnalytics,
                 scanner: router.transcriptScannerForAnalytics
             )
+        case .configGrid:
+            ConfigGridView()
+                .environmentObject(router.pipeline)
+        case .flowStrip:
+            FlowStripView()
+                .environmentObject(router.pipeline)
+        case .sessionTimeline:
+            SessionTimelineView()
+                .environmentObject(router.pipeline)
         }
     }
 
@@ -194,8 +212,22 @@ struct ScopeStackSidebar: View {
         .managed, .user, .project, .projectLocal, .session, .cli
     ]
 
+    /// Deferred binding that delays the `objectWillChange` publish to the next
+    /// run-loop tick, preventing "Publishing changes from within view updates"
+    /// warnings triggered by NavigationSplitView + List(selection:).
+    private var deferredSelection: Binding<SidebarDestination?> {
+        Binding(
+            get: { router.sidebarState.selection },
+            set: { newValue in
+                Task { @MainActor in
+                    router.sidebarState.selection = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
-        List(selection: $router.sidebarState.selection) {
+        List(selection: deferredSelection) {
             // Dashboard (top, not part of scope stack)
             Label(SidebarDestination.dashboard.title, systemImage: SidebarDestination.dashboard.systemImage)
                 .tag(SidebarDestination.dashboard)
@@ -242,17 +274,28 @@ struct ScopeStackSidebar: View {
 
                 Label(SidebarDestination.usageAnalytics.title, systemImage: SidebarDestination.usageAnalytics.systemImage)
                     .tag(SidebarDestination.usageAnalytics)
+
+                Label(SidebarDestination.configGrid.title, systemImage: SidebarDestination.configGrid.systemImage)
+                    .tag(SidebarDestination.configGrid)
+
+                Label(SidebarDestination.flowStrip.title, systemImage: SidebarDestination.flowStrip.systemImage)
+                    .tag(SidebarDestination.flowStrip)
+
+                Label(SidebarDestination.sessionTimeline.title, systemImage: SidebarDestination.sessionTimeline.systemImage)
+                    .tag(SidebarDestination.sessionTimeline)
             } header: {
                 Text("Views")
             }
         }
         .navigationTitle("Claude Config")
         .onAppear {
-            debugMonitor.registerSidebar(items: SidebarDestination.allCases)
-            debugMonitor.recordSelection(router.sidebarState.selection)
+            Task { @MainActor in
+                debugMonitor.registerSidebar(items: SidebarDestination.allCases)
+                debugMonitor.recordSelection(router.sidebarState.selection)
+            }
         }
         .onChange(of: router.sidebarState.selection) { _, newValue in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 debugMonitor.recordSelection(newValue)
             }
         }
@@ -384,6 +427,9 @@ enum GlobalShortcutAction {
     case permissions  // ⌘3
     case issues       // ⌘4
     case pipelineView // ⌘5
+    case configGrid   // ⌘6
+    case flowStrip        // ⌘7
+    case sessionTimeline  // ⌘8
 }
 
 extension View {
@@ -409,6 +455,9 @@ extension GlobalShortcutAction {
         case .permissions:   ("3", .command)
         case .issues:        ("4", .command)
         case .pipelineView:  ("5", .command)
+        case .configGrid:    ("6", .command)
+        case .flowStrip:        ("7", .command)
+        case .sessionTimeline:  ("8", .command)
         }
     }
 }

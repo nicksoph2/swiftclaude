@@ -14,6 +14,9 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
     case issues
     case transcripts
     case usageAnalytics
+    case configGrid
+    case flowStrip
+    case sessionTimeline
 
     var id: String { rawValue }
 
@@ -45,6 +48,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
             "Transcripts"
         case .usageAnalytics:
             "Usage Analytics"
+        case .configGrid:
+            "Config Grid"
+        case .flowStrip:
+            "Flow Strip"
+        case .sessionTimeline:
+            "Session Timeline"
         }
     }
 
@@ -76,6 +85,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
             "Browse and search session transcripts"
         case .usageAnalytics:
             "Token usage, costs, and trends across sessions"
+        case .configGrid:
+            "Every setting by function, with scope columns and override visibility"
+        case .flowStrip:
+            "Phase-by-phase view of how config becomes Claude's behaviour"
+        case .sessionTimeline:
+            "Chronological story of a Claude exchange from config to reply"
         }
     }
 
@@ -107,6 +122,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
             "text.bubble"
         case .usageAnalytics:
             "chart.line.uptrend.xyaxis"
+        case .configGrid:
+            "tablecells"
+        case .flowStrip:
+            "arrow.down.doc"
+        case .sessionTimeline:
+            "clock.arrow.2.circlepath"
         }
     }
 

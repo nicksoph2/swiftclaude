@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Config Manager — UI Concept Explorations</title>
+<style>
+  :root {
+    --bg: #1a1210;
+    --surface: #231c19;
+    --surface2: #2d2420;
+    --surface3: #382e28;
+    --border: #443830;
+    --text: #e8ddd5;
+    --text-dim: #9a8b80;
+    --text-faint: #6a5d55;
+
+    /* Scope colours matching ScopeColorScheme.swift */
+    --managed: #ff4d4d;
+    --user: #4d8bff;
+    --project: #4dcc6d;
+    --project-local: #4dd9c0;
+    --session: #ff9f43;
+    --cli: #a66dff;
+    --auto-memory: #6d6dff;
+    --synthetic: #888;
+
+    /* Functional */
+    --accent: #d4956a;
+    --accent2: #7ab5e0;
+    --accent3: #8fd4a0;
+    --glow: rgba(212, 149, 106, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  .concept-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .concept-nav h1 {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--text-dim);
+    margin-right: 32px; padding: 16px 0;
+    white-space: nowrap;
+  }
+  .concept-nav button {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 14px; font-weight: 500; padding: 16px 20px;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .concept-nav button:hover { color: var(--text); }
+  .concept-nav button.active {
+    color: var(--accent); border-bottom-color: var(--accent);
+  }
+
+  /* ── PANELS ── */
+  .concept-panel { display: none; min-height: 100vh; }
+  .concept-panel.active { display: block; }
+
+  .concept-header {
+    padding: 48px 48px 32px;
+    max-width: 1100px;
+  }
+  .concept-header h2 {
+    font-size: 28px; font-weight: 700; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .concept-header .subtitle {
+    font-size: 15px; color: var(--text-dim); line-height: 1.6;
+    max-width: 700px;
+  }
+  .concept-header .metaphor {
+    margin-top: 16px; padding: 12px 16px;
+    background: var(--glow); border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px; color: var(--accent); font-style: italic;
+  }
+
+  /* ── SHARED MOCK FRAME ── */
+  .mock-frame {
+    margin: 0 48px 48px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    max-width: 1100px;
+  }
+  .mock-titlebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .mock-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .mock-dot.r { background: #ff5f57; }
+  .mock-dot.y { background: #febc2e; }
+  .mock-dot.g { background: #28c840; }
+  .mock-titlebar span {
+    font-size: 12px; color: var(--text-dim); margin-left: 8px;
+  }
+
+  .mock-body {
+    display: flex; min-height: 560px;
+  }
+
+  /* ── SIDEBAR (shared) ── */
+  .mock-sidebar {
+    width: 180px; min-width: 180px;
+    background: var(--surface2);
+    border-right: 1px solid var(--border);
+    padding: 12px 0;
+    font-size: 12px;
+  }
+  .mock-sidebar .section-label {
+    padding: 8px 14px 4px; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-faint); font-weight: 600;
+  }
+  .mock-sidebar .item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; cursor: pointer; transition: background 0.15s;
+  }
+  .mock-sidebar .item:hover { background: var(--surface3); }
+  .mock-sidebar .item.active { background: var(--accent); color: #000; border-radius: 0; }
+  .mock-sidebar .scope-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .mock-main { flex: 1; padding: 0; overflow: hidden; position: relative; }
+
+  /* ══════════════════════════════════════════
+     CONCEPT A: RIVER DELTA — CONVERGING STREAMS
+     ══════════════════════════════════════════ */
+
+  .river-canvas {
+    width: 100%; height: 560px; position: relative;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(77,139,255,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, rgba(255,159,67,0.04) 0%, transparent 50%),
+      var(--bg);
+    overflow: hidden;
+  }
+
+  /* Stream lanes */
+  .stream {
+    position: absolute; display: flex; align-items: center;
+  }
+  .stream-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+    font-weight: 700; writing-mode: vertical-rl; text-orientation: mixed;
+    transform: rotate(180deg);
+    padding: 8px 4px; white-space: nowrap;
+  }
+  .stream-track {
+    height: 2px; position: relative;
+  }
+  .stream-node {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 500;
+    border: 1px solid; white-space: nowrap; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .stream-node:hover {
+    transform: translateY(-50%) scale(1.08);
+    box-shadow: 0 0 20px rgba(255,255,255,0.05);
+  }
+
+  /* Convergence zone */
+  .convergence {
+    position: absolute;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    border: 2px solid var(--accent);
+    background: radial-gradient(circle, rgba(212,149,106,0.12) 0%, transparent 70%);
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 30px rgba(212,149,106,0.1); }
+    50% { box-shadow: 0 0 60px rgba(212,149,106,0.2); }
+  }
+  .convergence .label { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .convergence .sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Flow arrows (SVG) */
+  .flow-svg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .flow-line {
+    fill: none; stroke-width: 1.5; opacity: 0.4;
+  }
+  .flow-particle {
+    r: 3; opacity: 0.8;
+  }
+
+  /* Agentic loop zone */
+  .loop-zone {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    width: 200px; height: 240px;
+    border: 1.5px dashed var(--session);
+    border-radius: 16px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    background: rgba(255,159,67,0.03);
+  }
+  .loop-zone .title {
+    font-size: 11px; font-weight: 700; color: var(--session);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .loop-step {
+    font-size: 10px; color: var(--text-dim);
+    padding: 4px 10px; background: var(--surface2);
+    border-radius: 6px; border: 1px solid var(--border);
+    width: 140px; text-align: center;
+  }
+  .loop-arrow {
+    font-size: 14px; color: var(--session); opacity: 0.5;
+  }
+  .loop-return {
+    position: absolute; right: -8px; top: 30%; bottom: 30%;
+    width: 16px;
+    border: 1.5px solid var(--session);
+    border-left: none;
+    border-radius: 0 20px 20px 0;
+    opacity: 0.3;
+  }
+  .loop-return::after {
+    content: '▲'; position: absolute; top: -8px; left: -5px;
+    font-size: 8px; color: var(--session); opacity: 0.8;
+  }
+
+  /* ══════════════════════════════════════════
+     CONCEPT B: CROSS-SECTION — LAYERED ANATOMY
+     ══════════════════════════════════════════ */
+
+  .anatomy-canvas {
+    width: 100%; height: 560px; position: relative;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .anatomy-layer {
+    flex: 1; display: flex; align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    position: relative; cursor: pointer;
+    transition: all 0.3s;
+    overflow: hidden;
+  }
+  .anatomy-layer:last-child { border-bottom: none; }
+  .anatomy-layer:hover { flex: 2; }
+  .anatomy-layer:hover .layer-detail { opacity: 1; max-height: 200px; }
+
+  .layer-spine {
+    width: 4px; flex-shrink: 0;
+  }
+  .layer-gutter {
+    width: 120px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+  .layer-gutter .depth {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    font-weight: 700; opacity: 0.5;
+  }
+  .layer-gutter .name {
+    font-size: 13px; font-weight: 600; margin-top: 2px;
+  }
+
+  .layer-content {
+    flex: 1; display: flex; align-items: center;
+    padding: 12px 20px; gap: 12px;
+    overflow-x: auto;
+  }
+
+  .layer-card {
+    padding: 8px 14px; border-radius: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-size: 11px; white-space: nowrap;
+    flex-shrink: 0; transition: all 0.2s;
+    cursor: pointer; position: relative;
+  }
+  .layer-card:hover {
+    background: var(--surface3);
+    transform: translateY(-2px);
+  }
+  .layer-card .card-label { font-weight: 600; }
+  .layer-card .card-sub { color: var(--text-dim); font-size: 10px; margin-top: 2px; }
+
+  .layer-detail {
+    opacity: 0; max-height: 0; overflow: hidden;
+    transition: all 0.3s;
+    padding: 0 20px;
+    font-size: 11px; color: var(--text-dim);
+  }
+
+  /* Precedence arrows between layers */
+  .precedence-indicator {
+    position: absolute; left: 62px; top: -8px;
+    font-size: 8px; color: var(--text-faint);
+    background: var(--bg); padding: 0 4px;
+    z-index: 2;
+  }
+
+  /* The depth meter on the right */
+  .depth-meter {
+    position: absolute; right: 16px; top: 16px; bottom: 16px;
+    width: 40px; display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+  }
+  .depth-meter .dm-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-faint); writing-mode: vertical-rl;
+  }
+  .depth-meter .dm-track {
+    width: 2px; flex: 1; margin: 8px 0;
+    background: linear-gradient(to bottom, var(--managed), var(--user), var(--project), var(--session), var(--accent));
+    border-radius: 1px; opacity: 0.3;
+  }
+
+  /* ══════════════════════════════════════════
+     CONCEPT C: TIMELINE SWIMLANES
+     ══════════════════════════════════════════ */
+
+  .timeline-canvas {
+    width: 100%; height: 560px;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  /* Time axis */
+  .time-axis {
+    height: 32px; display: flex; align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-left: 120px;
+    background: var(--surface2);
+  }
+  .time-phase {
+    flex: 1; text-align: center;
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.8px; font-weight: 600;
+    padding: 8px 0;
+    border-right: 1px solid var(--border);
+  }
+  .time-phase:last-child { border-right: none; }
+
+  .swimlane-area {
+    flex: 1; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .swimlane {
+    flex: 1; display: flex; align-items: stretch;
+    border-bottom: 1px solid rgba(68,56,48,0.5);
+    min-height: 0;
+  }
+  .swimlane:last-child { border-bottom: none; }
+
+  .swim-label {
+    width: 120px; flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 0 12px;
+    background: var(--surface2);
+    border-right: 1px solid var(--border);
+    font-size: 11px; font-weight: 600;
+  }
+  .swim-label .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 8px; flex-shrink: 0;
+  }
+
+  .swim-track {
+    flex: 1; display: flex; align-items: center;
+    padding: 4px 8px; gap: 4px;
+    position: relative;
+  }
+
+  .swim-event {
+    height: 28px; border-radius: 6px;
+    display: flex; align-items: center;
+    padding: 0 10px;
+    font-size: 10px; font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .swim-event:hover {
+    transform: scaleY(1.15);
+    z-index: 2;
+  }
+
+  /* Cross-lane arrows */
+  .cross-arrow {
+    position: absolute;
+    width: 2px;
+    background: var(--accent);
+    opacity: 0.3;
+    left: 50%;
+  }
+  .cross-arrow::after {
+    content: '▼'; position: absolute; bottom: -6px; left: -3px;
+    font-size: 6px; color: var(--accent);
+  }
+
+  /* Phase separators */
+  .phase-sep {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px; background: var(--border);
+    opacity: 0.3;
+  }
+
+  /* ══════════════════════════════════════════
+     CONCEPT D (BONUS): CIRCUIT BOARD
+     ══════════════════════════════════════════ */
+
+  .circuit-canvas {
+    width: 100%; height: 560px;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(68,56,48,0.15) 19px, rgba(68,56,48,0.15) 20px),
+      repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(68,56,48,0.15) 19px, rgba(68,56,48,0.15) 20px),
+      var(--bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .circuit-node {
+    position: absolute;
+    border-radius: 10px;
+    border: 1.5px solid;
+    padding: 10px 14px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 2;
+  }
+  .circuit-node:hover {
+    transform: scale(1.05);
+    z-index: 3;
+  }
+  .circuit-node .cn-icon {
+    font-size: 16px; margin-bottom: 4px;
+  }
+  .circuit-node .cn-label {
+    font-size: 11px; font-weight: 600;
+  }
+  .circuit-node .cn-detail {
+    font-size: 9px; color: var(--text-dim); margin-top: 2px;
+  }
+
+  .circuit-trace {
+    position: absolute; z-index: 1;
+  }
+  .circuit-trace line, .circuit-trace polyline {
+    fill: none; stroke-width: 2; opacity: 0.25;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .circuit-bus {
+    position: absolute;
+    height: 3px; border-radius: 1.5px;
+    opacity: 0.15;
+  }
+
+  .circuit-junction {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 2px solid;
+    background: var(--bg);
+    z-index: 2;
+  }
+
+  /* ── Annotations ── */
+  .annotation {
+    margin: 32px 48px; max-width: 1100px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .annotation h3 {
+    font-size: 14px; font-weight: 700; margin-bottom: 12px;
+    color: var(--accent);
+  }
+  .annotation p {
+    font-size: 13px; line-height: 1.7; color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .annotation p:last-child { margin-bottom: 0; }
+  .ann-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-top: 12px;
+  }
+  .ann-card {
+    padding: 12px 16px; background: var(--surface2);
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  .ann-card .label { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .ann-card .desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
+  /* ── Comparison table ── */
+  .compare-section {
+    margin: 48px 48px 64px;
+    max-width: 1100px;
+  }
+  .compare-section h2 {
+    font-size: 22px; font-weight: 700; margin-bottom: 24px;
+    color: var(--text);
+  }
+  .compare-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px;
+  }
+  .compare-table th {
+    text-align: left; padding: 12px 16px;
+    background: var(--surface2); color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .compare-table td {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    color: var(--text-dim); line-height: 1.5;
+  }
+  .compare-table tr:hover td { background: var(--surface); }
+  .compare-table .concept-name { color: var(--accent); font-weight: 600; }
+
+  /* Scope legend */
+  .scope-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 12px 20px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+  }
+  .scope-legend .leg-item {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .scope-legend .leg-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAVIGATION ── -->
+<nav class="concept-nav">
+  <h1>UI Concepts</h1>
+  <button class="active" onclick="showConcept('a')">A: River Delta</button>
+  <button onclick="showConcept('b')">B: Layered Anatomy</button>
+  <button onclick="showConcept('c')">C: Timeline Swimlanes</button>
+  <button onclick="showConcept('d')">D: Circuit Board</button>
+  <button onclick="showConcept('compare')">Compare</button>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     CONCEPT A: RIVER DELTA — CONVERGING STREAMS
+     ══════════════════════════════════════════ -->
+<div id="panel-a" class="concept-panel active">
+
+  <div class="concept-header">
+    <h2>A — River Delta: Converging Streams</h2>
+    <p class="subtitle">
+      Multiple configuration streams flow from their sources on the left and converge into a single assembled prompt at the centre.
+      From there the prompt enters the agentic loop on the right — a visible cycle of reasoning, tool use, and verification.
+    </p>
+    <div class="metaphor">
+      Metaphor: A river system. Tributaries (scopes) feed into a main channel (the assembled prompt), which enters rapids (the agentic loop).
+      You can trace any piece of configuration back upstream to its source.
+    </div>
+  </div>
+
+  <div class="mock-frame">
+    <div class="mock-titlebar">
+      <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+      <span>Claude Config Manager — River Delta View</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-sidebar">
+        <div class="section-label">Scope Stack</div>
+        <div class="item"><div class="scope-dot" style="background:var(--managed)"></div> Managed</div>
+        <div class="item"><div class="scope-dot" style="background:var(--user)"></div> User</div>
+        <div class="item"><div class="scope-dot" style="background:var(--project)"></div> Project</div>
+        <div class="item"><div class="scope-dot" style="background:var(--project-local)"></div> Project-Local</div>
+        <div class="item"><div class="scope-dot" style="background:var(--session)"></div> Session</div>
+        <div class="item"><div class="scope-dot" style="background:var(--cli)"></div> CLI</div>
+        <div class="section-label" style="margin-top:12px">Views</div>
+        <div class="item active">⟁ Flow Map</div>
+        <div class="item">⚙ Resolved</div>
+        <div class="item">⛨ Permissions</div>
+      </div>
+
+      <div class="mock-main">
+        <div class="river-canvas">
+          <!-- SVG flow lines -->
+          <svg class="flow-svg" viewBox="0 0 920 560" preserveAspectRatio="none">
+            <!-- Stream: Managed → Convergence -->
+            <path class="flow-line" style="stroke:var(--managed)" d="M 0,80 C 150,80 300,200 420,255" />
+            <!-- Stream: User Settings → Convergence -->
+            <path class="flow-line" style="stroke:var(--user)" d="M 0,160 C 180,160 300,220 420,265" />
+            <!-- Stream: CLAUDE.md Instructions → Convergence -->
+            <path class="flow-line" style="stroke:var(--project)" d="M 0,250 C 200,250 320,260 420,275" />
+            <!-- Stream: Tools & MCP → Convergence -->
+            <path class="flow-line" style="stroke:var(--project-local)" d="M 0,340 C 180,340 300,300 420,285" />
+            <!-- Stream: Memory → Convergence -->
+            <path class="flow-line" style="stroke:var(--auto-memory)" d="M 0,420 C 160,420 320,320 420,295" />
+            <!-- Stream: User Message → Convergence -->
+            <path class="flow-line" style="stroke:var(--session)" d="M 0,490 C 200,490 350,340 420,305" />
+
+            <!-- Convergence → Loop zone -->
+            <path class="flow-line" style="stroke:var(--accent); stroke-width:2.5; opacity:0.5" d="M 560,280 C 600,280 620,280 680,280" />
+
+            <!-- Animated particles -->
+            <circle class="flow-particle" style="fill:var(--managed)">
+              <animateMotion dur="4s" repeatCount="indefinite" path="M 0,80 C 150,80 300,200 420,255" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--user)">
+              <animateMotion dur="4.5s" repeatCount="indefinite" path="M 0,160 C 180,160 300,220 420,265" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--project)">
+              <animateMotion dur="3.8s" repeatCount="indefinite" path="M 0,250 C 200,250 320,260 420,275" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--project-local)">
+              <animateMotion dur="5s" repeatCount="indefinite" path="M 0,340 C 180,340 300,300 420,285" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--auto-memory)">
+              <animateMotion dur="4.2s" repeatCount="indefinite" path="M 0,420 C 160,420 320,320 420,295" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--session)">
+              <animateMotion dur="3.5s" repeatCount="indefinite" path="M 0,490 C 200,490 350,340 420,305" />
+            </circle>
+            <circle class="flow-particle" style="fill:var(--accent); r:4">
+              <animateMotion dur="2s" repeatCount="indefinite" path="M 560,280 C 600,280 620,280 680,280" />
+            </circle>
+          </svg>
+
+          <!-- Source nodes (left edge) -->
+          <div class="stream-node" style="left:16px; top:65px; border-color:var(--managed); background:rgba(255,77,77,0.08); color:var(--managed)">
+            🔒 Managed Settings
+          </div>
+          <div class="stream-node" style="left:16px; top:145px; border-color:var(--user); background:rgba(77,139,255,0.08); color:var(--user)">
+            👤 User Settings
+          </div>
+          <div class="stream-node" style="left:16px; top:235px; border-color:var(--project); background:rgba(77,204,109,0.08); color:var(--project)">
+            📄 CLAUDE.md + Rules
+          </div>
+          <div class="stream-node" style="left:16px; top:325px; border-color:var(--project-local); background:rgba(77,217,192,0.08); color:var(--project-local)">
+            🔧 Tools & MCP
+          </div>
+          <div class="stream-node" style="left:16px; top:405px; border-color:var(--auto-memory); background:rgba(109,109,255,0.08); color:var(--auto-memory)">
+            🧠 Memory
+          </div>
+          <div class="stream-node" style="left:16px; top:475px; border-color:var(--session); background:rgba(255,159,67,0.08); color:var(--session)">
+            💬 User Prompt
+          </div>
+
+          <!-- Convergence point -->
+          <div class="convergence" style="left:420px; top:210px;">
+            <div class="label">Assembled</div>
+            <div class="label">Prompt</div>
+            <div class="sub" style="margin-top:8px; text-align:center">200K tokens<br/>context window</div>
+          </div>
+
+          <!-- Agentic loop zone -->
+          <div class="loop-zone">
+            <div class="title">Agentic Loop</div>
+            <div class="loop-step">🧠 Claude Reasons</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-step">🔧 Tool Call</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-step">🔒 Permission Check</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-step">⚡ Execute & Return</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-step">✅ Verify / Respond</div>
+            <div class="loop-return"></div>
+          </div>
+        </div>
+
+        <div class="scope-legend">
+          <div class="leg-item"><div class="leg-dot" style="background:var(--managed)"></div> Managed</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--user)"></div> User</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--project)"></div> Project</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--project-local)"></div> Project-Local</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--auto-memory)"></div> Auto-Memory</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--session)"></div> Session</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <h3>Design rationale</h3>
+    <p>The current pipeline view presents 8 stages as a flat sequence of boxes. But a Claude exchange isn't really a linear pipeline — it's a convergence of many independent streams that merge into one context, which then enters a cyclical process. This concept makes that convergence visible and tangible.</p>
+    <div class="ann-grid">
+      <div class="ann-card">
+        <div class="label">What it exposes</div>
+        <div class="desc">Every piece of data that enters the prompt — and where it came from. Clicking any source node shows what it contributed. Clicking the convergence shows the assembled context with each segment colour-coded by origin. The loop on the right shows the cyclical nature of tool use.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">Interaction model</div>
+        <div class="desc">Click a stream to highlight just that stream's path and what it contributes. Click the convergence to see the full assembled prompt with token counts. Click any loop step to see real tool calls, permission decisions, and hook events from the active session.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">What it teaches</div>
+        <div class="desc">That config from different scopes flows together and is resolved by precedence. That the user's message is just one of many inputs. That tool use is a cycle, not a one-shot. That everything is constrained by the 200K context window.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">SwiftUI feasibility</div>
+        <div class="desc">Canvas or Path-based drawing for the curves. GeometryReader for node positioning. TimelineView for particle animation. Each node is a standard SwiftUI view with .onTapGesture. The sidebar stays as-is.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CONCEPT B: CROSS-SECTION — LAYERED ANATOMY
+     ══════════════════════════════════════════ -->
+<div id="panel-b" class="concept-panel">
+
+  <div class="concept-header">
+    <h2>B — Layered Anatomy: Cross-Section View</h2>
+    <p class="subtitle">
+      The exchange is presented as horizontal strata — like a geological cross-section.
+      The top layer is the outermost shell (managed/enterprise config), and you drill down through
+      user → project → instructions → tools → the live agentic loop at the core.
+    </p>
+    <div class="metaphor">
+      Metaphor: An onion or the Earth's layers. Outer layers constrain inner ones. The deeper you go, the more dynamic and session-specific the behaviour. Hover to expand any layer and see its contents.
+    </div>
+  </div>
+
+  <div class="mock-frame">
+    <div class="mock-titlebar">
+      <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+      <span>Claude Config Manager — Layered Anatomy View</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-sidebar">
+        <div class="section-label">Depth</div>
+        <div class="item" style="color:var(--managed)">◆ Enterprise</div>
+        <div class="item" style="color:var(--user)">◆ User</div>
+        <div class="item" style="color:var(--project)">◆ Project</div>
+        <div class="item active">◆ All Layers</div>
+        <div class="section-label" style="margin-top:12px">Focus</div>
+        <div class="item">Settings</div>
+        <div class="item">Instructions</div>
+        <div class="item">Permissions</div>
+        <div class="item">Tools</div>
+        <div class="item">Hooks</div>
+      </div>
+
+      <div class="mock-main">
+        <div class="anatomy-canvas">
+
+          <!-- Layer 1: Managed/Enterprise -->
+          <div class="anatomy-layer" style="background: linear-gradient(90deg, rgba(255,77,77,0.06) 0%, transparent 40%)">
+            <div class="layer-spine" style="background:var(--managed)"></div>
+            <div class="layer-gutter">
+              <div class="depth" style="color:var(--managed)">Shell</div>
+              <div class="name" style="color:var(--managed)">Enterprise</div>
+            </div>
+            <div class="layer-content">
+              <div class="layer-card" style="border-color:var(--managed)">
+                <div class="card-label">managed-settings.json</div>
+                <div class="card-sub">Cannot be overridden ↓</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--managed)">
+                <div class="card-label">Denied tools</div>
+                <div class="card-sub">Enforced globally</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--managed)">
+                <div class="card-label">MCP allowlist</div>
+                <div class="card-sub">3 servers locked</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer 2: User -->
+          <div class="anatomy-layer" style="background: linear-gradient(90deg, rgba(77,139,255,0.06) 0%, transparent 40%)">
+            <div class="precedence-indicator">overrides ↑ · overridden by ↓</div>
+            <div class="layer-spine" style="background:var(--user)"></div>
+            <div class="layer-gutter">
+              <div class="depth" style="color:var(--user)">Global</div>
+              <div class="name" style="color:var(--user)">User</div>
+            </div>
+            <div class="layer-content">
+              <div class="layer-card" style="border-color:var(--user)">
+                <div class="card-label">~/.claude/settings.json</div>
+                <div class="card-sub">Permissions, env vars</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--user)">
+                <div class="card-label">~/.claude/CLAUDE.md</div>
+                <div class="card-sub">Global instructions</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--auto-memory)">
+                <div class="card-label">MEMORY.md</div>
+                <div class="card-sub">Auto-learned context</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer 3: Project -->
+          <div class="anatomy-layer" style="background: linear-gradient(90deg, rgba(77,204,109,0.06) 0%, transparent 40%)">
+            <div class="precedence-indicator">overrides ↑ · overridden by ↓</div>
+            <div class="layer-spine" style="background:var(--project)"></div>
+            <div class="layer-gutter">
+              <div class="depth" style="color:var(--project)">Repo</div>
+              <div class="name" style="color:var(--project)">Project</div>
+            </div>
+            <div class="layer-content">
+              <div class="layer-card" style="border-color:var(--project)">
+                <div class="card-label">.claude/settings.json</div>
+                <div class="card-sub">Shared team settings</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--project)">
+                <div class="card-label">CLAUDE.md</div>
+                <div class="card-sub">Project instructions</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--project)">
+                <div class="card-label">.claude/commands/</div>
+                <div class="card-sub">Custom slash commands</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--project-local)">
+                <div class="card-label">settings.local.json</div>
+                <div class="card-sub">Your personal overrides</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer 4: Prompt Assembly -->
+          <div class="anatomy-layer" style="background: linear-gradient(90deg, rgba(212,149,106,0.06) 0%, transparent 40%)">
+            <div class="layer-spine" style="background:var(--accent)"></div>
+            <div class="layer-gutter">
+              <div class="depth" style="color:var(--accent)">Build</div>
+              <div class="name" style="color:var(--accent)">Assembly</div>
+            </div>
+            <div class="layer-content">
+              <div class="layer-card" style="border-color:var(--accent)">
+                <div class="card-label">System Prompt</div>
+                <div class="card-sub">~2.5K tokens (cached)</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--accent)">
+                <div class="card-label">Tool Definitions</div>
+                <div class="card-sub">~14K tokens built-in</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--accent)">
+                <div class="card-label">MCP Tools</div>
+                <div class="card-sub">Deferred / lazy-loaded</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--accent)">
+                <div class="card-label">Conv. History</div>
+                <div class="card-sub">Compacted if needed</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--accent)">
+                <div class="card-label">Context Budget</div>
+                <div class="card-sub">200K shared window</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layer 5: Live Exchange (Core) -->
+          <div class="anatomy-layer" style="background: linear-gradient(90deg, rgba(255,159,67,0.08) 0%, transparent 40%)">
+            <div class="layer-spine" style="background:var(--session)"></div>
+            <div class="layer-gutter">
+              <div class="depth" style="color:var(--session)">Core</div>
+              <div class="name" style="color:var(--session)">Exchange</div>
+            </div>
+            <div class="layer-content">
+              <div class="layer-card" style="border-color:var(--session); background:rgba(255,159,67,0.08)">
+                <div class="card-label">→ User Message</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--session)">
+                <div class="card-label">🧠 Reasoning</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--session)">
+                <div class="card-label">🔧 Tool Calls</div>
+                <div class="card-sub">Bash, Read, Edit…</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--session)">
+                <div class="card-label">⟲ Loop (5–50×)</div>
+              </div>
+              <div class="layer-card" style="border-color:var(--session); background:rgba(255,159,67,0.08)">
+                <div class="card-label">← Response</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Depth meter -->
+          <div class="depth-meter">
+            <div class="dm-label">STATIC</div>
+            <div class="dm-track"></div>
+            <div class="dm-label">DYNAMIC</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <h3>Design rationale</h3>
+    <p>Your current app already has a "scope stack" in the sidebar, but it reads as a flat list. This concept makes the layering physically visible — outer layers constrain inner ones, and you can see at a glance how deep any piece of config sits. The hover-to-expand interaction lets you focus on one layer at a time without losing the big picture.</p>
+    <div class="ann-grid">
+      <div class="ann-card">
+        <div class="label">What it exposes</div>
+        <div class="desc">The precedence hierarchy as a spatial relationship: outer = more authority. The gradient from static (enterprise) to dynamic (live exchange) is visible as a literal depth axis. Each card shows what that layer contributes to the final prompt.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">Interaction model</div>
+        <div class="desc">Hover a layer to expand it and see detailed contents. Click a card to drill into its editor. The "overrides ↑ / overridden by ↓" labels between layers make the merge logic explicit. The depth meter on the right shows where you are on the static↔dynamic spectrum.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">What it teaches</div>
+        <div class="desc">That Claude's behaviour is shaped by concentric layers of configuration. That managed settings form an immutable shell. That the live exchange sits inside all these constraints. That overriding works inward — outer layers can block inner ones.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">SwiftUI feasibility</div>
+        <div class="desc">Simple VStack of expandable rows with .animation(). Each layer is a standard HStack of cards. The spine colour and gradient background use ScopeColorScheme. Hover detection via .onHover(). Very achievable with current SwiftUI.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CONCEPT C: TIMELINE SWIMLANES
+     ══════════════════════════════════════════ -->
+<div id="panel-c" class="concept-panel">
+
+  <div class="concept-header">
+    <h2>C — Timeline Swimlanes: Parallel Tracks</h2>
+    <p class="subtitle">
+      Time flows left to right. Horizontal swimlanes represent the different threads of an exchange:
+      config resolution, prompt assembly, the agentic loop, hooks, and context budget.
+      Cross-lane arrows show how data flows between threads.
+    </p>
+    <div class="metaphor">
+      Metaphor: A music score or sequence diagram. Each instrument (thread) plays its part on its own staff,
+      but they all synchronise vertically at key moments — the "beats" of the exchange.
+    </div>
+  </div>
+
+  <div class="mock-frame">
+    <div class="mock-titlebar">
+      <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+      <span>Claude Config Manager — Timeline Swimlanes View</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-sidebar">
+        <div class="section-label">Threads</div>
+        <div class="item active">All Threads</div>
+        <div class="item"><div class="scope-dot" style="background:var(--user)"></div> Config</div>
+        <div class="item"><div class="scope-dot" style="background:var(--accent)"></div> Prompt</div>
+        <div class="item"><div class="scope-dot" style="background:var(--session)"></div> Loop</div>
+        <div class="item"><div class="scope-dot" style="background:var(--cli)"></div> Hooks</div>
+        <div class="item"><div class="scope-dot" style="background:var(--project)"></div> Budget</div>
+        <div class="section-label" style="margin-top:12px">Session</div>
+        <div class="item">▶ Live</div>
+        <div class="item">⏮ Replay</div>
+      </div>
+
+      <div class="mock-main">
+        <div class="timeline-canvas">
+          <!-- Time axis -->
+          <div class="time-axis">
+            <div class="time-phase" style="flex:1.2; color:var(--user)">① Discovery & Parse</div>
+            <div class="time-phase" style="flex:1; color:var(--accent)">② Resolve & Assemble</div>
+            <div class="time-phase" style="flex:2.5; color:var(--session)">③ Agentic Loop (per turn)</div>
+            <div class="time-phase" style="flex:0.8; color:var(--accent3)">④ Output</div>
+          </div>
+
+          <div class="swimlane-area">
+            <!-- Swimlane: Config Resolution -->
+            <div class="swimlane">
+              <div class="swim-label"><div class="dot" style="background:var(--user)"></div>Config</div>
+              <div class="swim-track">
+                <div class="swim-event" style="background:rgba(255,77,77,0.15); color:var(--managed); border:1px solid rgba(255,77,77,0.3); width:60px">
+                  Managed
+                </div>
+                <div class="swim-event" style="background:rgba(77,139,255,0.15); color:var(--user); border:1px solid rgba(77,139,255,0.3); width:50px">
+                  User
+                </div>
+                <div class="swim-event" style="background:rgba(77,204,109,0.15); color:var(--project); border:1px solid rgba(77,204,109,0.3); width:65px">
+                  Project
+                </div>
+                <div class="swim-event" style="background:rgba(77,139,255,0.2); color:var(--accent2); border:1px solid rgba(77,139,255,0.3); width:80px; margin-left:20px">
+                  → Merge
+                </div>
+                <div style="flex:1"></div>
+              </div>
+            </div>
+
+            <!-- Swimlane: Prompt Assembly -->
+            <div class="swimlane">
+              <div class="swim-label"><div class="dot" style="background:var(--accent)"></div>Prompt</div>
+              <div class="swim-track">
+                <div style="width:195px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(212,149,106,0.15); color:var(--accent); border:1px solid rgba(212,149,106,0.3); width:55px">
+                  System
+                </div>
+                <div class="swim-event" style="background:rgba(212,149,106,0.12); color:var(--accent); border:1px solid rgba(212,149,106,0.25); width:60px">
+                  Tools
+                </div>
+                <div class="swim-event" style="background:rgba(212,149,106,0.12); color:var(--accent); border:1px solid rgba(212,149,106,0.25); width:55px">
+                  History
+                </div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.2); color:var(--session); border:1px solid rgba(255,159,67,0.3); width:50px">
+                  You →
+                </div>
+                <div style="flex:1"></div>
+              </div>
+            </div>
+
+            <!-- Swimlane: Agentic Loop -->
+            <div class="swimlane" style="flex:1.5">
+              <div class="swim-label"><div class="dot" style="background:var(--session)"></div>Loop</div>
+              <div class="swim-track">
+                <div style="width:415px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.15); color:var(--session); border:1px solid rgba(255,159,67,0.3); width:55px">
+                  Think
+                </div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.2); color:var(--session); border:1px solid rgba(255,159,67,0.4); width:75px">
+                  🔧 Bash
+                </div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.15); color:var(--session); border:1px solid rgba(255,159,67,0.3); width:55px">
+                  Think
+                </div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.2); color:var(--session); border:1px solid rgba(255,159,67,0.4); width:60px">
+                  🔧 Edit
+                </div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.15); color:var(--session); border:1px solid rgba(255,159,67,0.3); width:55px">
+                  Think
+                </div>
+                <div class="swim-event" style="background:rgba(143,212,160,0.2); color:var(--accent3); border:1px solid rgba(143,212,160,0.3); width:60px">
+                  ✓ Reply
+                </div>
+              </div>
+            </div>
+
+            <!-- Swimlane: Hooks -->
+            <div class="swimlane">
+              <div class="swim-label"><div class="dot" style="background:var(--cli)"></div>Hooks</div>
+              <div class="swim-track">
+                <div style="width:395px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.12); color:var(--cli); border:1px solid rgba(166,109,255,0.25); width:45px; font-size:9px">
+                  Pre
+                </div>
+                <div style="width:25px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.12); color:var(--cli); border:1px solid rgba(166,109,255,0.25); width:35px; font-size:9px">
+                  Pre
+                </div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.12); color:var(--cli); border:1px solid rgba(166,109,255,0.25); width:35px; font-size:9px">
+                  Post
+                </div>
+                <div style="width:25px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.12); color:var(--cli); border:1px solid rgba(166,109,255,0.25); width:35px; font-size:9px">
+                  Pre
+                </div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.12); color:var(--cli); border:1px solid rgba(166,109,255,0.25); width:35px; font-size:9px">
+                  Post
+                </div>
+                <div style="flex:1"></div>
+                <div class="swim-event" style="background:rgba(166,109,255,0.15); color:var(--cli); border:1px solid rgba(166,109,255,0.3); width:45px; font-size:9px">
+                  Post✓
+                </div>
+              </div>
+            </div>
+
+            <!-- Swimlane: Permissions -->
+            <div class="swimlane">
+              <div class="swim-label"><div class="dot" style="background:var(--managed)"></div>Perms</div>
+              <div class="swim-track">
+                <div style="width:460px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(77,204,109,0.15); color:var(--accent3); border:1px solid rgba(77,204,109,0.3); width:80px; font-size:9px">
+                  ✓ Bash allowed
+                </div>
+                <div style="width:55px; flex-shrink:0"></div>
+                <div class="swim-event" style="background:rgba(255,159,67,0.15); color:var(--session); border:1px solid rgba(255,159,67,0.3); width:70px; font-size:9px">
+                  ? Edit — ask
+                </div>
+                <div style="flex:1"></div>
+              </div>
+            </div>
+
+            <!-- Swimlane: Context Budget -->
+            <div class="swimlane">
+              <div class="swim-label"><div class="dot" style="background:var(--accent3)"></div>Budget</div>
+              <div class="swim-track">
+                <div style="width:195px; flex-shrink:0"></div>
+                <!-- Budget bar -->
+                <div style="flex:1; display:flex; align-items:center; padding-right:16px">
+                  <div style="height:20px; width:100%; background:var(--surface2); border-radius:10px; border:1px solid var(--border); overflow:hidden; position:relative">
+                    <div style="height:100%; width:12%; background:linear-gradient(90deg, rgba(212,149,106,0.3), rgba(212,149,106,0.2)); border-radius:10px 0 0 10px;"></div>
+                    <div style="height:100%; width:8%; background:linear-gradient(90deg, rgba(77,139,255,0.3), rgba(77,139,255,0.2)); position:absolute; top:0; left:12%"></div>
+                    <div style="height:100%; width:15%; background:linear-gradient(90deg, rgba(255,159,67,0.3), rgba(255,159,67,0.15)); position:absolute; top:0; left:20%"></div>
+                    <div style="position:absolute; right:8px; top:3px; font-size:9px; color:var(--text-dim)">35% of 200K used</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <h3>Design rationale</h3>
+    <p>This concept foregrounds time and concurrency. Rather than asking "what are the stages?", it asks "what happens when, and how do the threads interact?". It's particularly powerful for understanding the agentic loop — you can see each think→tool→result cycle as discrete events, with hooks and permissions firing at precise moments between them.</p>
+    <div class="ann-grid">
+      <div class="ann-card">
+        <div class="label">What it exposes</div>
+        <div class="desc">The temporal flow: what happens first, what happens in parallel, what blocks what. The hooks firing before and after each tool call. The permission gates. The context budget growing as tool results come back. Great for understanding the agentic loop as a real process.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">Interaction model</div>
+        <div class="desc">Horizontal scroll for long sessions. Click any event to see its payload. Toggle swimlanes on/off in the sidebar to focus on specific threads. "Replay" mode plays through a recorded session step-by-step. "Live" mode updates in real-time during an active session.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">What it teaches</div>
+        <div class="desc">The temporal ordering and dependencies. That hooks bracket every tool call. That permissions are checked per-call. That context grows over time and may trigger compaction. That a single user prompt can cause dozens of tool calls in a loop.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">SwiftUI feasibility</div>
+        <div class="desc">ScrollView(.horizontal) with VStack of lane rows. Events are coloured capsules. Phase headers are a sticky top bar. The budget lane uses a ProgressView or custom shape. Session replay requires transcript parsing (already built).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CONCEPT D (BONUS): CIRCUIT BOARD
+     ══════════════════════════════════════════ -->
+<div id="panel-d" class="concept-panel">
+
+  <div class="concept-header">
+    <h2>D — Circuit Board: Wired Components (Bonus)</h2>
+    <p class="subtitle">
+      Config sources, resolvers, and runtime components are shown as labelled chips on a circuit board,
+      connected by colour-coded traces. Data flows along the traces like current.
+      You can tap any chip to inspect its inputs and outputs.
+    </p>
+    <div class="metaphor">
+      Metaphor: A printed circuit board. Each configuration source and processing stage is a chip. Traces (wires)
+      show data flow. Power rails represent the scope hierarchy. Signal direction shows information flow.
+    </div>
+  </div>
+
+  <div class="mock-frame">
+    <div class="mock-titlebar">
+      <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+      <span>Claude Config Manager — Circuit Board View</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-sidebar">
+        <div class="section-label">Components</div>
+        <div class="item active">Full Board</div>
+        <div class="item">Sources</div>
+        <div class="item">Resolvers</div>
+        <div class="item">Runtime</div>
+        <div class="section-label" style="margin-top:12px">Traces</div>
+        <div class="item"><div class="scope-dot" style="background:var(--managed)"></div> Managed</div>
+        <div class="item"><div class="scope-dot" style="background:var(--user)"></div> User</div>
+        <div class="item"><div class="scope-dot" style="background:var(--project)"></div> Project</div>
+        <div class="item"><div class="scope-dot" style="background:var(--session)"></div> Session</div>
+      </div>
+
+      <div class="mock-main">
+        <div class="circuit-canvas">
+          <!-- Power rails (horizontal scope buses) -->
+          <div class="circuit-bus" style="top:60px; left:0; right:0; background:var(--managed)"></div>
+          <div class="circuit-bus" style="top:160px; left:0; right:0; background:var(--user)"></div>
+          <div class="circuit-bus" style="top:280px; left:0; right:0; background:var(--project)"></div>
+          <div class="circuit-bus" style="top:400px; left:0; right:0; background:var(--session)"></div>
+
+          <!-- SVG traces connecting components -->
+          <svg class="circuit-trace" style="left:0;top:0;width:100%;height:100%" viewBox="0 0 740 560">
+            <!-- Managed settings → Resolver -->
+            <polyline points="140,70 200,70 200,200 340,200" style="stroke:var(--managed)" />
+            <!-- User settings → Resolver -->
+            <polyline points="140,170 220,170 220,210 340,210" style="stroke:var(--user)" />
+            <!-- User CLAUDE.md → Instruction Resolver -->
+            <polyline points="140,190 240,190 240,300 340,300" style="stroke:var(--user)" />
+            <!-- Project settings → Resolver -->
+            <polyline points="140,290 260,290 260,220 340,220" style="stroke:var(--project)" />
+            <!-- Project CLAUDE.md → Instruction Resolver -->
+            <polyline points="140,310 280,310 280,310 340,310" style="stroke:var(--project)" />
+            <!-- MCP config → MCP Resolver -->
+            <polyline points="140,410 280,410 280,410 340,410" style="stroke:var(--session)" />
+
+            <!-- Settings Resolver → Prompt Builder -->
+            <polyline points="440,215 500,215 500,270 540,270" style="stroke:var(--accent); stroke-width:2.5; opacity:0.35" />
+            <!-- Instruction Resolver → Prompt Builder -->
+            <polyline points="440,305 500,305 500,285 540,285" style="stroke:var(--accent); stroke-width:2.5; opacity:0.35" />
+            <!-- MCP Resolver → Prompt Builder -->
+            <polyline points="440,415 500,415 500,300 540,300" style="stroke:var(--accent); stroke-width:2.5; opacity:0.35" />
+            <!-- Tool Defs → Prompt Builder -->
+            <polyline points="440,490 510,490 510,310 540,310" style="stroke:var(--accent); stroke-width:2.5; opacity:0.35" />
+
+            <!-- Prompt Builder → API -->
+            <polyline points="650,290 700,290" style="stroke:var(--accent); stroke-width:3; opacity:0.5" />
+
+            <!-- Animated pulse dots on key traces -->
+            <circle r="3" fill="var(--managed)" opacity="0.7">
+              <animateMotion dur="3s" repeatCount="indefinite" path="M 140,70 L 200,70 L 200,200 L 340,200" />
+            </circle>
+            <circle r="3" fill="var(--user)" opacity="0.7">
+              <animateMotion dur="3.5s" repeatCount="indefinite" path="M 140,170 L 220,170 L 220,210 L 340,210" />
+            </circle>
+            <circle r="3" fill="var(--project)" opacity="0.7">
+              <animateMotion dur="4s" repeatCount="indefinite" path="M 140,290 L 260,290 L 260,220 L 340,220" />
+            </circle>
+            <circle r="4" fill="var(--accent)" opacity="0.7">
+              <animateMotion dur="2s" repeatCount="indefinite" path="M 440,215 L 500,215 L 500,270 L 540,270" />
+            </circle>
+          </svg>
+
+          <!-- Junctions where traces cross bus rails -->
+          <div class="circuit-junction" style="left:197px; top:56px; border-color:var(--managed)"></div>
+          <div class="circuit-junction" style="left:217px; top:156px; border-color:var(--user)"></div>
+          <div class="circuit-junction" style="left:257px; top:276px; border-color:var(--project)"></div>
+
+          <!-- SOURCE CHIPS (left column) -->
+          <div class="circuit-node" style="left:20px; top:48px; border-color:var(--managed)">
+            <div class="cn-icon">🔒</div>
+            <div class="cn-label" style="color:var(--managed)">Managed</div>
+            <div class="cn-detail">settings.json</div>
+          </div>
+
+          <div class="circuit-node" style="left:20px; top:148px; border-color:var(--user)">
+            <div class="cn-icon">👤</div>
+            <div class="cn-label" style="color:var(--user)">User</div>
+            <div class="cn-detail">settings + CLAUDE.md</div>
+          </div>
+
+          <div class="circuit-node" style="left:20px; top:268px; border-color:var(--project)">
+            <div class="cn-icon">📁</div>
+            <div class="cn-label" style="color:var(--project)">Project</div>
+            <div class="cn-detail">settings + CLAUDE.md</div>
+          </div>
+
+          <div class="circuit-node" style="left:20px; top:388px; border-color:var(--session)">
+            <div class="cn-icon">🔌</div>
+            <div class="cn-label" style="color:var(--session)">MCP Servers</div>
+            <div class="cn-detail">3 configured</div>
+          </div>
+
+          <div class="circuit-node" style="left:20px; top:468px; border-color:var(--accent3)">
+            <div class="cn-icon">🔧</div>
+            <div class="cn-label" style="color:var(--accent3)">Built-in Tools</div>
+            <div class="cn-detail">14 core tools</div>
+          </div>
+
+          <!-- RESOLVER CHIPS (middle column) -->
+          <div class="circuit-node" style="left:340px; top:182px; border-color:var(--accent2); min-width:95px">
+            <div class="cn-label" style="color:var(--accent2)">⚙ Settings</div>
+            <div class="cn-label" style="color:var(--accent2)">Resolver</div>
+            <div class="cn-detail">Merge by precedence</div>
+          </div>
+
+          <div class="circuit-node" style="left:340px; top:282px; border-color:var(--accent2); min-width:95px">
+            <div class="cn-label" style="color:var(--accent2)">📋 Instruction</div>
+            <div class="cn-label" style="color:var(--accent2)">Resolver</div>
+            <div class="cn-detail">Layer & resolve @import</div>
+          </div>
+
+          <div class="circuit-node" style="left:340px; top:392px; border-color:var(--accent2); min-width:95px">
+            <div class="cn-label" style="color:var(--accent2)">🔌 MCP</div>
+            <div class="cn-label" style="color:var(--accent2)">Resolver</div>
+            <div class="cn-detail">Deferred tool search</div>
+          </div>
+
+          <div class="circuit-node" style="left:340px; top:472px; border-color:var(--accent2); min-width:95px">
+            <div class="cn-label" style="color:var(--accent2)">🔧 Tool</div>
+            <div class="cn-label" style="color:var(--accent2)">Definitions</div>
+            <div class="cn-detail">~14K tokens</div>
+          </div>
+
+          <!-- PROMPT BUILDER (right) -->
+          <div class="circuit-node" style="left:540px; top:240px; border-color:var(--accent); min-width:105px; min-height:100px; display:flex; flex-direction:column; align-items:center; justify-content:center">
+            <div class="cn-icon" style="font-size:22px">⚡</div>
+            <div class="cn-label" style="color:var(--accent); text-align:center">Prompt<br/>Builder</div>
+            <div class="cn-detail" style="text-align:center; margin-top:4px">Assemble<br/>200K context</div>
+          </div>
+
+          <!-- API output -->
+          <div class="circuit-node" style="left:690px; top:262px; border-color:var(--session); background:rgba(255,159,67,0.08); min-width:40px">
+            <div class="cn-icon" style="font-size:18px">→</div>
+            <div class="cn-label" style="color:var(--session)">API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <h3>Design rationale</h3>
+    <p>This concept is the most literal representation of the data flow architecture. It treats each config source and processing stage as a discrete component, connected by visible "traces" that carry data. The grid background and junction dots reinforce the circuit metaphor. It's particularly good for understanding the resolver stage — where multiple inputs merge into resolved outputs.</p>
+    <div class="ann-grid">
+      <div class="ann-card">
+        <div class="label">What it exposes</div>
+        <div class="desc">The exact data flow graph: which sources feed which resolvers, how resolvers feed the prompt builder. The bus rails show scope authority. Animated pulses show data movement. Clicking any chip shows its inputs and outputs.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">Interaction model</div>
+        <div class="desc">Click a chip to inspect its data. Hover a trace to highlight the full path from source to API. Toggle scope traces in the sidebar to isolate one scope's path. Zoom into resolver chips to see the merge waterfall. The grid snaps components to a clean layout.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">What it teaches</div>
+        <div class="desc">That the system is a directed graph of transformations. That multiple sources converge at resolver nodes. That the prompt builder is the final aggregation point. That the API call is the output of the entire circuit.</div>
+      </div>
+      <div class="ann-card">
+        <div class="label">SwiftUI feasibility</div>
+        <div class="desc">Canvas for the grid and traces. ZStack with positioned views for chips. Matches your existing DiagramLayout and DiagramEdgeFlow infrastructure closely. Animated dots via TimelineView. Most directly maps to your current pipeline architecture.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     COMPARISON TABLE
+     ══════════════════════════════════════════ -->
+<div id="panel-compare" class="concept-panel">
+  <div class="concept-header">
+    <h2>Side-by-Side Comparison</h2>
+    <p class="subtitle">How the four concepts compare across key dimensions relevant to your goals.</p>
+  </div>
+
+  <div class="compare-section">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th style="width:140px">Dimension</th>
+          <th>A: River Delta</th>
+          <th>B: Layered Anatomy</th>
+          <th>C: Timeline Swimlanes</th>
+          <th>D: Circuit Board</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Primary question it answers</strong></td>
+          <td>"Where does everything come from, and where does it go?"</td>
+          <td>"What constrains what?"</td>
+          <td>"What happens when?"</td>
+          <td>"How are the components wired together?"</td>
+        </tr>
+        <tr>
+          <td><strong>Best for learning about</strong></td>
+          <td>The convergence of config into a single prompt</td>
+          <td>Scope hierarchy and override precedence</td>
+          <td>The agentic loop and temporal dependencies</td>
+          <td>The resolver architecture and data transformations</td>
+        </tr>
+        <tr>
+          <td><strong>Exposes the "flow"</strong></td>
+          <td>★★★★★ — flow is the core metaphor</td>
+          <td>★★★ — vertical flow (depth), less horizontal</td>
+          <td>★★★★ — temporal flow, left to right</td>
+          <td>★★★★ — data flow along traces</td>
+        </tr>
+        <tr>
+          <td><strong>Exposes the "threads"</strong></td>
+          <td>★★★★ — each stream is a visible thread</td>
+          <td>★★★ — layers are implicit threads</td>
+          <td>★★★★★ — swimlanes ARE threads</td>
+          <td>★★★ — threads visible as trace groups</td>
+        </tr>
+        <tr>
+          <td><strong>Shows the agentic loop</strong></td>
+          <td>★★★ — loop box on the right</td>
+          <td>★★ — core layer only</td>
+          <td>★★★★★ — each iteration visible</td>
+          <td>★★ — API node only, no loop detail</td>
+        </tr>
+        <tr>
+          <td><strong>Shows scope precedence</strong></td>
+          <td>★★★ — implicit in stream ordering</td>
+          <td>★★★★★ — explicit layering</td>
+          <td>★★★ — in config swimlane</td>
+          <td>★★★★ — bus rails show hierarchy</td>
+        </tr>
+        <tr>
+          <td><strong>Visual appeal</strong></td>
+          <td>High — organic, animated particles</td>
+          <td>Medium-high — clean, architectural</td>
+          <td>Medium — functional, information-dense</td>
+          <td>High — distinctive, technical aesthetic</td>
+        </tr>
+        <tr>
+          <td><strong>SwiftUI complexity</strong></td>
+          <td>Medium — Canvas paths, animation</td>
+          <td>Low — standard VStack/HStack</td>
+          <td>Medium — ScrollView, layout math</td>
+          <td>Medium-high — matches your existing diagram infra</td>
+        </tr>
+        <tr>
+          <td><strong>Fits existing architecture</strong></td>
+          <td>Good — new view, reuses models</td>
+          <td>Very good — simplest to add</td>
+          <td>Good — needs transcript replay</td>
+          <td>Best — maps directly to your pipeline stages</td>
+        </tr>
+        <tr>
+          <td><strong>Recommendation</strong></td>
+          <td class="concept-name">Best "wow factor" — makes the convergence visceral</td>
+          <td class="concept-name">Best for newcomers — immediately readable</td>
+          <td class="concept-name">Best for power users — most information density</td>
+          <td class="concept-name">Best fit for your codebase — leverages existing infra</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="annotation" style="margin:32px 0">
+      <h3>My take</h3>
+      <p>These aren't mutually exclusive. The strongest approach would be to combine elements: use <strong>B (Layered Anatomy)</strong> as the default "overview" since it's the most immediately readable, then let users switch into <strong>A (River Delta)</strong> for the convergence view or <strong>C (Timeline Swimlanes)</strong> when exploring a live/recorded session. <strong>D (Circuit Board)</strong> maps most naturally onto your existing 8-stage pipeline and DiagramLayout infrastructure, so it could replace the current pipeline view with minimal architectural change.</p>
+      <p>The common thread across all four: your current UI shows configuration as static data panels. All four of these concepts instead show configuration as <em>something that flows</em> — from source to resolution to prompt to execution. That sense of movement is what will make the exchange logic legible.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function showConcept(id) {
+  document.querySelectorAll('.concept-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.concept-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>
