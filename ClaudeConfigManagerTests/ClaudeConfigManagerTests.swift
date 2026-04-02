@@ -5,7 +5,7 @@ final class ClaudeConfigManagerTests: XCTestCase {
     func testSidebarDestinationsExposeExpectedOrder() {
         XCTAssertEqual(
             SidebarDestination.allCases,
-            [.tree, .managed, .user, .project, .session, .issues]
+            [.dashboard, .managed, .user, .project, .projectLocal, .session, .cli, .resolvedConfig, .tree, .permissions, .issues, .transcripts, .usageAnalytics]
         )
     }
 

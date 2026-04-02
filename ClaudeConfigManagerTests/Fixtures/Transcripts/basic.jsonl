@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"What is the capital of France?"},"timestamp":"2026-03-15T10:00:00.000Z","sessionId":"test-session-001"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"The capital of France is Paris."}],"model":"claude-sonnet-4-6","usage":{"input_tokens":120,"output_tokens":25}},"timestamp":"2026-03-15T10:00:05.000Z","sessionId":"test-session-001"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01ABC","name":"Read","input":{"file_path":"/tmp/test.txt"}}],"model":"claude-sonnet-4-6","usage":{"input_tokens":200,"output_tokens":50},"stop_reason":"tool_use"},"timestamp":"2026-03-15T10:00:10.000Z","sessionId":"test-session-001"}
+{"type":"tool_result","tool_use_id":"toolu_01ABC","content":"Hello from test file"}

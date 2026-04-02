@@ -331,7 +331,7 @@ final class ConfigurationPipeline: ObservableObject {
                     parsedSkill: parseResult.value
                 )
 
-            case .managedClaudeMarkdown, .userClaudeMarkdown, .projectClaudeMarkdown, .projectClaudeDotMarkdown:
+            case .managedClaudeMarkdown, .managedRuleMarkdown, .userClaudeMarkdown, .projectClaudeMarkdown, .projectClaudeDotMarkdown:
                 let content = String(data: data, encoding: .utf8) ?? ""
                 let claudeMdParser = ClaudeMdParser()
                 let claudeMdResult = claudeMdParser.parse(data: data, sourceURL: file.url)
@@ -616,7 +616,7 @@ final class ConfigurationPipeline: ObservableObject {
             return .agent
         case .userSkillDefinition, .projectSkillDefinition:
             return .skill
-        case .managedClaudeMarkdown, .userClaudeMarkdown, .projectClaudeMarkdown, .projectClaudeDotMarkdown:
+        case .managedClaudeMarkdown, .managedRuleMarkdown, .userClaudeMarkdown, .projectClaudeMarkdown, .projectClaudeDotMarkdown:
             return .claudeMd
         case .managedMcpJSON, .projectMCPJSON:
             return .mcpJson

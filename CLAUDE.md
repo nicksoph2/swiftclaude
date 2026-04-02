@@ -76,10 +76,31 @@ When implementing a packet from `Documents/IMPLEMENTATION_PLAN_V2.md`:
    - Any issues encountered or open questions
    - Recommended next packet
 
+## Xcode Project Management (XcodeGen)
+
+This project uses **XcodeGen** with `ClaudeConfigManager/project.yml` as the single source of truth for the Xcode project structure. The generated `ClaudeConfigManager.xcodeproj` must never be edited by hand.
+
+**How it works:** The `project.yml` declares directory-based source groups (`App`, `Core`, `Features`, `Infrastructure`, `Resources` for the main target; `../ClaudeConfigManagerTests` for the test target). Any `.swift` file placed under those directories is automatically included when XcodeGen regenerates the project.
+
+**Adding new files — required workflow:**
+1. Create the `.swift` file in the correct directory under `ClaudeConfigManager/` (or `ClaudeConfigManagerTests/` for tests)
+2. After creating all new files, ask the user to run `xcodegen generate` from the `ClaudeConfigManager/` directory to regenerate the xcodeproj
+3. Do NOT skip step 2 — the project will fail to build until XcodeGen has run
+
+**Rules:**
+- NEVER edit `project.pbxproj` directly. It is a generated file. Any manual edits will be overwritten by XcodeGen and may corrupt the project in the meantime.
+- NEVER use `PBXFileReference`, `PBXBuildFile`, or any pbxproj-level manipulation to register files.
+- If you need to add a new top-level source group (rare), add it to the `sources:` list in `project.yml` instead.
+- If you need to add a new dependency, package, or build setting, add it to `project.yml`.
+- If a build fails with "Cannot find type X in scope" and the file exists on disk, the most likely cause is that XcodeGen has not been re-run. Ask the user to run `xcodegen generate` from `ClaudeConfigManager/`.
+
+**Type naming:** Every new type name must be unique across the entire module. Swift does not support two structs/classes/enums with the same name in the same module. Before creating a new type, grep the codebase for the proposed name and choose a different name if it already exists.
+
 ## Critical Rules
 
 - NEVER break existing tests. Run the full test suite after changes.
-- NEVER modify the Xcode project file structure manually — add files through the file system and let Xcode folder references pick them up.
+- NEVER edit `project.pbxproj` or any `.xcodeproj` contents directly — use `project.yml` and XcodeGen (see above).
+- NEVER run `xcodegen generate` yourself. When XcodeGen needs to be run, always stop and ask the user to run it. Do not attempt to invoke it via shell, bash, or any other means.
 - NEVER remove or rename existing public API without backward compatibility.
 - If you encounter a blocker requiring human input, write it to `Documents/<PACKET_ID>-BLOCKED.md` and stop working.
 - Keep each packet scoped — do not implement work belonging to other packets.

@@ -2,7 +2,7 @@ import XCTest
 @testable import ClaudeConfigManager
 
 final class SemanticValidatorTests: XCTestCase {
-    private let validator = SemanticValidator()
+    private let validator = SemanticProjectionValidator()
 
     // MARK: - Test: Deny Rule Shadows Allow Rule
 
@@ -42,6 +42,8 @@ final class SemanticValidatorTests: XCTestCase {
                     content: ResolvedValue(
                         effectiveValue: largeContent,
                         winningSource: source,
+                        trace: ResolutionTrace(participants: [source]),
+                        mergeMethod: .selectHighestPrecedence,
                         issues: [],
                         notes: []
                     )
@@ -111,16 +113,16 @@ final class SemanticValidatorTests: XCTestCase {
                 value: ResolvedValue(
                     effectiveValue: .object(permissions),
                     winningSource: source,
+                    trace: ResolutionTrace(participants: [source]),
+                    mergeMethod: .selectHighestPrecedence,
                     issues: [],
                     notes: []
-                ),
-                source: source
+                )
             ))
         }
 
         return ResolvedSettingsSnapshot(
             entries: entries,
-            precedenceTrace: [],
             issues: [],
             notes: []
         )
@@ -141,6 +143,8 @@ final class SemanticValidatorTests: XCTestCase {
             composedInstructions: ResolvedValue(
                 effectiveValue: "test",
                 winningSource: source,
+                trace: ResolutionTrace(participants: [source]),
+                mergeMethod: .selectHighestPrecedence,
                 issues: [],
                 notes: []
             ),

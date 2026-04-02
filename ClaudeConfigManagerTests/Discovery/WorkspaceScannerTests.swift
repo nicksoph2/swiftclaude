@@ -308,10 +308,19 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(managedWorkspace.scope.scopeKind, .managed)
         XCTAssertEqual(managedWorkspace.rootScope, .managedRoot)
         XCTAssertTrue(managedWorkspace.directories.contains { $0.kind == .managedSettingsRoot && $0.status == .present })
+
+        // Primary managed root files (from /Library/Application Support/ClaudeCode)
+        let primaryFiles = managedWorkspace.files.filter { $0.url.path.contains("ClaudeCode") }
         XCTAssertEqual(
-            managedWorkspace.files.map(\.kind),
+            primaryFiles.map(\.kind).sorted(by: { $0.rawValue < $1.rawValue }),
             [.managedClaudeMarkdown, .managedMcpJSON, .managedSettingsDropIn, .managedSettingsDropIn, .managedSettingsJSON]
         )
+
+        // /etc/claude-code files are also included (as missing, since mock has no entries for them)
+        let etcFiles = managedWorkspace.files.filter { $0.url.path.contains("/etc/claude-code") }
+        XCTAssertEqual(etcFiles.count, 2) // managed-settings.json + CLAUDE.md
+        XCTAssertTrue(etcFiles.allSatisfy { $0.status == .missing })
+
         XCTAssertTrue(managedWorkspace.files.allSatisfy { $0.scope.scopeKind == .managed })
 
         let userWorkspace = try XCTUnwrap(result.userWorkspace)
