@@ -333,6 +333,24 @@ struct PipelineDiagramView: View {
             selectedStage = status.stage
             onStageSelected?(status.stage)
         }
+        .accessibilityLabel(accessibilityLabel(for: status))
+        .accessibilityHint("Tap to expand")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private func accessibilityLabel(for status: PipelineStageStatus) -> String {
+        let healthLabel: String
+        switch status.health {
+        case .healthy:
+            healthLabel = "healthy"
+        case .warnings(let count):
+            healthLabel = "\(count) warning\(count == 1 ? "" : "s")"
+        case .errors(let count):
+            healthLabel = "\(count) error\(count == 1 ? "" : "s")"
+        case .noData:
+            healthLabel = "no data"
+        }
+        return "\(status.stage.title) stage, \(healthLabel), tap to expand"
     }
 
     // MARK: - Health Dot

@@ -20,6 +20,8 @@ struct TreeResolutionView: View {
     /// The resolved entry whose trace panel is currently shown.
     @State private var traceTarget: ResolvedSettingsEntry?
 
+    @State private var showSettingsChangeImpact: Bool = false
+
     /// Persisted expansion state for the sub-process lane diagram (Z5).
     @SceneStorage("resolutionSubProcessExpanded") private var subProcessExpanded: Bool = false
 
@@ -31,7 +33,20 @@ struct TreeResolutionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StageExplanationView(stage: .resolution)
+            HStack {
+                StageExplanationView(stage: .resolution)
+                Spacer()
+                Button {
+                    showSettingsChangeImpact = true
+                } label: {
+                    Label("Test a change", systemImage: "slider.horizontal.2.arrow.trianglehead.counterclockwise")
+                        .font(.caption)
+                }
+                .help("Preview the impact of a hypothetical settings change")
+            }
+            .sheet(isPresented: $showSettingsChangeImpact) {
+                SettingsChangeImpactView()
+            }
 
             if viewModel.entries.isEmpty {
                 noDataPlaceholder

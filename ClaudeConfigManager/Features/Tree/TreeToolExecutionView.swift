@@ -14,13 +14,28 @@ struct TreeToolExecutionView: View {
 
     @EnvironmentObject private var pipeline: ConfigurationPipeline
     @StateObject private var viewModel = TreeToolExecutionViewModel()
+    @State private var showWhatIfInspector: Bool = false
 
     /// Optional callback for cross-stage navigation.
     var onNavigate: ((TreeNavigationTarget) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StageExplanationView(stage: .toolExecution)
+            HStack {
+                StageExplanationView(stage: .toolExecution)
+                Spacer()
+                Button {
+                    showWhatIfInspector = true
+                } label: {
+                    Label("What If", systemImage: "questionmark.diamond")
+                        .font(.caption)
+                }
+                .help("Test a tool invocation")
+            }
+
+            if viewModel.isLiveSession, let toolName = viewModel.liveActiveToolName {
+                activeToolBanner(toolName: toolName)
+            }
 
             if viewModel.gates.isEmpty {
                 noDataPlaceholder
@@ -33,6 +48,47 @@ struct TreeToolExecutionView: View {
         .onAppear {
             viewModel.bind(to: pipeline)
         }
+        .sheet(isPresented: $showWhatIfInspector) {
+            WhatIfInspectorView()
+        }
+    }
+
+    // MARK: - Active Tool Banner
+
+    private func activeToolBanner(toolName: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+
+            Image(systemName: "hammer.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+
+            Text("Running: ")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            + Text(toolName)
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .foregroundStyle(.green)
+
+            Spacer()
+
+            Circle()
+                .fill(.green)
+                .frame(width: 8, height: 8)
+                .modifier(PulsingDotModifier())
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.green.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.green.opacity(0.3), lineWidth: 1)
+        )
+        .transition(.opacity.combined(with: .move(edge: .top)))
+        .animation(.easeInOut(duration: 0.3), value: toolName)
     }
 
     // MARK: - No Data

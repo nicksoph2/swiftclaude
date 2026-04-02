@@ -65,6 +65,10 @@ enum SyntaxIssueCode: String, Equatable, Sendable {
     case invalidEnumValue
     case scopeRestrictionViolated
     case mutuallyExclusiveKeys
+    case mcpCommandNotFound
+    case mcpCommandNotExecutable
+    case mcpInvalidUrl
+    case mcpMissingRequiredField
 }
 
 struct SyntaxIssue: Equatable, Identifiable, Sendable {

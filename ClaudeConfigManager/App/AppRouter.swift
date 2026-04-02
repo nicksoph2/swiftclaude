@@ -13,6 +13,15 @@ final class AppRouter: ObservableObject {
 
     @Published var sidebarState: SidebarState
 
+    /// Shared transcript scanner for the analytics dashboard sidebar destination.
+    lazy var transcriptScannerForAnalytics: TranscriptScanner = TranscriptScanner()
+
+    /// Shared usage aggregator for the analytics dashboard sidebar destination.
+    lazy var usageAggregatorForAnalytics: UsageAggregator = UsageAggregator(
+        transcriptScanner: transcriptScannerForAnalytics,
+        runtimeDiscovery: RuntimeSessionDiscovery()
+    )
+
     private let bookmarkStore: BookmarkStore?
     private let logger = Logger(subsystem: "com.nicholassophocleous.ClaudeConfigManager", category: "Bootstrap")
     private var pipelineObservationTask: Task<Void, Never>?
@@ -307,6 +316,56 @@ final class ProjectRegistry {
         try bookmarkStore?.removeBookmark(id: BookmarkStore.managedRootBookmarkID)
     }
 
+    func setUserClaudeJson(fileURL: URL, now: Date = Date()) throws {
+        guard let bookmarkStore else {
+            throw BookmarkError.failedToSaveMetadata
+        }
+
+        _ = try bookmarkStore.upsertBookmark(
+            id: BookmarkStore.userClaudeJsonBookmarkID,
+            kind: .userClaudeJson,
+            folderURL: fileURL,
+            displayName: ".claude.json",
+            now: now
+        )
+
+        var state = try globalStateStore.loadState()
+        state.userClaudeJsonBookmarkID = BookmarkStore.userClaudeJsonBookmarkID
+        try globalStateStore.saveState(state)
+    }
+
+    func clearUserClaudeJson() throws {
+        var state = try globalStateStore.loadState()
+        state.userClaudeJsonBookmarkID = nil
+        try globalStateStore.saveState(state)
+        try bookmarkStore?.removeBookmark(id: BookmarkStore.userClaudeJsonBookmarkID)
+    }
+
+    func setEtcClaudeCodeRoot(folderURL: URL, now: Date = Date()) throws {
+        guard let bookmarkStore else {
+            throw BookmarkError.failedToSaveMetadata
+        }
+
+        _ = try bookmarkStore.upsertBookmark(
+            id: BookmarkStore.etcClaudeCodeRootBookmarkID,
+            kind: .etcClaudeCodeRoot,
+            folderURL: folderURL,
+            displayName: "etc claude-code Root",
+            now: now
+        )
+
+        var state = try globalStateStore.loadState()
+        state.etcClaudeCodeRootBookmarkID = BookmarkStore.etcClaudeCodeRootBookmarkID
+        try globalStateStore.saveState(state)
+    }
+
+    func clearEtcClaudeCodeRoot() throws {
+        var state = try globalStateStore.loadState()
+        state.etcClaudeCodeRootBookmarkID = nil
+        try globalStateStore.saveState(state)
+        try bookmarkStore?.removeBookmark(id: BookmarkStore.etcClaudeCodeRootBookmarkID)
+    }
+
     static func normalizePath(_ path: String) -> String {
         let resolved = URL(fileURLWithPath: path)
             .standardizedFileURL
@@ -338,6 +397,8 @@ final class RootSelectionViewModel: ObservableObject {
     @Published private(set) var hasAuthorizedGlobalRoot: Bool
     @Published private(set) var hasCompletedInitialGlobalRootSetup: Bool
     @Published private(set) var hasAuthorizedManagedRoot: Bool
+    @Published private(set) var hasAuthorizedUserClaudeJson: Bool
+    @Published private(set) var hasAuthorizedEtcClaudeCodeRoot: Bool
     @Published private(set) var projectRegistrations: [ProjectRegistration]
     @Published var selectedProjectRegistrationID: String?
     @Published var issue: RootSelectionIssue?
@@ -366,6 +427,8 @@ final class RootSelectionViewModel: ObservableObject {
         self.hasAuthorizedGlobalRoot = false
         self.hasCompletedInitialGlobalRootSetup = false
         self.hasAuthorizedManagedRoot = false
+        self.hasAuthorizedUserClaudeJson = false
+        self.hasAuthorizedEtcClaudeCodeRoot = false
         self.projectRegistrations = []
         self.selectedProjectRegistrationID = nil
 
@@ -415,6 +478,14 @@ final class RootSelectionViewModel: ObservableObject {
 
             hasAuthorizedManagedRoot = allRecords.contains(where: {
                 $0.id == BookmarkStore.managedRootBookmarkID
+            })
+
+            hasAuthorizedUserClaudeJson = allRecords.contains(where: {
+                $0.id == BookmarkStore.userClaudeJsonBookmarkID
+            })
+
+            hasAuthorizedEtcClaudeCodeRoot = allRecords.contains(where: {
+                $0.id == BookmarkStore.etcClaudeCodeRootBookmarkID
             })
         } catch {
             issue = .persistenceFailure(area: .globalRoot, details: String(describing: error))
@@ -522,6 +593,69 @@ final class RootSelectionViewModel: ObservableObject {
             refreshFromStores()
         } catch {
             issue = .bookmarkFailure(area: .managedRoot, details: String(describing: error))
+        }
+    }
+
+    func authorizeUserClaudeJson() {
+        let candidate = folderSelector.selectFolder(
+            title: "Authorize .claude.json",
+            message: "Select the .claude.json file in your home directory to grant read access.",
+            prompt: "Grant Access",
+            initialDirectory: RealHomeDirectory.url,
+            showsHiddenFiles: true
+        )
+        guard let candidate else {
+            return
+        }
+
+        do {
+            try projectRegistry.setUserClaudeJson(fileURL: candidate)
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .userClaudeJson, details: String(describing: error))
+        }
+    }
+
+    func clearUserClaudeJsonSelection() {
+        do {
+            try projectRegistry.clearUserClaudeJson()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .userClaudeJson, details: String(describing: error))
+        }
+    }
+
+    func authorizeEtcClaudeCodeRoot() {
+        let etcURL = URL(fileURLWithPath: "/etc/", isDirectory: true)
+        let candidate = folderSelector.selectFolder(
+            title: "Authorize /etc/claude-code",
+            message: "Select the claude-code folder in /etc/ to grant read access to system-level managed settings.",
+            prompt: "Grant Access",
+            initialDirectory: etcURL,
+            showsHiddenFiles: false
+        )
+        guard let candidate else {
+            return
+        }
+
+        do {
+            try projectRegistry.setEtcClaudeCodeRoot(folderURL: candidate)
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .etcClaudeCodeRoot, details: String(describing: error))
+        }
+    }
+
+    func clearEtcClaudeCodeRootSelection() {
+        do {
+            try projectRegistry.clearEtcClaudeCodeRoot()
+            issue = nil
+            refreshFromStores()
+        } catch {
+            issue = .bookmarkFailure(area: .etcClaudeCodeRoot, details: String(describing: error))
         }
     }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectScopeView: View {
     @EnvironmentObject private var rootSelection: RootSelectionViewModel
+    @State private var showSettingsEditor = false
 
     var body: some View {
         ScrollView {
@@ -14,12 +15,21 @@ struct ProjectScopeView: View {
 
                 projectRegistryCard
                 precedenceReminderCard
+
+                editProjectSettingsButton
+
                 ScopeContributionSummaryView(targetScope: .project)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Project")
+        .sheet(isPresented: $showSettingsEditor) {
+            if let selectedID = rootSelection.selectedProjectRegistrationID,
+               let project = rootSelection.projectRegistrations.first(where: { $0.id == selectedID }) {
+                ProjectSettingsEditorSheet(projectRootURL: URL(fileURLWithPath: project.preferredPath))
+            }
+        }
     }
 
     private var headerCard: some View {
@@ -102,6 +112,21 @@ struct ProjectScopeView: View {
 
     private func isSelected(_ project: ProjectRegistration) -> Bool {
         rootSelection.selectedProjectRegistrationID == project.id
+    }
+
+    private var editProjectSettingsButton: some View {
+        Button(action: { showSettingsEditor = true }) {
+            HStack {
+                Image(systemName: "pencil.circle.fill")
+                Text("Edit project settings")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.green.opacity(0.1))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.green)
     }
 
     private func issueCard(_ issue: RootSelectionIssue) -> some View {

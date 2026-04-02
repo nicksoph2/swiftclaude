@@ -59,6 +59,8 @@ struct URLSecurityScopeAccessor: SecurityScopedAccessing {
 final class BookmarkStore {
     static let globalRootBookmarkID = "global-claude-root"
     static let managedRootBookmarkID = "managed-claude-code-root"
+    static let userClaudeJsonBookmarkID = "user-claude-json"
+    static let etcClaudeCodeRootBookmarkID = "etc-claude-code-root"
 
     private let persistence: BookmarkMetadataPersisting
     private let dataCoder: BookmarkDataCoding

@@ -249,7 +249,11 @@ struct ResolutionIssue: Equatable, Identifiable, Sendable {
              .invalidFieldType,
              .invalidEnumValue,
              .scopeRestrictionViolated,
-             .mutuallyExclusiveKeys:
+             .mutuallyExclusiveKeys,
+             .mcpCommandNotFound,
+             .mcpCommandNotExecutable,
+             .mcpInvalidUrl,
+             .mcpMissingRequiredField:
             return .parserSyntaxIssue
         }
     }

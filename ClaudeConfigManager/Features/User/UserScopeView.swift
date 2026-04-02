@@ -2,6 +2,7 @@ import SwiftUI
 
 struct UserScopeView: View {
     @EnvironmentObject private var rootSelection: RootSelectionViewModel
+    @State private var showSettingsEditor = false
 
     var body: some View {
         ScrollView {
@@ -14,12 +15,21 @@ struct UserScopeView: View {
 
                 globalRootCard
                 precedenceReminderCard
+
+                editSettingsButton
+
                 ScopeContributionSummaryView(targetScope: .user)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("User")
+        .sheet(isPresented: $showSettingsEditor) {
+            let userSettingsURL = rootSelection.selectedGlobalRootURL
+                .appendingPathComponent(".claude")
+                .appendingPathComponent("settings.json")
+            UserSettingsEditorSheet(fileURL: userSettingsURL)
+        }
     }
 
     private var headerCard: some View {
@@ -103,6 +113,21 @@ struct UserScopeView: View {
                     : Color.orange.opacity(0.18),
                 in: Capsule()
             )
+    }
+
+    private var editSettingsButton: some View {
+        Button(action: { showSettingsEditor = true }) {
+            HStack {
+                Image(systemName: "pencil.circle.fill")
+                Text("Edit settings.json")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.blue)
     }
 
     private func issueCard(_ issue: RootSelectionIssue) -> some View {

@@ -2,7 +2,14 @@ import SwiftUI
 
 struct PermissionsInspectorView: View {
     @EnvironmentObject private var router: AppRouter
+    @StateObject private var editModeState = EditModeState()
     @State private var selectedRuleID: String?
+    @State private var showRuleEditor: Bool = false
+    @State private var editingRule: PermissionRuleWithOrigin?
+    @State private var addRuleOutcome: PermissionRuleType?
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var ruleToDelete: PermissionRuleWithOrigin?
+    @State private var showWhatIfInspector: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +40,58 @@ struct PermissionsInspectorView: View {
             }
         }
         .navigationTitle("Permissions")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showWhatIfInspector = true
+                } label: {
+                    Label("What If", systemImage: "questionmark.diamond")
+                }
+                .help("Test a tool invocation")
+            }
+
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    editModeState.toggleEditMode()
+                } label: {
+                    Label(
+                        editModeState.isEditModeActive ? "Done" : "Edit",
+                        systemImage: editModeState.isEditModeActive ? "pencil.circle.fill" : "pencil.circle"
+                    )
+                }
+                .help(editModeState.isEditModeActive ? "Exit edit mode" : "Enter edit mode to add/remove rules")
+            }
+        }
+        .sheet(isPresented: $showWhatIfInspector) {
+            WhatIfInspectorView()
+                .environmentObject(router)
+        }
+        .popover(isPresented: $showRuleEditor) {
+            PermissionRuleEditorView(
+                existingRule: editingRule,
+                preselectedOutcome: addRuleOutcome,
+                targetScope: editingRule?.sourceScope ?? .user,
+                onSave: { pattern, ruleType, scope in
+                    // Save via AtomicFileWriter in real integration
+                },
+                onDelete: editingRule != nil ? { rule in
+                    // Delete via AtomicFileWriter in real integration
+                } : nil
+            )
+        }
+        .alert("Delete Rule", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                // Delete via AtomicFileWriter in real integration
+                ruleToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                ruleToDelete = nil
+            }
+        } message: {
+            if let rule = ruleToDelete {
+                Text("Remove \"\(rule.pattern)\" from \(rule.ruleType.rawValue) rules?")
+            }
+        }
     }
 
     // MARK: - Section 1: Evaluation Order Diagram
@@ -196,6 +255,28 @@ struct PermissionsInspectorView: View {
                         }
                     }
                 }
+
+                // Add rule buttons by outcome type when in edit mode
+                if editModeState.isEditModeActive {
+                    VStack(spacing: 8) {
+                        ForEach([PermissionRuleType.deny, .ask, .allow], id: \.rawValue) { ruleType in
+                            Button {
+                                editingRule = nil
+                                addRuleOutcome = ruleType
+                                showRuleEditor = true
+                            } label: {
+                                Label(
+                                    "Add \(ruleType.rawValue) rule",
+                                    systemImage: "plus.circle.fill"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(outcomeColor(for: ruleType))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
             } else {
                 Text("No configuration loaded.")
                     .font(.body)
@@ -321,6 +402,32 @@ struct PermissionsInspectorView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption2)
                     .foregroundStyle(.orange)
+            }
+
+            // Edit mode buttons
+            if editModeState.isEditModeActive {
+                Button {
+                    editingRule = rule
+                    addRuleOutcome = nil
+                    showRuleEditor = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+                .help("Edit rule")
+
+                Button(role: .destructive) {
+                    ruleToDelete = rule
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Delete rule")
             }
         }
         .padding(.vertical, 6)

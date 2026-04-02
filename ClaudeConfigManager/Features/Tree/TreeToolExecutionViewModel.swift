@@ -33,10 +33,20 @@ final class TreeToolExecutionViewModel: ObservableObject {
     /// Aggregate stage health.
     @Published private(set) var stageHealth: StageHealth = .noData
 
+    /// The name of the tool currently being executed in a live session, or `nil`.
+    @Published private(set) var liveActiveToolName: String?
+
+    /// The name of the hook event currently being executed in a live session, or `nil`.
+    @Published private(set) var liveActiveHookEvent: String?
+
+    /// Whether a live session is active.
+    @Published private(set) var isLiveSession: Bool = false
+
     // MARK: - Private State
 
     private var cancellables = Set<AnyCancellable>()
     private weak var pipeline: ConfigurationPipeline?
+    private weak var liveWatcher: LiveSessionWatcher?
 
     // MARK: - Binding
 
@@ -55,6 +65,30 @@ final class TreeToolExecutionViewModel: ObservableObject {
             .store(in: &cancellables)
 
         rebuild()
+    }
+
+    /// Binds to a live session watcher for active tool highlighting.
+    func bindLiveWatcher(_ watcher: LiveSessionWatcher) {
+        self.liveWatcher = watcher
+
+        watcher.$activeSession
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                self?.liveActiveToolName = state?.activeToolName
+                self?.liveActiveHookEvent = state?.activeHookEvent
+            }
+            .store(in: &cancellables)
+
+        watcher.$isLive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLive in
+                self?.isLiveSession = isLive
+                if !isLive {
+                    self?.liveActiveToolName = nil
+                    self?.liveActiveHookEvent = nil
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Private Rebuild

@@ -16,7 +16,13 @@ struct TreeContextBudgetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StageExplanationView(stage: .contextBudget)
+            HStack {
+                StageExplanationView(stage: .contextBudget)
+
+                Spacer()
+
+                displayModeToggle
+            }
 
             if viewModel.segments.isEmpty {
                 noDataPlaceholder
@@ -29,6 +35,36 @@ struct TreeContextBudgetView: View {
         }
         .onAppear {
             viewModel.bind(to: pipeline)
+        }
+    }
+
+    // MARK: - Display Mode Toggle
+
+    private var displayModeToggle: some View {
+        HStack(spacing: 6) {
+            // Live indicator dot
+            if viewModel.displayMode == .live && viewModel.liveSessionAvailable {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 8, height: 8)
+                    .modifier(PulsingDotModifier())
+            } else {
+                Circle()
+                    .fill(.gray.opacity(0.4))
+                    .frame(width: 8, height: 8)
+            }
+
+            Picker("Mode", selection: $viewModel.displayMode) {
+                ForEach(BudgetDisplayMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 150)
+            .disabled(!viewModel.liveSessionAvailable && viewModel.displayMode != .live)
+            .help(viewModel.liveSessionAvailable
+                ? "Switch between estimated and live token usage"
+                : "No active session detected")
         }
     }
 
@@ -288,5 +324,24 @@ struct TreeContextBudgetView: View {
         case "budget-auto-memory": return "layer-auto-memory"
         default: return segment.id
         }
+    }
+}
+
+// MARK: - Pulsing Dot Modifier
+
+/// Animates a pulsing opacity effect on a view, used for the live indicator dot.
+struct PulsingDotModifier: ViewModifier {
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isPulsing ? 0.4 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
+                value: isPulsing
+            )
+            .onAppear {
+                isPulsing = true
+            }
     }
 }

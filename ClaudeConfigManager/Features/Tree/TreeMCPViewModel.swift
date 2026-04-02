@@ -23,6 +23,7 @@ final class TreeMCPViewModel: ObservableObject {
     @Published private(set) var blockedServers: [MCPServerDisplayModel] = []
     @Published private(set) var globalPolicyEffects: [McpPolicyEffect] = []
     @Published private(set) var stageHealth: StageHealth = .noData
+    @Published private(set) var healthIssues: [MCPHealthIssue] = []
 
     // MARK: - Private State
 
@@ -56,6 +57,7 @@ final class TreeMCPViewModel: ObservableObject {
             blockedServers = []
             globalPolicyEffects = []
             stageHealth = .noData
+            healthIssues = []
             return
         }
 
@@ -66,6 +68,11 @@ final class TreeMCPViewModel: ObservableObject {
         activeServers = displayModels.filter { !$0.isBlocked }
         blockedServers = displayModels.filter { $0.isBlocked }
         landscapeNodes = buildLandscapeTree(from: displayModels)
+
+        // Run server health checks
+        let checker = MCPServerHealthChecker()
+        healthIssues = checker.check(mcp.servers)
+
         stageHealth = computeHealth(from: mcp)
     }
 

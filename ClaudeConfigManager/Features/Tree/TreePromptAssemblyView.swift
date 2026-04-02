@@ -26,6 +26,14 @@ struct TreePromptAssemblyView: View {
             } else {
                 teachingCallout
                 layerStack
+
+                if let instructions = pipeline.projection?.instructions,
+                   !instructions.orderedBlocks.isEmpty {
+                    Divider()
+                        .padding(.vertical, 4)
+                    InstructionTreeView(snapshot: instructions)
+                }
+
                 overheadFooter
             }
         }

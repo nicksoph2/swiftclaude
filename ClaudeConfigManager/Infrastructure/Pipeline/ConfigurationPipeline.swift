@@ -150,6 +150,20 @@ final class ConfigurationPipeline: ObservableObject {
         await run(globalRootURL: lastGlobalRootURL, projectRootURLs: lastProjectRootURLs)
     }
 
+    // MARK: - Test Helpers
+
+    /// Injects a projection directly for unit testing.
+    /// Not intended for production use.
+    func injectProjectionForTesting(_ projection: SessionProjection) {
+        self.projection = projection
+        self.pipelineState = .completed
+    }
+
+    /// Injects a scan result directly for unit testing.
+    func injectScanResultForTesting(_ scanResult: ScanResult) {
+        self.scanResult = scanResult
+    }
+
     // MARK: - Private Methods
 
     private func buildScanRequest(globalRootURL: URL?, projectRootURLs: [URL]) -> ScanRequest {

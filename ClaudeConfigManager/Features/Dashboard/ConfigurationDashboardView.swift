@@ -112,6 +112,9 @@ struct ConfigurationDashboardView: View {
     @EnvironmentObject private var pipeline: ConfigurationPipeline
 
     @State private var selectedTraceEntry: IdentifiableSettingsEntry?
+    @State private var showingSnapshotExport = false
+    @State private var showingProfileManager = false
+    @StateObject private var profileStore = ProfileStore()
 
     var body: some View {
         ScrollView {
@@ -139,6 +142,29 @@ struct ConfigurationDashboardView: View {
                 }
                 .disabled(pipeline.pipelineState == .running)
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingSnapshotExport = true
+                } label: {
+                    Label("Export Snapshot", systemImage: "square.and.arrow.up")
+                }
+                .disabled(pipeline.projection == nil)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingProfileManager = true
+                } label: {
+                    Label("Profiles", systemImage: "person.crop.rectangle.stack")
+                }
+            }
+        }
+        .sheet(isPresented: $showingSnapshotExport) {
+            SnapshotExportView()
+                .environmentObject(pipeline)
+        }
+        .sheet(isPresented: $showingProfileManager) {
+            ProfileManagerView(profileStore: profileStore)
+                .environmentObject(pipeline)
         }
         .sheet(item: $selectedTraceEntry) { wrapper in
             ResolutionTracePanelView(entry: wrapper.entry, onClose: { selectedTraceEntry = nil })

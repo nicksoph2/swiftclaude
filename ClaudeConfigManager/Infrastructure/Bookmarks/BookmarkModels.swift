@@ -4,6 +4,8 @@ enum BookmarkKind: String, Codable, CaseIterable, Sendable {
     case globalClaudeRoot
     case managedClaudeCodeRoot
     case projectRoot
+    case userClaudeJson
+    case etcClaudeCodeRoot
 }
 
 enum GlobalClaudeRootSource: String, Codable, Sendable {
@@ -107,6 +109,8 @@ struct GlobalAppState: Codable, Equatable, Sendable {
     var globalClaudeRootBookmarkID: String?
     var hasCompletedInitialGlobalRootSetup: Bool
     var managedRootBookmarkID: String? = nil
+    var userClaudeJsonBookmarkID: String? = nil
+    var etcClaudeCodeRootBookmarkID: String? = nil
     var projectRegistrations: [ProjectRegistration]
     var selectedProjectRegistrationID: String?
 
@@ -115,6 +119,8 @@ struct GlobalAppState: Codable, Equatable, Sendable {
         globalClaudeRootBookmarkID: nil,
         hasCompletedInitialGlobalRootSetup: false,
         managedRootBookmarkID: nil,
+        userClaudeJsonBookmarkID: nil,
+        etcClaudeCodeRootBookmarkID: nil,
         projectRegistrations: [],
         selectedProjectRegistrationID: nil
     )
@@ -123,6 +129,8 @@ struct GlobalAppState: Codable, Equatable, Sendable {
 enum RootSelectionArea: Equatable, Sendable {
     case globalRoot
     case managedRoot
+    case userClaudeJson
+    case etcClaudeCodeRoot
     case projects
 }
 
@@ -184,6 +192,10 @@ private extension RootSelectionArea {
             return "global-root"
         case .managedRoot:
             return "managed-root"
+        case .userClaudeJson:
+            return "user-claude-json"
+        case .etcClaudeCodeRoot:
+            return "etc-claude-code-root"
         case .projects:
             return "projects"
         }

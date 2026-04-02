@@ -25,7 +25,8 @@ struct TreeMCPView: View {
                 noDataPlaceholder
             } else {
                 teachingCallout
-                builtInToolsSection
+                healthIssuesBanner
+                toolCatalogSection
                 mcpServersSection
                 deferredLoadingNote
             }
@@ -73,7 +74,60 @@ struct TreeMCPView: View {
         )
     }
 
-    // MARK: - Built-in Tools Section
+    // MARK: - Health Issues Banner
+
+    @ViewBuilder
+    private var healthIssuesBanner: some View {
+        if !viewModel.healthIssues.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Text("Server Health Issues")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+
+                ForEach(Array(viewModel.healthIssues.enumerated()), id: \.offset) { _, issue in
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: issue.severity == .error ? "xmark.circle.fill" : "exclamationmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(issue.severity == .error ? .red : .orange)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(issue.serverId)
+                                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                            Text(issue.message)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.orange.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 0.5)
+            )
+        }
+    }
+
+    // MARK: - Tool Catalog Section
+
+    private var toolCatalogSection: some View {
+        MCPToolCatalogView(
+            builtInTools: BuiltInToolCatalog.tools,
+            mcpServers: viewModel.activeServers + viewModel.blockedServers
+        )
+    }
+
+    // MARK: - Built-in Tools Section (Legacy)
 
     private var builtInToolsSection: some View {
         DisclosureGroup {

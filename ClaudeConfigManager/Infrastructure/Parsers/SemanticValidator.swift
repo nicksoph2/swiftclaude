@@ -16,6 +16,9 @@ struct SemanticProjectionValidator {
         // Check instruction token budget
         issues.append(contentsOf: checkInstructionTokenBudget(projection))
 
+        // Check instruction @import cycles
+        issues.append(contentsOf: checkInstructionImportCycles(projection))
+
         // Check redundant permission rules
         issues.append(contentsOf: checkRedundantPermissionRules(projection))
 
@@ -59,6 +62,54 @@ struct SemanticProjectionValidator {
                     )
                 }
             }
+        }
+
+        return issues
+    }
+
+    private func checkInstructionImportCycles(_ projection: SessionProjection) -> [ValidationIssue] {
+        guard let instructions = projection.instructions else { return [] }
+
+        let cycleEdges = instructions.importEdges.filter { $0.isCycle }
+        guard !cycleEdges.isEmpty else { return [] }
+
+        // Build a human-readable cycle path for each cycle edge.
+        // Each cycle edge records the parent that tried to (re-)import an ancestor.
+        let blockNameByID: [String: String] = Dictionary(
+            uniqueKeysWithValues: instructions.orderedBlocks.map { block in
+                let name: String
+                if let path = block.content.winningSource?.sourcePath {
+                    name = URL(fileURLWithPath: path).lastPathComponent
+                } else {
+                    name = block.content.winningSource?.displayName ?? block.blockID
+                }
+                return (block.blockID, name)
+            }
+        )
+
+        var issues: [ValidationIssue] = []
+
+        for edge in cycleEdges {
+            let parentName = blockNameByID[edge.parentBlockID] ?? edge.parentBlockID
+            let cyclePath = [parentName, edge.rawToken, parentName]
+            let cyclePathString = cyclePath.joined(separator: " → ")
+
+            let source = instructions.orderedBlocks
+                .first(where: { $0.blockID == edge.parentBlockID })
+                .flatMap { $0.content.winningSource }
+                .map { ValidationSourceReference(resolutionSource: $0) }
+
+            issues.append(
+                ValidationIssue(
+                    code: .semantic("instructions.importCycle"),
+                    severity: .error,
+                    category: .semantic,
+                    message: "Import cycle detected: \(cyclePathString) (cycle). The cycling file will not be loaded; its instructions are missing from Claude's context.",
+                    source: source,
+                    keyPath: "instructions",
+                    relatedSources: []
+                )
+            )
         }
 
         return issues

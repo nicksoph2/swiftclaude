@@ -7,6 +7,7 @@ enum DiscoveredFileKind: String, Equatable, Sendable {
     case managedSettingsDropIn
     case managedMcpJSON
     case managedClaudeMarkdown
+    case managedRuleMarkdown
     case userSettingsJSON
     case userClaudeMarkdown
     case userClaudeJSON
@@ -23,6 +24,8 @@ enum DiscoveredFileKind: String, Equatable, Sendable {
 
 enum DiscoveredDirectoryKind: String, Equatable, Sendable {
     case managedSettingsRoot
+    case managedRulesRoot
+    case etcManagedRoot
     case userClaudeRoot
     case userAgentsRoot
     case userSkillsRoot
@@ -204,10 +207,12 @@ struct ManagedSettingsDiscoverySnapshot {
 
 struct ManagedSettingsLocator {
     static let managedRootPath = "/Library/Application Support/ClaudeCode"
+    static let etcManagedRootPath = "/etc/claude-code"
     static let managedSettingsFileName = "managed-settings.json"
     static let managedSettingsDropInDirectoryName = "managed-settings.d"
     static let managedMcpFileName = "managed-mcp.json"
     static let managedClaudeMdFileName = "CLAUDE.md"
+    static let managedRulesDirectoryName = "rules"
 
     private let fileSystem: ManagedSettingsFileSystem
 
@@ -679,6 +684,13 @@ struct WorkspaceScanner {
         let managedScope = DiscoveryScopeIdentity.managed()
         let managedRootScope = RootResolutionScope.managedRoot
         let discovery = scanManagedSettingsScope(issues: &issues)
+
+        // Also scan /etc/claude-code/ and merge results
+        let etcDiscovery = scanEtcManagedScope(issues: &issues)
+
+        let allFiles = discovery.files + etcDiscovery.files
+        let allDirectories = discovery.directories + etcDiscovery.directories
+
         let rootStatus = discovery.directories.first(where: { $0.kind == .managedSettingsRoot })?.status ?? .missing
 
         return DiscoveredWorkspace(
@@ -687,8 +699,8 @@ struct WorkspaceScanner {
             rootURL: managedRootURL,
             rootNormalizedPath: managedRootPath,
             rootAccessStatus: rootAccessStatus(for: rootStatus),
-            files: sortFiles(discovery.files),
-            directories: sortDirectories(discovery.directories)
+            files: sortFiles(allFiles),
+            directories: sortDirectories(allDirectories)
         )
     }
 
@@ -726,7 +738,107 @@ struct WorkspaceScanner {
             }
         )
 
+        // Scan rules/ subdirectory for *.md files
+        let rulesDiscovery = scanManagedRulesDirectory(
+            rootURL: snapshot.rootURL,
+            scope: scope,
+            issues: &issues
+        )
+        files.append(contentsOf: rulesDiscovery.files)
+        directories.append(contentsOf: rulesDiscovery.directories)
+
         appendManagedDiscoveryIssues(from: snapshot, scope: scope, issues: &issues)
+
+        return (files, directories)
+    }
+
+    private func scanManagedRulesDirectory(
+        rootURL: URL,
+        scope: DiscoveryScopeIdentity,
+        issues: inout [DiscoveryIssue]
+    ) -> (files: [DiscoveredFile], directories: [DiscoveredDirectory]) {
+        let rulesURL = rootURL.appendingPathComponent(ManagedSettingsLocator.managedRulesDirectoryName, isDirectory: true)
+        var files: [DiscoveredFile] = []
+        var directories: [DiscoveredDirectory] = []
+
+        let rulesStatus = discoveredDirectoryStatus(at: rulesURL)
+        directories.append(
+            DiscoveredDirectory(
+                scope: scope,
+                kind: .managedRulesRoot,
+                url: rulesURL,
+                provenance: .canonicalExpected,
+                status: rulesStatus
+            )
+        )
+
+        if rulesStatus == .present {
+            let ruleFiles = readDirectorySafely(
+                at: rulesURL,
+                scope: scope,
+                rootScope: .managedRoot,
+                issues: &issues
+            )
+            .filter { $0.pathExtension.lowercased() == "md" }
+            .sorted { normalizedPath(for: $0) < normalizedPath(for: $1) }
+
+            for ruleFileURL in ruleFiles {
+                files.append(
+                    discoveredFile(scope: scope, kind: .managedRuleMarkdown, url: ruleFileURL, provenance: .descendantDiscovered)
+                )
+            }
+        }
+
+        return (files, directories)
+    }
+
+    private func scanEtcManagedScope(
+        issues: inout [DiscoveryIssue]
+    ) -> (files: [DiscoveredFile], directories: [DiscoveredDirectory]) {
+        let rootURL = URL(fileURLWithPath: ManagedSettingsLocator.etcManagedRootPath, isDirectory: true)
+        let scope = DiscoveryScopeIdentity.managed()
+
+        var files: [DiscoveredFile] = []
+        var directories: [DiscoveredDirectory] = []
+
+        let rootStatus = discoveredDirectoryStatus(at: rootURL)
+        directories.append(
+            DiscoveredDirectory(
+                scope: scope,
+                kind: .etcManagedRoot,
+                url: rootURL,
+                provenance: .canonicalExpected,
+                status: rootStatus
+            )
+        )
+
+        guard rootStatus == .present else {
+            // If the root is missing or inaccessible, still report canonical files as missing
+            let settingsURL = rootURL.appendingPathComponent(ManagedSettingsLocator.managedSettingsFileName, isDirectory: false)
+            let claudeMdURL = rootURL.appendingPathComponent(ManagedSettingsLocator.managedClaudeMdFileName, isDirectory: false)
+
+            files.append(discoveredFile(scope: scope, kind: .managedSettingsJSON, url: settingsURL, provenance: .canonicalExpected))
+            files.append(discoveredFile(scope: scope, kind: .managedClaudeMarkdown, url: claudeMdURL, provenance: .canonicalExpected))
+
+            return (files, directories)
+        }
+
+        // Check for managed-settings.json
+        let settingsURL = rootURL.appendingPathComponent(ManagedSettingsLocator.managedSettingsFileName, isDirectory: false)
+        files.append(discoveredFile(scope: scope, kind: .managedSettingsJSON, url: settingsURL, provenance: .canonicalExpected))
+
+        // Check for CLAUDE.md
+        let claudeMdURL = rootURL.appendingPathComponent(ManagedSettingsLocator.managedClaudeMdFileName, isDirectory: false)
+        files.append(discoveredFile(scope: scope, kind: .managedClaudeMarkdown, url: claudeMdURL, provenance: .canonicalExpected))
+
+        // Scan rules/ subdirectory
+        let rulesDiscovery = scanManagedRulesDirectory(
+            rootURL: rootURL,
+            scope: scope,
+            issues: &issues
+        )
+        files.append(contentsOf: rulesDiscovery.files)
+        directories.append(contentsOf: rulesDiscovery.directories)
 
         return (files, directories)
     }
