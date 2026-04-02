@@ -29,6 +29,7 @@ struct ManagedScopeView: View {
                 managedSettingsCard(vm)
                 managedMcpCard(vm)
                 managedClaudeMdCard(vm)
+                ScopeContributionSummaryView(targetScope: .managed)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)

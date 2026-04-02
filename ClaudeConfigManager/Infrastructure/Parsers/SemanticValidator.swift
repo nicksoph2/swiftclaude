@@ -2,7 +2,8 @@ import Foundation
 
 /// Semantic validator runs checks that require understanding multiple keys or scopes together.
 /// Complements schema validation by catching cross-key and cross-scope configuration issues.
-struct SemanticValidator {
+/// Named SemanticProjectionValidator to avoid conflict with the rule-based SemanticValidator in ResolverModels.
+struct SemanticProjectionValidator {
 
     /// Run semantic checks against the fully-resolved SessionProjection.
     /// Returns validation issues that cannot be detected by per-file schema validation alone.
@@ -75,7 +76,7 @@ struct SemanticValidator {
             totalTokens += blockTokens
         }
 
-        guard totalTokens > threshold else { return [] }
+        guard totalTokens >= threshold else { return [] }
 
         return [
             ValidationIssue(
@@ -116,7 +117,7 @@ struct SemanticValidator {
                             severity: .info,
                             category: .semantic,
                             message: "Deny rule '\(rule)' appears \(count) times in the same scope. Remove duplicate rules.",
-                            source: ValidationSourceReference(resolutionSource: entry.source),
+                            source: entry.value.winningSource.map(ValidationSourceReference.init(resolutionSource:)),
                             keyPath: "permissions.deny",
                             relatedSources: []
                         )
@@ -134,7 +135,7 @@ struct SemanticValidator {
                             severity: .info,
                             category: .semantic,
                             message: "Allow rule '\(rule)' appears \(count) times in the same scope. Remove duplicate rules.",
-                            source: ValidationSourceReference(resolutionSource: entry.source),
+                            source: entry.value.winningSource.map(ValidationSourceReference.init(resolutionSource:)),
                             keyPath: "permissions.allow",
                             relatedSources: []
                         )
@@ -157,7 +158,7 @@ struct SemanticValidator {
 
         // Check each hook handler for MCP server references
         for event in hooks.events {
-            for handler in event.handlers {
+            for handler in event.resolvedHandlers {
                 // Extract MCP server ID from handler
                 guard let serverId = extractMcpServerId(from: handler) else { continue }
 
@@ -198,7 +199,7 @@ struct SemanticValidator {
 
         // Check each hook handler for HTTP requests
         for event in hooks.events {
-            for handler in event.handlers {
+            for handler in event.resolvedHandlers {
                 guard let url = extractHttpHandlerUrl(from: handler) else { continue }
 
                 // Check if URL domain is in allowedDomains
@@ -244,17 +245,22 @@ struct SemanticValidator {
     }
 
     private func ruleMatches(denyRule: String, allowRule: String) -> Bool {
-        // Simple prefix matching: bash:* shadows bash: ls, etc.
+        // Exact match: identical rules always shadow each other
+        if denyRule == allowRule { return true }
+
+        // Wildcard prefix matching: bash:* shadows bash: ls, etc.
+        guard denyRule.hasSuffix("*") else { return false }
         let denyPrefix = denyRule.replacingOccurrences(of: "*", with: "")
         let allowPrefix = allowRule.prefix(denyPrefix.count)
-        return String(allowPrefix) == denyPrefix && denyRule.hasSuffix("*")
+        return String(allowPrefix) == denyPrefix
     }
 
     private func findPermissionRuleSource(_ settings: ResolvedSettingsSnapshot, rule: String) -> ValidationSourceReference? {
         guard let entry = settings.entries.first(where: { $0.keyPath == "permissions" }) else {
             return nil
         }
-        return ValidationSourceReference(resolutionSource: entry.source)
+        guard let winningSource = entry.value.winningSource else { return nil }
+        return ValidationSourceReference(resolutionSource: winningSource)
     }
 
     private func findDuplicateStrings(_ array: [JSONValue]) -> [(rule: String, count: Int)] {
@@ -288,8 +294,8 @@ struct SemanticValidator {
     }
 
     private func extractMcpServerId(from handler: ResolvedHookHandler) -> String? {
-        // MCP handlers have handlerType == .mcp and serverId in the raw object
-        guard handler.handlerType == .mcp else { return nil }
+        // MCP handlers have rawType == "mcp" and serverId in the raw object
+        guard handler.rawType == "mcp" else { return nil }
         guard case .object(let obj) = handler.rawObject,
               case .string(let serverId) = obj["server_id"] else {
             return nil

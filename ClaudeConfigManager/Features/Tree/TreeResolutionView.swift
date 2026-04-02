@@ -8,6 +8,8 @@ import SwiftUI
 ///   and conflict indicator.
 /// - **Sub-view B: Resolution Waterfall** — drill-down showing the full scope tier waterfall
 ///   for a selected key.
+/// - **Sub-view Z5: Sub-process expansion** — three merge-method lanes shown when the
+///   "Show sub-processes" toggle is active.
 struct TreeResolutionView: View {
 
     @EnvironmentObject private var pipeline: ConfigurationPipeline
@@ -15,22 +17,76 @@ struct TreeResolutionView: View {
 
     @State private var selectedEntry: ResolutionEntryDisplay?
 
+    /// The resolved entry whose trace panel is currently shown.
+    @State private var traceTarget: ResolvedSettingsEntry?
+
+    /// Persisted expansion state for the sub-process lane diagram (Z5).
+    @SceneStorage("resolutionSubProcessExpanded") private var subProcessExpanded: Bool = false
+
+    /// Persisted "show conflicts only" filter state.
+    @SceneStorage("showConflictsOnly") private var showConflictsOnly: Bool = false
+
     /// Optional cross-stage navigation callback.
     var onNavigate: ((TreeNavigationTarget) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .resolution)
+
             if viewModel.entries.isEmpty {
                 noDataPlaceholder
             } else if let entry = selectedEntry {
                 waterfallDrillDown(for: entry)
             } else {
-                conflictSummaryList
+                VStack(alignment: .leading, spacing: 12) {
+                    // Sub-process toggle (Z5)
+                    subProcessToggleButton
+
+                    if subProcessExpanded {
+                        ResolutionSubProcessView(entries: viewModel.entries)
+                            .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: UnitPoint.top)))
+                    }
+
+                    conflictSummaryList
+                }
+                .animation(.easeInOut(duration: 0.2), value: subProcessExpanded)
             }
         }
         .onAppear {
             viewModel.bind(to: pipeline)
         }
+        .sheet(isPresented: Binding(
+            get: { traceTarget != nil },
+            set: { if !$0 { traceTarget = nil } }
+        )) {
+            if let target = traceTarget {
+                ResolutionTracePanelView(
+                    entry: target,
+                    onClose: { traceTarget = nil },
+                    onNavigate: onNavigate
+                )
+            }
+        }
+    }
+
+    // MARK: - Sub-process Toggle
+
+    @ViewBuilder
+    private var subProcessToggleButton: some View {
+        Button {
+            subProcessExpanded.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: subProcessExpanded
+                      ? "chevron.down.circle.fill"
+                      : "chevron.right.circle")
+                    .font(.caption)
+                Text(subProcessExpanded ? "Hide sub-processes" : "Show sub-processes")
+                    .font(.callout.weight(.medium))
+            }
+            .foregroundStyle(Color.accentColor)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - No Data
@@ -59,6 +115,16 @@ struct TreeResolutionView: View {
 
             // Summary counts
             summaryBanner
+
+            // Merge method examples disclosure
+            DisclosureGroup("Merge method examples", isExpanded: Binding(
+                get: { viewModel.showMergeExamples },
+                set: { viewModel.showMergeExamples = $0 }
+            )) {
+                MergeMethodExampleView()
+                    .padding(.top, 8)
+            }
+            .font(.caption.weight(.medium))
 
             // Entry list
             let filtered = viewModel.filteredEntries
@@ -90,6 +156,20 @@ struct TreeResolutionView: View {
             .pickerStyle(.segmented)
             .frame(maxWidth: 360)
 
+            // Conflicts-only toolbar button
+            Button {
+                showConflictsOnly.toggle()
+                viewModel.filterMode = showConflictsOnly ? .conflictsOnly : .all
+            } label: {
+                Image(systemName: showConflictsOnly
+                      ? "line.3.horizontal.decrease.circle.fill"
+                      : "line.3.horizontal.decrease.circle")
+                    .font(.body)
+                    .foregroundStyle(showConflictsOnly ? .orange : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Show conflicts only")
+
             Spacer()
 
             // Search field
@@ -120,6 +200,9 @@ struct TreeResolutionView: View {
             )
             .frame(maxWidth: 240)
         }
+        .onChange(of: viewModel.filterMode) { _, newMode in
+            showConflictsOnly = (newMode == .conflictsOnly)
+        }
     }
 
     @ViewBuilder
@@ -136,7 +219,7 @@ struct TreeResolutionView: View {
             if conflicts > 0 {
                 Label(
                     "\(conflicts) conflict\(conflicts == 1 ? "" : "s")",
-                    systemImage: "arrow.triangle.branch"
+                    systemImage: "exclamationmark.circle.fill"
                 )
                 .font(.caption)
                 .foregroundStyle(.orange)
@@ -169,26 +252,39 @@ struct TreeResolutionView: View {
 
                 Spacer()
 
-                // Merge method label
-                Text(entry.mergeMethodLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                // Merge method label with icon
+                HStack(spacing: 3) {
+                    Image(systemName: TreeResolutionViewModel.mergeMethodIcon(for: entry.mergeMethod))
+                        .font(.caption2)
+                    Text(entry.mergeMethodLabel)
+                        .font(.caption2)
+                }
+                .foregroundStyle(.tertiary)
+                .help(entry.mergeMethod.rawValue)
 
-                // Conflict indicator
+                // Conflict badge
                 if entry.hasConflict {
-                    HStack(spacing: 2) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.caption2)
-                        Text("\(entry.overriddenCount)")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityLabel("Resolved conflict — multiple scopes had different values for this key")
                 }
 
                 // Winning source scope badge
                 if let scope = entry.winningScope {
                     ScopeColorScheme.scopeBadge(for: scope)
                 }
+
+                // Trace panel button
+                Button {
+                    traceTarget = entry.resolvedEntry
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Show resolution trace")
 
                 // Effective value (truncated)
                 Text(entry.effectiveValueString)
@@ -233,6 +329,22 @@ struct TreeResolutionView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.accentColor)
+
+            // Trace panel button
+            if let resolvedEntry = entry.resolvedEntry {
+                Button {
+                    traceTarget = resolvedEntry
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                        Text("Show resolution trace")
+                            .font(.callout)
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+            }
 
             // Waterfall view
             ResolutionWaterfallView(

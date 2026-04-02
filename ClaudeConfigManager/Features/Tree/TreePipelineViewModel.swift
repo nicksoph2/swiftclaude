@@ -2,6 +2,50 @@ import Foundation
 import SwiftUI
 import Combine
 
+// MARK: - Diagram Mode
+
+/// Controls whether the pipeline diagram shows all eight stages (advanced)
+/// or three composite "plain English" nodes (simplified).
+enum DiagramMode: String, CaseIterable, Sendable {
+    case simplified
+    case advanced
+}
+
+// MARK: - Composite Stage Group
+
+/// Three composite groups used in simplified mode.
+enum CompositeStageGroup: String, CaseIterable, Identifiable, Sendable {
+    case yourFiles      = "yourFiles"
+    case theRules       = "theRules"
+    case whatClaudeSees = "whatClaudeSees"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .yourFiles:      "Your Files"
+        case .theRules:       "The Rules"
+        case .whatClaudeSees: "What Claude Sees"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .yourFiles:      "doc.on.doc"
+        case .theRules:       "list.bullet.clipboard"
+        case .whatClaudeSees: "cpu"
+        }
+    }
+
+    var constituentStages: [PipelineStage] {
+        switch self {
+        case .yourFiles:      [.discovery, .parsing]
+        case .theRules:       [.resolution, .toolExecution, .hooksLifecycle]
+        case .whatClaudeSees: [.promptAssembly, .mcpServers, .contextBudget]
+        }
+    }
+}
+
 /// Coordinates stage health badges for the pipeline overview strip.
 ///
 /// Observes `ConfigurationPipeline` and computes a `StageHealth` value
@@ -11,6 +55,9 @@ final class TreePipelineViewModel: ObservableObject {
 
     /// Published snapshot of per-stage health, ordered by `PipelineStage.sortOrder`.
     @Published private(set) var stageHealthEntries: [(stage: PipelineStage, health: StageHealth)] = []
+
+    /// The currently selected (zoomed-in) stage. `nil` means the full diagram is shown.
+    @Published var selectedStage: PipelineStage? = nil
 
     private var cancellables = Set<AnyCancellable>()
 

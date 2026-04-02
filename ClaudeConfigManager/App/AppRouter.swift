@@ -103,12 +103,18 @@ final class AppRouter: ObservableObject {
         )
     }
 
+    func refreshPipeline() {
+        Task {
+            await triggerPipeline()
+        }
+    }
+
     func completeBootstrap() {
         defer {
             bootstrapState = .ready
 
             if sidebarState.selection == nil {
-                sidebarState.selection = .user
+                sidebarState.selection = .dashboard
             }
 
             // Trigger pipeline after bootstrap completes

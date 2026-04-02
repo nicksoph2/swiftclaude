@@ -19,6 +19,8 @@ struct TreeMCPView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .mcpServers)
+
             if viewModel.landscapeNodes.isEmpty {
                 noDataPlaceholder
             } else {
@@ -469,7 +471,7 @@ struct TreeMCPView: View {
     private func serverStatusColor(_ server: MCPServerDisplayModel) -> Color {
         switch server.effectiveState {
         case .active: .green
-        case .managed: .blue
+        case .managed: ScopeColorScheme.color(for: .managed)
         case .blocked, .disabled: .red
         case .unresolved: .gray
         }
@@ -503,7 +505,7 @@ struct TreeMCPView: View {
             case .managed:
                 Label("Managed", systemImage: "building.2.fill")
                     .font(.caption2)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(ScopeColorScheme.color(for: .managed))
             case .blocked:
                 Label("Blocked", systemImage: "xmark.circle.fill")
                     .font(.caption2)

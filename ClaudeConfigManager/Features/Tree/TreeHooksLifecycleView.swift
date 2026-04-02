@@ -21,6 +21,8 @@ struct TreeHooksLifecycleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .hooksLifecycle)
+
             if viewModel.lifecycleEvents.isEmpty {
                 noDataPlaceholder
             } else {

@@ -14,6 +14,7 @@ struct ProjectScopeView: View {
 
                 projectRegistryCard
                 precedenceReminderCard
+                ScopeContributionSummaryView(targetScope: .project)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)

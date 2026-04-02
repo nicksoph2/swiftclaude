@@ -40,7 +40,7 @@ struct RootSplitView: View {
                 debugMonitor.recordSelection(newValue)
             }
         } detail: {
-            detailView(for: router.sidebarState.selection ?? .managed)
+            detailView(for: router.sidebarState.selection ?? .dashboard)
                 .safeAreaInset(edge: .bottom) {
                     #if DEBUG
                     DebugStatusPanel()
@@ -62,9 +62,13 @@ struct RootSplitView: View {
     @ViewBuilder
     private func detailView(for destination: SidebarDestination) -> some View {
         switch destination {
+        case .dashboard:
+            ConfigurationDashboardView()
         case .tree:
             TreePipelineView()
                 .environmentObject(router.pipeline)
+        case .permissions:
+            PermissionsInspectorView()
         case .managed:
             ManagedScopeView()
         case .user:

@@ -93,6 +93,9 @@ struct SessionScopeView: View {
             switch selectedPanel {
             case .settings:
                 SessionSettingsView(viewModel: SessionSettingsViewModel(projection: projection))
+                ScopeContributionSummaryView(targetScope: .session)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
             case .instructions:
                 SessionInstructionsView(viewModel: SessionInstructionsViewModel(projection: projection))
             case .hooks:

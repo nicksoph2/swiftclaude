@@ -26,19 +26,24 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.ClaudeConfigManager
-        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: Resources/ClaudeConfigManager.entitlements
 
   ClaudeConfigManagerTests:
-    type: bundle.unit-testing
+    type: bundle.unit-test
     platform: macOS
     deploymentTarget: "15.0"
     sources:
       - path: ../ClaudeConfigManagerTests
+        excludes:
+          - "Fixtures/**"
+      - path: ../ClaudeConfigManagerTests/Fixtures
+        buildPhase: none
     dependencies:
       - target: ClaudeConfigManager
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/ClaudeConfigManager.app/Contents/MacOS/ClaudeConfigManager
 
@@ -47,7 +52,7 @@ schemes:
     build:
       targets:
         ClaudeConfigManager: all
-        ClaudeConfigManagerTests: all
+        ClaudeConfigManagerTests: [test]
     run:
       config: Debug
     test:

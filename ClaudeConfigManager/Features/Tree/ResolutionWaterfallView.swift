@@ -80,13 +80,14 @@ struct ResolutionWaterfallView: View {
                 .font(.headline.monospaced())
 
             HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.merge")
+                Image(systemName: TreeResolutionViewModel.mergeMethodIcon(for: mergeMethod))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(mergeMethodLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .help(mergeMethod.rawValue)
         }
     }
 

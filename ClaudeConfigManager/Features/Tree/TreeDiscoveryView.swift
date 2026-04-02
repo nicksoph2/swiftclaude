@@ -16,6 +16,8 @@ struct TreeDiscoveryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .discovery)
+
             if viewModel.rootNodes.isEmpty {
                 noDataPlaceholder
             } else {

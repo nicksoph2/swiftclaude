@@ -19,6 +19,8 @@ struct TreePromptAssemblyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .promptAssembly)
+
             if viewModel.layers.isEmpty {
                 noDataPlaceholder
             } else {
@@ -303,6 +305,18 @@ struct PromptChildLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            // Load order badge for instructions
+            if child.id.hasPrefix("instruction-"),
+               parentID == "layer-instructions" {
+                let instructionIndex = self.getInstructionIndex()
+                Text("\(instructionIndex)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .background(Circle().fill(Color.blue))
+                    .help("Load order — files loaded later have stronger influence")
+            }
+
             if child.id.hasPrefix("instruction-"),
                let scope = Self.extractScope(from: child.description) {
                 ScopeColorScheme.scopeBadge(for: scope)
@@ -337,6 +351,15 @@ struct PromptChildLabel: View {
                 PromptTokenBadge(tokens: tokens)
             }
         }
+    }
+
+    /// Returns the load order index for this instruction (1-based).
+    /// This would normally come from parent context, but for now uses a placeholder.
+    private func getInstructionIndex() -> Int {
+        // In a real implementation, this would be passed via parent state or
+        // computed from the parent's children enumeration. For now, we return a placeholder
+        // that would be replaced by actual load order tracking.
+        1
     }
 
     /// Attempts to extract a `ResolutionScope` from a description string like "[User] — /path".

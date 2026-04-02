@@ -18,6 +18,8 @@ struct ResolutionEntryDisplay: Identifiable {
     let waterfallNodes: [WaterfallNode]
     let hasConflict: Bool
     let isMergedArray: Bool
+    /// The original resolved entry, used by the trace panel drill-down.
+    let resolvedEntry: ResolvedSettingsEntry?
 }
 
 // MARK: - Filter Mode
@@ -41,6 +43,7 @@ final class TreeResolutionViewModel: ObservableObject {
     @Published private(set) var entries: [ResolutionEntryDisplay] = []
     @Published var filterMode: ResolutionFilterMode = .all
     @Published var searchText: String = ""
+    @Published var showMergeExamples: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
     private weak var pipeline: ConfigurationPipeline?
@@ -143,7 +146,8 @@ final class TreeResolutionViewModel: ObservableObject {
             participantCount: resolved.trace.participants.count,
             waterfallNodes: waterfallNodes,
             hasConflict: !resolved.trace.overridden.isEmpty,
-            isMergedArray: isMerged && resolved.trace.participants.count > 1
+            isMergedArray: isMerged && resolved.trace.participants.count > 1,
+            resolvedEntry: entry
         )
     }
 
@@ -218,22 +222,41 @@ final class TreeResolutionViewModel: ObservableObject {
     static func mergeMethodLabel(for method: MergeMethod) -> String {
         switch method {
         case .selectHighestPrecedence:
-            return "Highest precedence wins"
+            return "Overrides — highest scope wins"
         case .replace:
-            return "Full replacement"
+            return "Overrides — highest scope wins"
         case .deepMergeObject:
-            return "Deep merge (object)"
+            return "Deep merges — per-key precedence"
         case .append:
-            return "Append (array concat)"
+            return "Merges — all scopes combined"
         case .appendUnique:
-            return "Append unique values"
+            return "Merges — all scopes combined"
         case .setUnion:
-            return "Set union"
+            return "Merges — all scopes combined"
         case .keyedByIdentifier:
-            return "Keyed by identifier"
+            return "Deep merges — per-key precedence"
         case .passthrough:
             return "Passthrough"
         }
+    }
+
+    /// Returns the SF Symbol name for a merge method icon.
+    static func mergeMethodIcon(for method: MergeMethod) -> String {
+        switch method {
+        case .selectHighestPrecedence, .replace:
+            return "chevron.up"
+        case .append, .appendUnique, .setUnion:
+            return "arrow.triangle.merge"
+        case .deepMergeObject, .keyedByIdentifier:
+            return "square.3.layers.3d"
+        case .passthrough:
+            return "arrow.right"
+        }
+    }
+
+    /// Returns the developer-facing identifier for use in tooltips.
+    static func mergeMethodDeveloperID(for method: MergeMethod) -> String {
+        return method.rawValue
     }
 
     // MARK: - JSON Display

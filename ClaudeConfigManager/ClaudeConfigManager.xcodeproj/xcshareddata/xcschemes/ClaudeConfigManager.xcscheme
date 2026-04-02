@@ -21,6 +21,20 @@
                ReferencedContainer = "container:ClaudeConfigManager.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4A4060BBAF5157225F0AAD05"
+               BuildableName = "ClaudeConfigManagerTests.xctest"
+               BlueprintName = "ClaudeConfigManagerTests"
+               ReferencedContainer = "container:ClaudeConfigManager.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -45,7 +59,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4A4060BBAF5157225F0AAD05"
-               BuildableName = "ClaudeConfigManagerTests.bundle"
+               BuildableName = "ClaudeConfigManagerTests.xctest"
                BlueprintName = "ClaudeConfigManagerTests"
                ReferencedContainer = "container:ClaudeConfigManager.xcodeproj">
             </BuildableReference>

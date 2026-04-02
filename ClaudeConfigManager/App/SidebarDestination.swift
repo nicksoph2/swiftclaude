@@ -1,7 +1,9 @@
 import Foundation
 
 enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
+    case dashboard
     case tree
+    case permissions
     case managed
     case user
     case project
@@ -12,8 +14,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
 
     var title: String {
         switch self {
+        case .dashboard:
+            "Dashboard"
         case .tree:
             "Pipeline"
+        case .permissions:
+            "Permissions"
         case .managed:
             "Managed"
         case .user:
@@ -29,8 +35,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
 
     var subtitle: String {
         switch self {
+        case .dashboard:
+            "Overview of your Claude configuration health"
         case .tree:
             "How Claude Code assembles your configuration"
+        case .permissions:
+            "Inspection of permission rules and evaluation order"
         case .managed:
             "App-owned metadata and future infrastructure live here."
         case .user:
@@ -46,8 +56,12 @@ enum SidebarDestination: String, CaseIterable, Codable, Hashable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .dashboard:
+            "gauge.with.needle"
         case .tree:
             "arrow.triangle.branch"
+        case .permissions:
+            "lock.open"
         case .managed:
             "tray.full"
         case .user:

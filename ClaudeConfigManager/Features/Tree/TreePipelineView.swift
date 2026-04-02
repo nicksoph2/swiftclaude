@@ -2,18 +2,53 @@ import SwiftUI
 
 /// Root view for the Pipeline (Tree) destination.
 ///
-/// Layout:
-/// - **Top**: `TreePipelineOverviewStrip` — fixed, non-scrollable horizontal strip
-/// - **Bottom**: `ScrollViewReader` wrapping a `LazyVStack` of stage sections,
-///   each as a `DisclosureGroup` with stub content (replaced by later packets).
+/// Supports two top-level display modes:
+/// - **Advanced** (8 nodes): full `PipelineDiagramView` + scrollable stage sections.
+/// - **Simplified** (3 composite nodes): `PipelineSimplifiedView` for new users.
 ///
-/// Collapse state is persisted via `@SceneStorage`.
+/// In advanced mode, tapping a node zooms in: the diagram is replaced by
+/// `PipelineZoomedView` (breadcrumb strip + full detail). A `matchedGeometryEffect`
+/// namespace shared between `PipelineDiagramView` and `PipelineBreadcrumbStrip`
+/// drives the spring animation.
+///
+/// Mode preference is stored in `AppStorage`. First-run defaults to `.simplified`.
 struct TreePipelineView: View {
 
     @EnvironmentObject private var pipeline: ConfigurationPipeline
     @StateObject private var viewModel = TreePipelineViewModel()
 
-    @State private var selectedStage: PipelineStage? = .discovery
+    // MARK: - Mode Persistence
+
+    /// Whether the user has ever activated advanced mode. Used for first-run default.
+    @AppStorage("hasActivatedAdvancedMode") private var hasActivatedAdvancedMode: Bool = false
+
+    /// The stored raw value for diagram mode.
+    @AppStorage("diagramMode") private var diagramModeRaw: String = DiagramMode.simplified.rawValue
+
+    private var diagramMode: DiagramMode {
+        DiagramMode(rawValue: diagramModeRaw) ?? .simplified
+    }
+
+    private func setDiagramMode(_ mode: DiagramMode) {
+        diagramModeRaw = mode.rawValue
+        if mode == .advanced {
+            hasActivatedAdvancedMode = true
+        }
+    }
+
+    // MARK: - Zoom State (advanced mode)
+
+    /// Namespace shared between PipelineDiagramView and PipelineBreadcrumbStrip.
+    @Namespace private var diagramNamespace
+
+    // MARK: - Simplified Mode State
+
+    /// Which composite group is tapped in simplified mode (nil = none).
+    @State private var selectedGroup: CompositeStageGroup? = nil
+
+    // MARK: - Scroll / Navigation (advanced overview)
+
+    @State private var scrollTarget: PipelineStage?
 
     /// Cross-stage navigation target. When set, the view expands the target stage,
     /// updates the strip selection, and scrolls to the target's anchor.
@@ -25,9 +60,7 @@ struct TreePipelineView: View {
     @SceneStorage("treeCollapsedStages") private var collapsedStagesStorage: String = ""
 
     private var collapsedStages: Set<String> {
-        get {
-            Set(collapsedStagesStorage.split(separator: ",").map(String.init))
-        }
+        Set(collapsedStagesStorage.split(separator: ",").map(String.init))
     }
 
     private func setCollapsed(_ collapsed: Bool, for stage: PipelineStage) {
@@ -54,50 +87,154 @@ struct TreePipelineView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Fixed overview strip at the top
-            TreePipelineOverviewStrip(
-                selectedStage: $selectedStage,
-                viewModel: viewModel,
-                onStageSelected: { stage in
-                    scrollTarget = stage
+        Group {
+            if diagramMode == .simplified {
+                simplifiedLayout
+            } else {
+                advancedLayout
+            }
+        }
+        .navigationTitle("Pipeline")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                modeToggleButton
+            }
+        }
+        .onAppear {
+            viewModel.bind(to: pipeline)
+        }
+        // Escape key returns to overview when a stage is zoomed
+        .onKeyPress(.escape) {
+            if viewModel.selectedStage != nil {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    viewModel.selectedStage = nil
                 }
+                return .handled
+            }
+            return .ignored
+        }
+    }
+
+    // MARK: - Mode Toggle Button
+
+    private var modeToggleButton: some View {
+        Button {
+            let newMode: DiagramMode = (diagramMode == .simplified) ? .advanced : .simplified
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                setDiagramMode(newMode)
+                // Reset zoom / group selection when switching modes
+                viewModel.selectedStage = nil
+                selectedGroup = nil
+            }
+        } label: {
+            Text(diagramMode == .simplified ? "Advanced" : "Overview")
+                .font(.subheadline.weight(.medium))
+        }
+        .help(diagramMode == .simplified
+              ? "Switch to Advanced mode — shows all eight pipeline stages"
+              : "Switch to Overview mode — shows three plain-English groups")
+    }
+
+    // MARK: - Simplified Layout
+
+    private var simplifiedLayout: some View {
+        VStack(spacing: 0) {
+            PipelineSimplifiedView(
+                selectedStage: Binding(
+                    get: { viewModel.selectedStage },
+                    set: { viewModel.selectedStage = $0 }
+                ),
+                selectedGroup: $selectedGroup,
+                viewModel: viewModel
             )
 
             Divider()
 
-            // Scrollable stage sections
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(stages) { stage in
-                            stageSection(for: stage)
-                                .id(stage)
+            // When a constituent stage is selected via the mini-diagram,
+            // show its full detail in a zoomed view.
+            if viewModel.selectedStage != nil {
+                PipelineZoomedView(
+                    selectedStage: Binding(
+                        get: { viewModel.selectedStage },
+                        set: { viewModel.selectedStage = $0 }
+                    ),
+                    viewModel: viewModel,
+                    namespace: diagramNamespace,
+                    onNavigate: { target in
+                        navigationTarget = target
+                    }
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.selectedStage)
+    }
+
+    // MARK: - Advanced Layout
+
+    private var advancedLayout: some View {
+        VStack(spacing: 0) {
+            if viewModel.selectedStage != nil {
+                // Zoomed mode: breadcrumb + detail
+                PipelineZoomedView(
+                    selectedStage: Binding(
+                        get: { viewModel.selectedStage },
+                        set: { viewModel.selectedStage = $0 }
+                    ),
+                    viewModel: viewModel,
+                    namespace: diagramNamespace,
+                    onNavigate: { target in
+                        navigationTarget = target
+                    }
+                )
+                .transition(.opacity)
+            } else {
+                // Overview mode: diagram + scrollable sections
+                PipelineDiagramView(
+                    selectedStage: Binding(
+                        get: { viewModel.selectedStage },
+                        set: { viewModel.selectedStage = $0 }
+                    ),
+                    viewModel: viewModel,
+                    namespace: diagramNamespace,
+                    onStageSelected: { stage in
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            viewModel.selectedStage = stage
                         }
                     }
-                    .padding(16)
-                }
-                .onChange(of: scrollTarget) { _, target in
-                    guard let target else { return }
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        proxy.scrollTo(target, anchor: .top)
+                )
+                .transition(.opacity)
+
+                Divider()
+
+                // Scrollable stage sections
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            ForEach(stages) { stage in
+                                stageSection(for: stage)
+                                    .id(stage)
+                            }
+                        }
+                        .padding(16)
                     }
-                    scrollTarget = nil
-                }
-                .onChange(of: navigationTarget) { _, target in
-                    guard let target else { return }
-                    handleNavigation(target, proxy: proxy)
-                    navigationTarget = nil
+                    .onChange(of: scrollTarget) { _, target in
+                        guard let target else { return }
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(target, anchor: .top)
+                        }
+                        scrollTarget = nil
+                    }
+                    .onChange(of: navigationTarget) { _, target in
+                        guard let target else { return }
+                        handleNavigation(target, proxy: proxy)
+                        navigationTarget = nil
+                    }
                 }
             }
         }
-        .navigationTitle("Pipeline")
-        .onAppear {
-            viewModel.bind(to: pipeline)
-        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.selectedStage)
     }
-
-    @State private var scrollTarget: PipelineStage?
 
     // MARK: - Stage Section
 
@@ -127,7 +264,7 @@ struct TreePipelineView: View {
         HStack(spacing: 8) {
             Image(systemName: stage.icon)
                 .font(.title3)
-                .foregroundStyle(selectedStage == stage ? Color.accentColor : .secondary)
+                .foregroundStyle(viewModel.selectedStage == stage ? Color.accentColor : .secondary)
                 .frame(width: 24)
 
             Text(stage.title)
@@ -139,7 +276,7 @@ struct TreePipelineView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            selectedStage = stage
+            viewModel.selectedStage = stage
         }
     }
 
@@ -165,7 +302,7 @@ struct TreePipelineView: View {
         }
     }
 
-    /// Content for each stage. Stages 1–3 are live; others are placeholders.
+    /// Content for each stage.
     @ViewBuilder
     private func stageContent(for stage: PipelineStage) -> some View {
         switch stage {
@@ -204,21 +341,6 @@ struct TreePipelineView: View {
         }
     }
 
-    @ViewBuilder
-    private func stagePlaceholder(stage: PipelineStage, number: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Stage \(number): \(stage.title)")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-
-            Text("Detail view will be implemented in a future packet.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 4)
-    }
-
     // MARK: - Cross-Stage Navigation
 
     /// Handles a cross-stage navigation request by expanding the target stage,
@@ -230,7 +352,7 @@ struct TreePipelineView: View {
         setCollapsed(false, for: targetStage)
 
         // 2. Update strip selection
-        selectedStage = targetStage
+        viewModel.selectedStage = targetStage
 
         // 3. First scroll to the stage section, then to the specific anchor
         withAnimation(.easeInOut(duration: 0.3)) {

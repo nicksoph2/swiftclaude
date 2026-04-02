@@ -14,6 +14,7 @@ struct UserScopeView: View {
 
                 globalRootCard
                 precedenceReminderCard
+                ScopeContributionSummaryView(targetScope: .user)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)

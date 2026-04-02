@@ -20,11 +20,14 @@ struct TreeToolExecutionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .toolExecution)
+
             if viewModel.gates.isEmpty {
                 noDataPlaceholder
             } else {
                 teachingCallout
                 gateFlowchart
+                permissionWalkthrough
             }
         }
         .onAppear {
@@ -83,6 +86,16 @@ struct TreeToolExecutionView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Permission Evaluation Walkthrough
+
+    private var permissionWalkthrough: some View {
+        PermissionEvaluationWalkthroughView(
+            actualDenyRules: viewModel.denyRules.map(\.pattern),
+            actualAskRules: viewModel.askRules.map(\.pattern),
+            actualAllowRules: viewModel.allowRules.map(\.pattern)
+        )
     }
 
     // MARK: - Gate Card

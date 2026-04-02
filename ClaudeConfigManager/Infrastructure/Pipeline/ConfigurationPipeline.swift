@@ -124,8 +124,8 @@ final class ConfigurationPipeline: ObservableObject {
         let projection = SessionProjectionBuilder().build(from: builderInput)
         self.projection = projection
 
-        // Phase 6: Semantic validation
-        let semanticValidator = SemanticValidator()
+        // Phase 6: Semantic validation (rule-based from resolver)
+        let ruleBasedValidator = SemanticValidator()
         let semanticContext = SemanticValidationContext(
             settings: settingsSnapshot,
             instructions: instructionSnapshot,
@@ -134,8 +134,13 @@ final class ConfigurationPipeline: ObservableObject {
             skills: skillSnapshot,
             existingIssues: []
         )
-        let semanticResult = semanticValidator.validate(context: semanticContext)
-        self.semanticIssues = semanticResult.issues
+        let ruleBasedResult = ruleBasedValidator.validate(context: semanticContext)
+
+        // Phase 6b: Projection-level semantic validation (cross-key/cross-scope checks)
+        let projectionValidator = SemanticProjectionValidator()
+        let projectionIssues = projectionValidator.validate(projection)
+
+        self.semanticIssues = ruleBasedResult.issues + projectionIssues
 
         pipelineState = .completed
         logger.info("Pipeline completed successfully")
@@ -621,5 +626,189 @@ final class ConfigurationPipeline: ObservableObject {
         default:
             return .user
         }
+    }
+}
+
+// MARK: - In-Memory Preview (Packet 19)
+
+extension ConfigurationPipeline {
+
+    /// Run the full resolution pipeline in memory with `change` applied at `scope`,
+    /// without touching any files on disk. Returns the projected outcome.
+    func preview(
+        change: SettingsChange,
+        at scope: ResolutionScope,
+        fileURL: URL
+    ) async -> PreviewResult {
+        let fileManager = FileManager.default
+
+        // Step 1: Read the target file. If not yet created, treat as empty object.
+        let fileContent: String
+        if fileManager.fileExists(atPath: fileURL.path) {
+            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                return PreviewResult(
+                    proposedProjection: projection ?? SessionProjection(),
+                    affectedKeys: [],
+                    targetFilePreview: "",
+                    error: .fileNotReadable(fileURL)
+                )
+            }
+            fileContent = content
+        } else {
+            fileContent = "{}"
+        }
+
+        // Step 2: Parse the file content.
+        guard let contentData = fileContent.data(using: .utf8) else {
+            return PreviewResult(
+                proposedProjection: projection ?? SessionProjection(),
+                affectedKeys: [],
+                targetFilePreview: "",
+                error: .parseFailure(fileURL, [])
+            )
+        }
+        let parseResult = settingsParser.parse(data: contentData, sourceURL: fileURL, scope: scope)
+        guard let document = parseResult.value else {
+            return PreviewResult(
+                proposedProjection: projection ?? SessionProjection(),
+                affectedKeys: [],
+                targetFilePreview: "",
+                error: .parseFailure(fileURL, parseResult.issues)
+            )
+        }
+
+        // Step 3: Apply the change in memory.
+        let mutator = JSONKeyPathMutator()
+        let modifiedRoot: JSONValue
+        do {
+            modifiedRoot = try mutator.apply(change, to: .object(document.rawTopLevelObject))
+        } catch {
+            return PreviewResult(
+                proposedProjection: projection ?? SessionProjection(),
+                affectedKeys: [],
+                targetFilePreview: "",
+                error: .writeFailed(fileURL, error)
+            )
+        }
+
+        // Step 4: Validate the modified document.
+        let validator = SettingsValidator()
+        let modifiedDocument = ParsedSettingsDocument(
+            source: document.source,
+            value: document.value,
+            rawTopLevelObject: modifiedRoot.objectValue ?? [:],
+            unsupportedTopLevelKeys: document.unsupportedTopLevelKeys
+        )
+        let validationIssues = validator.validate(modifiedDocument, at: scope)
+        let validationErrors = validationIssues.filter { $0.severity == .error }
+        if !validationErrors.isEmpty {
+            return PreviewResult(
+                proposedProjection: projection ?? SessionProjection(),
+                affectedKeys: [],
+                targetFilePreview: "",
+                error: .schemaValidationFailed(validationErrors)
+            )
+        }
+
+        // Step 5: Serialize to canonical JSON for the file preview.
+        let targetFilePreview: String
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let serialized = try encoder.encode(modifiedRoot)
+            targetFilePreview = String(data: serialized, encoding: .utf8) ?? ""
+        } catch {
+            return PreviewResult(
+                proposedProjection: projection ?? SessionProjection(),
+                affectedKeys: [],
+                targetFilePreview: "",
+                error: .serializationFailed(error)
+            )
+        }
+
+        // Step 6: Build a modified parse results list with the proposed change applied.
+        var modifiedParseResults = parseResults
+        if let idx = modifiedParseResults.firstIndex(where: { $0.sourceFile == fileURL }) {
+            let existing = modifiedParseResults[idx]
+            modifiedParseResults[idx] = ParseResultRecord(
+                id: existing.id,
+                sourceFile: existing.sourceFile,
+                scope: scope,
+                fileType: existing.fileType,
+                parseIssues: [],
+                rawContent: modifiedRoot,
+                rawTextContent: nil,
+                parsedSettings: modifiedDocument
+            )
+        } else {
+            modifiedParseResults.append(ParseResultRecord(
+                id: UUID().uuidString,
+                sourceFile: fileURL,
+                scope: scope,
+                fileType: .settings,
+                parseIssues: [],
+                rawContent: modifiedRoot,
+                rawTextContent: nil,
+                parsedSettings: modifiedDocument
+            ))
+        }
+
+        // Step 7: Re-run the resolvers in memory on the modified inputs.
+        let (settings, mcp, agents, skills, instructions) = buildResolverInputs(modifiedParseResults)
+        let (settingsSnapshot, _, mcpSnapshot, agentSnapshot, skillSnapshot, instructionSnapshot) =
+            runResolvers(settings: settings, mcp: mcp, agents: agents, skills: skills, instructions: instructions)
+
+        let builderInput = SessionProjectionBuilder.Input(
+            settings: settingsSnapshot,
+            instructions: instructionSnapshot,
+            mcp: mcpSnapshot,
+            agents: agentSnapshot,
+            skills: skillSnapshot,
+            validationIssues: [],
+            notes: []
+        )
+        let proposedProjection = SessionProjectionBuilder().build(from: builderInput)
+
+        // Step 8: Compute the key deltas between the current and proposed projections.
+        let affectedKeys = computeKeyDeltas(from: projection, to: proposedProjection)
+
+        return PreviewResult(
+            proposedProjection: proposedProjection,
+            affectedKeys: affectedKeys,
+            targetFilePreview: targetFilePreview,
+            error: nil
+        )
+    }
+
+    // MARK: - Private helpers
+
+    private func computeKeyDeltas(
+        from current: SessionProjection?,
+        to proposed: SessionProjection
+    ) -> [KeyDelta] {
+        let currentEntries = current?.settings?.entries ?? []
+        let proposedEntries = proposed.settings?.entries ?? []
+
+        let currentMap = Dictionary(uniqueKeysWithValues: currentEntries.map { ($0.keyPath, $0) })
+        let proposedMap = Dictionary(uniqueKeysWithValues: proposedEntries.map { ($0.keyPath, $0) })
+
+        var deltas: [KeyDelta] = []
+        let allKeys = Set(currentMap.keys).union(Set(proposedMap.keys))
+
+        for key in allKeys {
+            let before = currentMap[key]?.value.effectiveValue
+            let after = proposedMap[key]?.value.effectiveValue
+
+            if before != after {
+                let winningScope = proposedMap[key]?.value.winningSource?.scope ?? scope(for: proposed, key: key)
+                deltas.append(KeyDelta(keyPath: key, before: before, after: after, winningScope: winningScope))
+            }
+        }
+
+        return deltas.sorted { $0.keyPath < $1.keyPath }
+    }
+
+    private func scope(for projection: SessionProjection, key: String) -> ResolutionScope {
+        projection.settings?.entries.first(where: { $0.keyPath == key })?.value.winningSource?.scope ?? .user
     }
 }

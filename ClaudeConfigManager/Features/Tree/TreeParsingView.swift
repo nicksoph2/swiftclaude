@@ -20,6 +20,8 @@ struct TreeParsingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            StageExplanationView(stage: .parsing)
+
             if viewModel.fileSummaries.isEmpty {
                 noDataPlaceholder
             } else {
